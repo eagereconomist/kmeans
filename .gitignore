@@ -80,8 +80,13 @@ instance/
 # Scrapy stuff:
 .scrapy
 
+<<<<<<< HEAD
 # MkDocs documentation
 docs/site/
+=======
+# Sphinx documentation
+docs/_build/
+>>>>>>> 8acb71d53967d35cbb0292ebc43b6a072f898b8a
 
 # PyBuilder
 .pybuilder/
@@ -183,4 +188,8 @@ cython_debug/
 .ruff_cache/
 
 # PyPI configuration file
+<<<<<<< HEAD
 .pypirc
+=======
+.pypirc
+>>>>>>> 8acb71d53967d35cbb0292ebc43b6a072f898b8a
