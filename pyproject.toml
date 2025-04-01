@@ -1,0 +1,32 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "tennis_racquet_analysis"
+version = "0.0.1"
+description = "Quantitative Analysis and Segmentation of Tennis Racquet Data Using K-means Clustering and Dendrogram-based Discriminant Analysis in Python."
+authors = [
+  { name = "eagereconomist" },
+]
+license = { file = "LICENSE" }
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License"
+]
+requires-python = "~=3.13.0"
+
+
+[tool.ruff]
+line-length = 99
+src = ["tennis_racquet_analysis"]
+include = ["pyproject.toml", "tennis_racquet_analysis/**/*.py"]
+
+[tool.ruff.lint]
+extend-select = ["I"]  # Add import sorting
+
+[tool.ruff.lint.isort]
+known-first-party = ["tennis_racquet_analysis"]
+force-sort-within-sections = true
+
