@@ -7,7 +7,7 @@ from sklearn.cluster import KMeans
 from scipy.cluster.hierarchy import dendrogram
 from sklearn.cluster import AgglomerativeClustering
 
-# Build the relative path to your CSV file
+# Build the relative path to CSV file
 data_path = os.path.join('data', 'raw', 'tennis-racquets.csv')
 print("Looking for file at:", data_path)
 
@@ -15,6 +15,7 @@ print("Looking for file at:", data_path)
 if os.path.exists(data_path):
     df = pd.read_csv(data_path)
     print("Data loaded successfully!")
-    print(df.head())
+    print(df.head(10))
 else:
     print("File not found. Please check your path:", data_path)
+
