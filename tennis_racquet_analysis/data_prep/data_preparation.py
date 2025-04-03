@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from scipy.cluster.hierarchy import dendrogram
 from sklearn.preprocessing import normalize
-from sklearn.preprocessing import normalize
 from sklearn.cluster import AgglomerativeClustering
 
 # Build the relative path to CSV file
