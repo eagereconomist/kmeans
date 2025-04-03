@@ -2,7 +2,7 @@
 
 ## Description
 
-Quantitative Analysis and Segmentation of Tennis Racquet Data Using K-means Clustering and Dendrogram-based Discriminant Analysis in Python.
+Quantitative Analysis and Segmentation of Tennis Racquet Data Using K-means and Hierarchical Clustering Methods in Python.
 
 ## Commands
 

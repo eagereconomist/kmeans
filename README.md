@@ -4,7 +4,7 @@
     <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
 </a>
 
-Quantitative Analysis and Segmentation of Tennis Racquet Data Using K-means Clustering and Dendrogram-based Discriminant Analysis in Python.
+Quantitative Analysis and Segmentation of Tennis Racquet Data Using K-means and Hierarchical Clustering Methods in Python.
 
 ## Project Organization
 
