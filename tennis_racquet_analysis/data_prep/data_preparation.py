@@ -31,7 +31,7 @@ print(df)
 df_preprocessed = df.copy()
 
 # Index by 'Racquet'
-df_preprocessed.set_index('Racquet', inplace=True)
+index_racquet = df_preprocessed.set_index('Racquet')
 print(df_preprocessed.head(10))
 
 # rename 'static.weight' column
