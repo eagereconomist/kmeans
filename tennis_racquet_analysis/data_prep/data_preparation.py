@@ -9,7 +9,7 @@ from sklearn.preprocessing import normalize
 from sklearn.cluster import AgglomerativeClustering
 
 # Build the relative path to CSV file
-data_path = os.path.join("tennis-racquet-analysis", "data", "raw", "tennis-racquets.csv")
+data_path = os.path.join("data", "raw", "tennis-racquets.csv")
 print("Looking for file at:", data_path)
 
 # Check if the file exists before trying to load it
