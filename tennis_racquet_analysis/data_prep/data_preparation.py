@@ -44,4 +44,4 @@ df_preprocessed["headsize_sq"] = df_preprocessed["headsize"] ** 2
 df_preprocessed["swingweight_sq"] = df_preprocessed["swingweight"] ** 2
 
 # Check the shape of the data frames
-print(df_preprocessed.shape, df_normalized.shape)
+print(df_preprocessed.shape, df.shape)
