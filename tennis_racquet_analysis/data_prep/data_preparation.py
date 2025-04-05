@@ -45,3 +45,12 @@ df_preprocessed["swingweight_sq"] = df_preprocessed["swingweight"] ** 2
 
 # Check the shape of the data frames
 print(df_preprocessed.shape, df.shape)
+
+
+def write_csv(dataframe, subfolder, file_label):
+    file_path = os.path.join("data", subfolder, f"tennis_racquet_{file_label}.csv")
+    dataframe.to_csv(file_path, index=False)
+    print(f"csv written to {file_path}")
+
+
+# write_csv(df_preprocessed, "interim", "preprocessed")
