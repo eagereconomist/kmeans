@@ -51,5 +51,4 @@ def write_csv(dataframe, subfolder, file_label):
     print(f"csv written to {file_path}")
 
 
-# write_csv(df_preprocessed, "interim", "preprocessed")
-write_csv(preprocessed_data, "interim", "processed")
+# write_csv(preprocessed_data, "interim", "preprocessed")
