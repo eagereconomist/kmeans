@@ -1,16 +1,16 @@
-from module import load_data, drop_column, rename_column, squared, write_csv
+import module
 
 
 def main():
     """Load the raw data and run through preprocess pipeline"""
-    df = load_data()
+    df = module.load_data()
 
     preprocessed_data = (
-        df.pipe(drop_column, "Racquet")
-        .pipe(rename_column, "static.weight")
-        .pipe(squared, "headsize")
-        .pipe(squared, "swingweight")
-        .pipe(write_csv, "interim", "preprocessed")
+        df.pipe(module.drop_column, "Racquet")
+        .pipe(module.rename_column, "static.weight")
+        .pipe(module.squared, "headsize")
+        .pipe(module.squared, "swingweight")
+        .pipe(module.write_csv, "interim", "preprocessed")
     )
     print("Data preprocessing complete")
 
