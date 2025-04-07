@@ -3,7 +3,7 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import normalize
+from sklearn import preprocessing
 
 # Build the relative path to CSV file
 data_path = os.path.join("data", "raw", "tennis_racquets.csv")
@@ -37,18 +37,16 @@ def squared(dataframe, column) -> int:
     return dataframe
 
 
+def write_csv(dataframe, subfolder, file_label):
+    file_path = os.path.join("data", subfolder, f"tennis_racquet_{file_label}.csv")
+    dataframe.to_csv(file_path, index=False)
+    return dataframe
+
+
 preprocessed_data = (
     df.pipe(drop_column, "Racquet")
     .pipe(rename_column, "static.weight")
     .pipe(squared, "headsize")
     .pipe(squared, "swingweight")
+    .pipe(write_csv, "interim", "preprocessed")
 )
-
-
-def write_csv(dataframe, subfolder, file_label):
-    file_path = os.path.join("data", subfolder, f"tennis_racquet_{file_label}.csv")
-    dataframe.to_csv(file_path, index=False)
-    print(f"csv written to {file_path}")
-
-
-# write_csv(preprocessed_data, "interim", "preprocessed")
