@@ -5,7 +5,7 @@ def main():
     """Load the raw data and run through preprocess pipeline"""
     df = module.load_data()
 
-    preprocessed_data = (
+    module.preprocessed_data = (
         df.pipe(module.drop_column, "Racquet")
         .pipe(module.rename_column, "static.weight")
         .pipe(module.squared, "headsize")
