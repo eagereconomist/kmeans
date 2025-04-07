@@ -22,29 +22,27 @@ with open(data_path) as lines:
     for _ in range(10):
         print(next(lines))
 
-print(df)
 
-# Create deep copy of the data frame
-df_preprocessed = df.copy()
+def drop_column(dataframe, column):
+    return dataframe.drop(columns=[column])
 
-# Index by 'Racquet'
-index_racquet = df_preprocessed.set_index("Racquet")
-print(index_racquet.head(10))
 
-# Drop 'Racquet' column
-df_preprocessed = df_preprocessed.drop(columns=["Racquet"])
+def rename_column(dataframe, column):
+    new_column = column.replace(".", "")
+    return dataframe.rename(columns={column: new_column})
 
-# rename 'static.weight' column
-df_preprocessed = df_preprocessed.rename(columns={"static.weight": "staticweight"})
 
-# Add non-linear version of 'headsize'
-df_preprocessed["headsize_sq"] = df_preprocessed["headsize"] ** 2
+def squared(dataframe, column) -> int:
+    dataframe[f"{column}_sq"] = dataframe[column] ** 2
+    return dataframe
 
-# Add non-linear version of 'swingweight'
-df_preprocessed["swingweight_sq"] = df_preprocessed["swingweight"] ** 2
 
-# Check the shape of the data frames
-print(df_preprocessed.shape, df.shape)
+preprocessed_data = (
+    df.pipe(drop_column, "Racquet")
+    .pipe(rename_column, "static.weight")
+    .pipe(squared, "headsize")
+    .pipe(squared, "swingweight")
+)
 
 
 def write_csv(dataframe, subfolder, file_label):
@@ -54,3 +52,4 @@ def write_csv(dataframe, subfolder, file_label):
 
 
 # write_csv(df_preprocessed, "interim", "preprocessed")
+write_csv(preprocessed_data, "interim", "processed")
