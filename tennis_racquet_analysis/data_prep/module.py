@@ -64,6 +64,6 @@ def log_transform(dataframe):
 
 
 def yeo_johnson(dataframe):
-    scaler = preprocessing.PowerTransformer(method="yeo_johnson", standardize=True)
+    scaler = preprocessing.PowerTransformer(method="yeo-johnson", standardize=True)
     scaled = scaler.fit_transform(dataframe)
     return pd.DataFrame(scaled, columns=dataframe.columns)
