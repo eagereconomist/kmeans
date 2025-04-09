@@ -38,6 +38,15 @@ def main():
 
     print("Data processing complete!")
 
+    # Return a dictionary of the processed DataFrames
+    return {
+        "normalized": normalized_data,
+        "standardized": standardized_data,
+        "minmax": minmax_data,
+        "log_scale": log_scale_data,
+        "yeo_johnson": yeo_johnson_data,
+    }
+
 
 if __name__ == "__main__":
     main()
