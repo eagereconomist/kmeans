@@ -13,7 +13,7 @@ def main():
         .pipe(module.squared, "swingweight")
         .pipe(module.write_csv, "interim", "preprocessed")
     )
-    print("Data preprocessing complete")
+    print("Data preprocessing complete!")
 
     # Data Processing Pipelines using various scalers
     normalized_data = preprocessed_data.pipe(module.apply_normalizer).pipe(
@@ -35,6 +35,8 @@ def main():
     yeo_johnson_data = preprocessed_data.pipe(module.yeo_johnson).pipe(
         module.write_csv, "processed", "yeo_johnson"
     )
+
+    print("Data processing complete!")
 
 
 if __name__ == "__main__":
