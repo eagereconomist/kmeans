@@ -51,6 +51,7 @@ def main(
         cleaning_steps, total=len(cleaning_steps), desc="Data Preprocessing Steps:"
     ):
         logger.info(f"Applying {step_name}...")
+        df = func(df, **kwargs)
 
     df.to_csv(output_path, index=False)
     logger.success(f"Dataset saved to {output_path}")
