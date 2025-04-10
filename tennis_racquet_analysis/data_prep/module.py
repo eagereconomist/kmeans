@@ -33,7 +33,7 @@ def squared(dataframe, column):
 
 
 def write_csv(dataframe, subfolder, file_label):
-    file_path = os.path.join("data", subfolder, f"tennis_racquet_{file_label}.csv")
+    file_path = os.path.join("data", subfolder, f"tennis_racquets_{file_label}.csv")
     dataframe.to_csv(file_path, index=False)
     print(f"csv written to {file_path}")
     return dataframe
