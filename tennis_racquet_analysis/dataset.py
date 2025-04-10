@@ -37,7 +37,7 @@ def main(
     input_path: Path = RAW_DATA_DIR / "tennis_racquets.csv", file_label: str = "preprocessed"
 ):
     output_path: Path = INTERIM_DATA_DIR / f"tennis_racquets_{file_label}.csv"
-    logger.info("Processing dataset...")
+    logger.info("Processing raw dataset...")
     df = load_data(input_path)
 
     # Each tuple consists of: (Step name, Function, **kwargs as a dictionary)
