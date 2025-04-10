@@ -50,7 +50,7 @@ def main(
 
     # Iterate over each cleaning step with a progress bar.
     for step_name, func, kwargs in tqdm(
-        cleaning_steps, total=len(cleaning_steps), desc="Cleaning steps"
+        cleaning_steps, total=len(cleaning_steps), desc="Data Preprocessing Steps:"
     ):
         logger.info(f"Applying {step_name}...")
         df = func(df, **kwargs)  # Apply the function with its parameters and update the DataFrame
