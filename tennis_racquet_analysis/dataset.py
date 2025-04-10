@@ -40,7 +40,6 @@ def main(
     logger.info("Processing raw dataset...")
     df = load_data(input_path)
 
-    # Each tuple consists of: (Step name, Function, **kwargs as a dictionary)
     cleaning_steps = [
         ("drop_column", drop_column, {"column": "Racquet"}),
         ("rename_column", rename_column, {"column": "static.weight"}),
@@ -48,14 +47,11 @@ def main(
         ("squared swingweight", squared, {"column": "swingweight"}),
     ]
 
-    # Iterate over each cleaning step with a progress bar.
     for step_name, func, kwargs in tqdm(
         cleaning_steps, total=len(cleaning_steps), desc="Data Preprocessing Steps:"
     ):
         logger.info(f"Applying {step_name}...")
-        df = func(df, **kwargs)  # Apply the function with its parameters and update the DataFrame
 
-    # After all cleaning steps are applied, save the processed dataset.
     df.to_csv(output_path, index=False)
     logger.success(f"Dataset saved to {output_path}")
 
