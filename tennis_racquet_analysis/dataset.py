@@ -3,17 +3,12 @@ from loguru import logger
 from tqdm import tqdm
 import typer
 import pandas as pd
-import os
-
-from tennis_racquet_analysis.config import INTERIM_DATA_DIR, RAW_DATA_DIR
+from tennis_racquet_analysis.config import RAW_DATA_DIR, INTERIM_DATA_DIR
 
 app = typer.Typer()
 
 
 def load_data(input_path: Path) -> pd.DataFrame:
-    """
-    Loads the raw tennis racquet data from the provided input path.
-    """
     logger.info(f"Looking for file at: {input_path}")
     if input_path.exists():
         df = pd.read_csv(input_path)
@@ -23,27 +18,44 @@ def load_data(input_path: Path) -> pd.DataFrame:
         raise FileNotFoundError(f"File not found. Please check your path: {input_path}")
 
 
+def drop_column(dataframe, column):
+    return dataframe.drop(columns=[column])
+
+
+def rename_column(dataframe, column):
+    new_column = column.replace(".", "")
+    return dataframe.rename(columns={column: new_column})
+
+
+def squared(dataframe, column):
+    dataframe[f"{column}_sq"] = dataframe[column] ** 2
+    return dataframe
+
+
 @app.command()
 def main(
     input_path: Path = RAW_DATA_DIR / "tennis_racquets.csv", file_label: str = "preprocessed"
 ):
-    """
-    Processes the dataset by loading it from the input path and saving it to a dynamically generated output path.
-    """
-    # Construct the output path based on the file_label parameter
     output_path: Path = INTERIM_DATA_DIR / f"tennis_racquets_{file_label}.csv"
-
     logger.info("Processing dataset...")
-
-    # Use the parameterized load_data function to load data from input_path
     df = load_data(input_path)
 
-    # Simulate processing steps; replace this block with actual cleaning/transformation logic.
-    for i in tqdm(range(10), total=10):
-        if i == 5:
-            logger.info("Something happened for iteration 5.")
+    # Each tuple consists of: (Step name, Function, **kwargs as a dictionary)
+    cleaning_steps = [
+        ("drop_column", drop_column, {"column": "Racquet"}),
+        ("rename_column", rename_column, {"column": "static.weight"}),
+        ("squared headsize", squared, {"column": "headsize"}),
+        ("squared swingweight", squared, {"column": "swingweight"}),
+    ]
 
-    # Save the (processed) DataFrame to the output path.
+    # Iterate over each cleaning step with a progress bar.
+    for step_name, func, kwargs in tqdm(
+        cleaning_steps, total=len(cleaning_steps), desc="Cleaning steps"
+    ):
+        logger.info(f"Applying {step_name}...")
+        df = func(df, **kwargs)  # Apply the function with its parameters and update the DataFrame
+
+    # After all cleaning steps are applied, save the processed dataset.
     df.to_csv(output_path, index=False)
     logger.success(f"Dataset saved to {output_path}")
 
