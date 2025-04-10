@@ -5,7 +5,7 @@ import typer
 import pandas as pd
 import os
 
-from tennis_racquet_analysis.config import PROCESSED_DATA_DIR, RAW_DATA_DIR
+from tennis_racquet_analysis.config import INTERIM_DATA_DIR, RAW_DATA_DIR
 
 app = typer.Typer()
 
@@ -31,7 +31,7 @@ def main(
     Processes the dataset by loading it from the input path and saving it to a dynamically generated output path.
     """
     # Construct the output path based on the file_label parameter
-    output_path: Path = PROCESSED_DATA_DIR / f"tennis_racquets_{file_label}.csv"
+    output_path: Path = INTERIM_DATA_DIR / f"tennis_racquets_{file_label}.csv"
 
     logger.info("Processing dataset...")
 
