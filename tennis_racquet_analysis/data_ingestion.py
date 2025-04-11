@@ -11,7 +11,7 @@ app = typer.Typer()
 
 @app.command()
 def main(input_path: Path = RAW_DATA_DIR / "tennis_racquets.csv"):
-    logger.info("Loading raw dataset")
+    logger.info("Loading raw dataset...")
     df = load_data(input_path)
     logger.info(f"Type of loaded data: {type(df)}")
     logger.info(f"Data shape: {df.shape}")
