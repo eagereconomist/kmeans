@@ -1,28 +1,42 @@
 from pathlib import Path
-
 from loguru import logger
 from tqdm import tqdm
 import typer
+import pandas as pd
 
-from tennis_racquet_analysis.config import PROCESSED_DATA_DIR
+from tennis_racquet_analysis.config import INTERIM_DATA_DIR, PROCESSED_DATA_DIR
+from tennis_racquet_analysis.preprocessing_utils import load_data
+
+
+def squared(dataframe, column):
+    dataframe[f"{column}_sq"] = dataframe[column] ** 2
+    return dataframe
+
 
 app = typer.Typer()
 
 
 @app.command()
 def main(
-    # ---- REPLACE DEFAULT PATHS AS APPROPRIATE ----
-    input_path: Path = PROCESSED_DATA_DIR / "dataset.csv",
-    output_path: Path = PROCESSED_DATA_DIR / "features.csv",
-    # -----------------------------------------
+    input_path: Path = INTERIM_DATA_DIR / "tennis_racquets_preprocessed.csv",
+    file_label: str = "features",
 ):
-    # ---- REPLACE THIS WITH YOUR OWN CODE ----
-    logger.info("Generating features from dataset...")
-    for i in tqdm(range(10), total=10):
-        if i == 5:
-            logger.info("Something happened for iteration 5.")
-    logger.success("Features generation complete.")
-    # -----------------------------------------
+    output_path: Path = INTERIM_DATA_DIR / f"tennis_racquets_{file_label}.csv"
+    logger.info("Loading preprocessed dataset...")
+    df = load_data(input_path)
+    feature_steps = [
+        ("squared headsize", squared, {"column": "headsize"}),
+        ("squared swingweight", squared, {"column": "swingweight"}),
+    ]
+
+    for step_name, func, kwargs in tqdm(
+        feature_steps, total=len(feature_steps), desc="Feature Engineering Steps"
+    ):
+        logger.info(f"Applying {step_name}...")
+        df = func(df, **kwargs)
+
+    df.to_csv(output_path, index=False)
+    logger.success(f"Feature-engineered dataset saved to {output_path}")
 
 
 if __name__ == "__main__":
