@@ -4,6 +4,7 @@ from sklearn import preprocessing
 from sklearn.preprocessing import Normalizer, StandardScaler, MinMaxScaler
 from sklearn.preprocessing import FunctionTransformer
 from tennis_racquet_analysis.config import PROCESSED_DATA_DIR
+from tennis_racquet_analysis.preprocessing_utils import load_data  # noqa: F401
 
 
 def write_csv(dataframe, subfolder, file_label):
