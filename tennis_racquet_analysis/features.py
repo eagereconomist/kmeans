@@ -3,13 +3,7 @@ from loguru import logger
 from tqdm import tqdm
 import typer
 from tennis_racquet_analysis.config import INTERIM_DATA_DIR
-from tennis_racquet_analysis.preprocessing_utils import load_data
-
-
-def squared(dataframe, column):
-    dataframe[f"{column}_sq"] = dataframe[column] ** 2
-    return dataframe
-
+from tennis_racquet_analysis.preprocessing_utils import load_data, squared
 
 app = typer.Typer()
 

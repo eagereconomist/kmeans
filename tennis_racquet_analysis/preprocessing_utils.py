@@ -20,8 +20,3 @@ def drop_column(dataframe, column):
 def rename_column(dataframe, column):
     new_column = column.replace(".", "")
     return dataframe.rename(columns={column: new_column})
-
-
-def squared(dataframe, column):
-    dataframe[f"{column}_sq"] = dataframe[column] ** 2
-    return dataframe
