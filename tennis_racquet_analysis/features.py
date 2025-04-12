@@ -3,7 +3,8 @@ from loguru import logger
 from tqdm import tqdm
 import typer
 from tennis_racquet_analysis.config import INTERIM_DATA_DIR
-from tennis_racquet_analysis.preprocessing_utils import load_data, squared
+from tennis_racquet_analysis.preprocessing_utils import load_data
+from tennis_racquet_analysis.features_utils import squared
 
 app = typer.Typer()
 
