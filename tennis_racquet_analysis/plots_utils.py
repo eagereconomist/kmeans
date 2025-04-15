@@ -3,7 +3,7 @@ from tennis_racquet_analysis.config import FIGURES_DIR, INTERIM_DATA_DIR, PROCES
 import matplotlib.pyplot as plt
 
 
-def histogram(dir_label: str, file_label: str, output_path: str, x_axis: str, num_bins: int = 30):
+def histogram(dir_label: str, file_label: str, output_path: str, x_axis: str, num_bins: int):
     file_path = INTERIM_DATA_DIR / f"tennis_racquets_{file_label}.csv"
     output_path = FIGURES_DIR / f"{x_axis}_{file_label}_histogram"
     df = pd.read_csv(file_path)
