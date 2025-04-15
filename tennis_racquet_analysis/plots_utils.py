@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 def histogram(dir_label: str, file_label: str, output_path: str, x_axis: str, num_bins: int = 30):
     file_path = INTERIM_DATA_DIR / f"tennis_racquets_{file_label}.csv"
-    full_output_path = FIGURES_DIR / output_path
+    output_path = FIGURES_DIR
     df = pd.read_csv(file_path)
     if x_axis not in df.columns:
         raise ValueError(f"Column '{x_axis}' not found in the file: {file_path}")
@@ -14,4 +14,4 @@ def histogram(dir_label: str, file_label: str, output_path: str, x_axis: str, nu
     ax.set_xlabel(x_axis.capitalize())
     ax.set_ylabel("Frequency")
     ax.set_title(f"Tennis Racquet {x_axis.capitalize()} from {file_label.capitalize()} Data")
-    fig.savefig(full_output_path)
+    fig.savefig(output_path)
