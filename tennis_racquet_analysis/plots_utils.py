@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from tennis_racquet_analysis.config import INTERIM_DATA_DIR, PROCESSED_DATA_DIR
-from tennis_racquet_analysis.preprocessing_utils import load_data  # noqa: F401
+from tennis_racquet_analysis.preprocessing_utils import load_data
 
 import matplotlib.pyplot as plt
 from itertools import groupby
@@ -16,5 +16,8 @@ colors = {
     "beamwidth": "orange",
 }
 
-plt.hist("tennis_racquets_preprocessed"[0], bins=None, color="red")
+plt.hist(load_data["length"], bins=30, color="blue", edgecolor="black")
+plt.xlabel("Length")
+plt.ylabel("Frequency")
+plt.title("Histogram of Tennis Racquet Length")
 plt.show()
