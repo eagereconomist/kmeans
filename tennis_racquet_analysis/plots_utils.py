@@ -16,7 +16,7 @@ colors = {
     "beamwidth": "orange",
 }
 
-plt.hist(load_data["length"], bins=30, color="blue", edgecolor="black")
+plt.hist(["length"], bins=30, color="blue", edgecolor="black")
 plt.xlabel("Length")
 plt.ylabel("Frequency")
 plt.title("Histogram of Tennis Racquet Length")
