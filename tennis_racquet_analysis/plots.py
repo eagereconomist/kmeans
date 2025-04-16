@@ -7,22 +7,23 @@ from tennis_racquet_analysis.plots_utils import histogram
 app = typer.Typer()
 
 
-@app.command()
-def main(
+@app.command("hist")
+def hist(
     dir_label: str,
     file_label: str,
     output_path: str,
     x_axis: str,
     num_bins: int,
 ):
-    logger.info(
-        f"Creating histogram for column '{x_axis}' using file tennis_racquets_{file_label}.csv in the '{dir_label}' directory."
-    )
-    progress_bar = tqdm(total=1, desc="Histogram Generation", ncols=80)
+    logger.info(f"Histogram: '{x_axis}' from {file_label} in directory '{dir_label}'.")
+    progress_bar = tqdm(total=3, desc="Histogram Steps", ncols=80)
+    progress_bar.set_description("Reading csv...")
     df = histogram(dir_label, file_label, output_path, x_axis, num_bins)
     progress_bar.update(1)
+    progress_bar.set_description("Plotting & Saving...")
+    progress_bar.update(2)
     progress_bar.close()
-    logger.success(f"Histogram for '{x_axis}' created and figure saved to {output_path}!")
+    logger.success(f"Saved histogram to {output_path}!")
     plt.show()
     return df
 
