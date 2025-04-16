@@ -1,6 +1,7 @@
 import typer
 import matplotlib.pyplot as plt
 from loguru import logger
+from tqdm import tqdm
 from tennis_racquet_analysis.plots_utils import histogram
 
 app = typer.Typer()
@@ -17,7 +18,10 @@ def main(
     logger.info(
         f"Creating histogram for column '{x_axis}' using file tennis_racquets_{file_label}.csv in the '{dir_label}' directory."
     )
+    progress_bar = tqdm(total=1, desc="Histogram Generation", ncols=80)
     df = histogram(dir_label, file_label, output_path, x_axis, num_bins)
+    progress_bar.update(1)
+    progress_bar.close()
     logger.success(f"Histogram for '{x_axis}' created and figure saved to {output_path}!")
     plt.show()
     return df

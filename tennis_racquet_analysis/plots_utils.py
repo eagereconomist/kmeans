@@ -15,3 +15,4 @@ def histogram(dir_label: str, file_label: str, output_path: str, x_axis: str, nu
     ax.set_ylabel("Frequency")
     ax.set_title(f"Tennis Racquet {x_axis.capitalize()} from {file_label.capitalize()} Data")
     fig.savefig(output_path)
+    return df
