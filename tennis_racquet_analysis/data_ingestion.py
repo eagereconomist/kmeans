@@ -1,7 +1,7 @@
 import typer
 from tqdm import tqdm
 from loguru import logger
-from tennis_racquet_analysis.config import DATA_DIR
+from tennis_racquet_analysis.config import RAW_DATA_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data
 
 app = typer.Typer()
@@ -9,7 +9,6 @@ app = typer.Typer()
 
 @app.command()
 def main(
-    dir_label: str,
     input_file: str,
     preview: bool = typer.Option(
         False, "--preview/--no-preview", help="Show first 5 rows of the loaded DataFrame."
@@ -17,7 +16,7 @@ def main(
 ):
     logger.info("Starting data ingestion pipeline...")
     pbar = tqdm(total=1, desc="Data Ingestion", ncols=100)
-    path = DATA_DIR / dir_label / input_file
+    path = RAW_DATA_DIR / input_file
     df = load_data(path)
     pbar.set_description("Finalizing Data Ingestion")
     pbar.update(1)
