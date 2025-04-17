@@ -18,14 +18,16 @@ def histogram(dir_label: str, file_label: str, output_path: str, x_axis: str, nu
     ax.hist(df[x_axis], bins=num_bins, color="blue", edgecolor="black")
     ax.set_xlabel(x_axis.capitalize())
     ax.set_ylabel("Frequency")
-    ax.set_title(f"Tennis Racquet {x_axis.capitalize()} from {file_label.capitalize()} Data")
+    ax.set_title(
+        f"Tennis Racquet {x_axis.capitalize()} Histogram from {file_label.capitalize()} DataFrame"
+    )
     fig.savefig(output_path)
     return df
 
 
 def scatter_plot(dir_label: str, file_label: str, output_path: str, x_axis: str, y_axis: str):
     file_path = DATA_DIR / dir_label / f"tennis_racquets_{file_label}.csv"
-    output_path = FIGURES_DIR / f"{x_axis}_{y_axis}_{file_label}_scatter.png"
+    output_path = FIGURES_DIR / f"{x_axis}_vs_{y_axis}_{file_label}_scatter.png"
     df = pd.read_csv(file_path)
     missing = [col for col in (x_axis, y_axis) if col not in df.columns]
     if missing:
@@ -35,7 +37,7 @@ def scatter_plot(dir_label: str, file_label: str, output_path: str, x_axis: str,
     ax.set_xlabel(x_axis.capitalize())
     ax.set_ylabel(y_axis.capitalize())
     ax.set_title(
-        f"Tennis Racquet {x_axis.capitalize()} and {y_axis.capitalize()} from {file_label.capitalize()} Data"
+        f"Tennis Racquet {x_axis.capitalize()} vs. {y_axis.capitalize()} Scatter Plot from {file_label.capitalize()} DataFrame"
     )
     fig.savefig(output_path)
     return df
