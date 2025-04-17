@@ -12,6 +12,9 @@ app = typer.Typer()
 def main(
     dir_label: str,
     input_file: str,
+    preview: bool = typer.Option(
+        False, "--preview/--no-preview", help="Show first 5 rows of the loaded DataFrame."
+    ),
 ):
     logger.info("Starting Data Ingestion Pipeline")
     pbar = tqdm(total=3, desc="Data Ingestion", ncols=80)
