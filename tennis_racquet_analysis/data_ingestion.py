@@ -1,4 +1,3 @@
-# from pathlib import Path
 import typer
 from tqdm import tqdm
 from loguru import logger
@@ -16,21 +15,19 @@ def main(
         False, "--preview/--no-preview", help="Show first 5 rows of the loaded DataFrame."
     ),
 ):
-    logger.info("Starting Data Ingestion Pipeline")
-    pbar = tqdm(total=3, desc="Data Ingestion", ncols=80)
-    pbar.set_description("Resolving Input File Path")
+    logger.info("Starting data ingestion pipeline...")
+    pbar = tqdm(total=1, desc="Data Ingestion", ncols=100)
     path = DATA_DIR / dir_label / input_file
-    pbar.update(1)
-    pbar.set_description("Reading File into DataFrame")
     df = load_data(path)
-    pbar.update(2)
     pbar.set_description("Finalizing Data Ingestion")
-    typer.echo(df.head())
-    logger.info(f"Ingested DataFrame Type: {type(df)}")
-    logger.info(f"DataFrame Dimensions: {df.shape}")
-    pbar.update(3)
+    pbar.update(1)
     pbar.close()
-    logger.success(f"Completed Data Ingestion from {path}")
+    # Only show the first 5 rows of DataFrame if --preview is set
+    if preview:
+        typer.echo(df.head())
+    logger.info(f"Ingested DataFrame type: {type(df)}")
+    logger.info(f"DataFrame dimensions: {df.shape}")
+    logger.success(f"Completed data ingestion from {path!r}")
     return df
 
 
