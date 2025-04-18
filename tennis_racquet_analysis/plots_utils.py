@@ -1,12 +1,12 @@
 import pandas as pd
-from tennis_racquet_analysis.config import (
-    FIGURES_DIR,
-    DATA_DIR,
-    # INTERIM_DATA_DIR,
-    # PROCESSED_DATA_DIR,
-)  # noqa: F401
 import matplotlib.pyplot as plt
-# import seaborn as sns
+import seaborn as sns
+from pathlib import Path
+from tennis_racquet_analysis.config import FIGURES_DIR, DATA_DIR
+
+PALETTE = sns.cubehelix_palette(8, start=2, rot=0.3)
+
+plt.rc("axes", prop_cycle=plt.cycler("color", PALETTE))
 
 
 def histogram(dir_label: str, file_label: str, output_path: str, x_axis: str, num_bins: int):
