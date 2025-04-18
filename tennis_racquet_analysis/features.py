@@ -36,7 +36,7 @@ def main(
     ]
 
     for step_name, func, kwargs in tqdm(
-        feature_steps, total=len(feature_steps), desc="Feature Engineering Steps"
+        feature_steps, total=len(feature_steps), ncols=100, desc="Feature Engineering Steps"
     ):
         logger.info(f"Applying {step_name}...")
         df = func(df, **kwargs)
@@ -45,7 +45,9 @@ def main(
     output_file = f"{stem}_{file_label}.csv"
     output_path = INTERIM_DATA_DIR / output_file
     df.to_csv(output_path, index=False)
-    logger.success(f"Feature-engineered dataset saved to {output_path}")
+    logger.info(f"Preprocessed Features DataFrame type: {type(df)}")
+    logger.info(f"Preprocessed Features DataFrame dimensions: {df.shape}")
+    logger.success(f"Preprocessed Feature-engineered dataset saved to {output_path}")
 
 
 if __name__ == "__main__":
