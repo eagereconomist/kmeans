@@ -49,7 +49,7 @@ def main(
     processed_results = {}
 
     for scaling_name, scaling_func, file_label in tqdm(
-        scaling_steps, total=len(scaling_steps), desc="Scaling Steps:"
+        scaling_steps, total=len(scaling_steps), ncols=100, desc="Scaling Steps:"
     ):
         logger.info(f"Applying scaling: {scaling_name}")
         df_processed = scaling_func(df_preprocessed)
