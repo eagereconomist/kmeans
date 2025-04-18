@@ -36,7 +36,7 @@ def main(
     ]
 
     for step_name, func, kwargs in tqdm(
-        cleaning_steps, total=len(cleaning_steps), desc="Data Preprocessing Steps:"
+        cleaning_steps, total=len(cleaning_steps), ncols=100, desc="Data Preprocessing Steps:"
     ):
         logger.info(f"Applying {step_name}...")
         df = func(df, **kwargs)
