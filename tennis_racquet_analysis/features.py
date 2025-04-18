@@ -11,10 +11,23 @@ app = typer.Typer()
 
 @app.command()
 def main(
-    input_path: Path = INTERIM_DATA_DIR / "tennis_racquets_preprocessed.csv",
-    file_label: str = "features",
+    input_file: str = typer.Argument(..., help="Preprocessed csv filename."),
+    input_dir: Path = typer.Option(
+        INTERIM_DATA_DIR,
+        "--input-dir",
+        "-d",
+        exists=True,
+        file_okay=True,
+        help="Directory where preprocessed files live.",
+    ),
+    file_label: str = typer.Option(
+        "features",
+        "--label",
+        "-l",
+        help="Suffix for the output file before .csv",
+    ),
 ):
-    output_path: Path = INTERIM_DATA_DIR / f"tennis_racquets_{file_label}.csv"
+    input_path = input_dir / input_file
     logger.info("Loading preprocessed dataset...")
     df = load_data(input_path)
     feature_steps = [
@@ -28,6 +41,9 @@ def main(
         logger.info(f"Applying {step_name}...")
         df = func(df, **kwargs)
 
+    stem = Path(input_file).stem
+    output_file = f"{stem}_{file_label}.csv"
+    output_path = INTERIM_DATA_DIR / output_file
     df.to_csv(output_path, index=False)
     logger.success(f"Feature-engineered dataset saved to {output_path}")
 
