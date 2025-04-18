@@ -10,10 +10,25 @@ app = typer.Typer()
 
 @app.command()
 def main(
-    input_path: Path = RAW_DATA_DIR / "tennis_racquets.csv", file_label: str = "preprocessed"
+    input_file: str = typer.Argument(..., help="Raw csv filename."),
+    input_dir: Path = typer.Option(
+        RAW_DATA_DIR,
+        "--input-dir",
+        "-d",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        help="Directory where raw files live.",
+    ),
+    file_label: str = typer.Option(
+        "preprocessed",
+        "--label",
+        "-l",
+        help="Suffix for the ouput file before .csv",
+    ),
 ):
-    output_path: Path = INTERIM_DATA_DIR / f"tennis_racquets_{file_label}.csv"
-    logger.info("Loading raw dataset...")
+    input_path = input_dir / input_file
+    logger.info(f"Loading raw dataset from: {input_path}...")
     df = load_data(input_path)
     cleaning_steps = [
         ("drop_column", drop_column, {"column": "Racquet"}),
@@ -26,8 +41,11 @@ def main(
         logger.info(f"Applying {step_name}...")
         df = func(df, **kwargs)
 
+    stem = Path(input_file).stem
+    output_file = f"{stem}_{file_label}.csv"
+    output_path = INTERIM_DATA_DIR / output_file
     df.to_csv(output_path, index=False)
-    logger.success(f"Preprocessed dataset saved to {output_path}")
+    logger.success(f"Preprocessed csv saved to {output_path}")
 
 
 if __name__ == "__main__":
