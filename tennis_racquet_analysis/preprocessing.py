@@ -45,6 +45,8 @@ def main(
     output_file = f"{stem}_{file_label}.csv"
     output_path = INTERIM_DATA_DIR / output_file
     df.to_csv(output_path, index=False)
+    logger.info(f"Preprocessed DataFrame type: {type(df)}")
+    logger.info(f"Preprocessed DataFrame dimensions: {df.shape}")
     logger.success(f"Preprocessed csv saved to {output_path}")
 
 
