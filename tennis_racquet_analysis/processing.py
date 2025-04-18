@@ -3,7 +3,7 @@ from loguru import logger
 from tqdm import tqdm
 import typer
 
-from tennis_racquet_analysis.config import INTERIM_DATA_DIR
+from tennis_racquet_analysis.config import INTERIM_DATA_DIR, PROCESSED_DATA_DIR
 from tennis_racquet_analysis.processing_utils import (
     load_data,
     write_csv,
@@ -19,8 +19,23 @@ app = typer.Typer()
 
 @app.command()
 def main(
-    input_path: Path = INTERIM_DATA_DIR / "tennis_racquets_features.csv",
+    input_file: str = typer.Argument(..., help="Preprocessed Feature-Engineered csv filename."),
+    input_dir: Path = typer.Option(
+        INTERIM_DATA_DIR,
+        "--input_dir",
+        "-d",
+        exists=True,
+        file_okay=True,
+        help="Directory where preprocessed feature-engineered files live.",
+    ),
+    file_label: str = typer.Option(
+        "processed",
+        "--label",
+        "-l",
+        help="Suffix for the output file before .csv",
+    ),
 ):
+    input_path = input_dir / input_file
     logger.info("Loading preprocessed dataset...")
     df_preprocessed = load_data(input_path)
     scaling_steps = [
@@ -38,10 +53,10 @@ def main(
     ):
         logger.info(f"Applying scaling: {scaling_name}")
         df_processed = scaling_func(df_preprocessed)
-        processed_results[scaling_name] = write_csv(df_processed, "processed", file_label)
+        processed_results[scaling_name] = write_csv(df_processed, "", file_label)
 
-    logger.success("Data processing complete!")
-    typer.echo("Processed DataFrames: " + ", ".join(processed_results.keys()))
+    logger.success("Data processing complete")
+    typer.echo("Wrote processed files to " + str(PROCESSED_DATA_DIR))
     return processed_results
 
 
