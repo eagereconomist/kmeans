@@ -36,7 +36,7 @@ def main(
     ),
 ):
     input_path = input_dir / input_file
-    logger.info("Loading preprocessed dataset...")
+    logger.info("Loading preprocessed feature-engineered dataset...")
     df_preprocessed = load_data(input_path)
     scaling_steps = [
         ("normalized", apply_normalizer, "normalized"),
@@ -49,13 +49,13 @@ def main(
     processed_results = {}
 
     for scaling_name, scaling_func, file_label in tqdm(
-        scaling_steps, total=len(scaling_steps), ncols=100, desc="Scaling Steps:"
+        scaling_steps, total=len(scaling_steps), ncols=100, desc="Scaling Steps"
     ):
         logger.info(f"Applying scaling: {scaling_name}")
         df_processed = scaling_func(df_preprocessed)
         processed_results[scaling_name] = write_csv(df_processed, "", file_label)
 
-    logger.success("Data processing complete")
+    logger.success("Data processing complete!")
     typer.echo("Wrote processed files to " + str(PROCESSED_DATA_DIR))
     return processed_results
 
