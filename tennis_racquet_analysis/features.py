@@ -47,7 +47,7 @@ def main(
     df.to_csv(output_path, index=False)
     logger.info(f"Preprocessed Features DataFrame type: {type(df)}")
     logger.info(f"Preprocessed Features DataFrame dimensions: {df.shape}")
-    logger.success(f"Preprocessed Feature-engineered dataset saved to {output_path}")
+    logger.success(f"Preprocessed Feature-Engineered dataset saved to {output_path}")
 
 
 if __name__ == "__main__":
