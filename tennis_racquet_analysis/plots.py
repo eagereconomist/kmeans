@@ -1,5 +1,4 @@
 import typer
-import matplotlib.pyplot as plt
 from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
@@ -16,9 +15,7 @@ app = typer.Typer()
 @app.command("hist")
 def hist(
     input_file: str = typer.Argument("csv filename."),
-    dir_label: str = typer.Option(
-        "processed", "--dir-label", "-d", help="Which sub-folder under data/ to read from."
-    ),
+    dir_label: str = typer.Argument("Pick the parent data folder's sub-folder."),
     x_axis: str = typer.Argument(..., help="Column to histogram."),
     num_bins: int = typer.Option(10, "--bins", "-b", help="Number of bins."),
     output_dir: Path = typer.Option(
@@ -30,7 +27,9 @@ def hist(
         help="Where to save the .png plot.",
     ),
 ):
-    logger.info(f"Histogram of '{x_axis}' from '{dir_label}/{input_file}'")
+    logger.info(
+        f"Generating Histogram with {num_bins} bins for '{x_axis}' from '{dir_label}/{input_file}'"
+    )
     histogram(
         input_file=input_file,
         dir_label=dir_label,
@@ -44,12 +43,7 @@ def hist(
 @app.command("scatter")
 def scatter(
     input_file: str = typer.Argument(..., help="csv filename."),
-    dir_label: str = typer.Option(
-        "processed",
-        "--dir-label",
-        "-d",
-        help="Data sub-folder.",
-    ),
+    dir_label: str = typer.Argument("Pick the parent data folder's sub-folder."),
     x_axis: str = typer.Argument(..., help="X-axis column."),
     y_axis: str = typer.Argument(..., help="Y-axis column."),
     output_dir: Path = typer.Option(
@@ -60,7 +54,7 @@ def scatter(
         file_okay=False,
     ),
 ):
-    logger.info(f"Scatterplot {x_axis} vs. {y_axis} from '{dir_label}/{input_file}'")
+    logger.info(f"Generating Scatterplot of {x_axis} vs. {y_axis} from '{dir_label}/{input_file}'")
     scatter_plot(
         input_file=input_file,
         dir_label=dir_label,
@@ -74,7 +68,7 @@ def scatter(
 @app.command("boxplot")
 def boxplt(
     input_file: str = typer.Argument(..., help="csv filename."),
-    dir_label: str = typer.Option("processed", "--dir-label", "-d", help="Data sub-folder."),
+    dir_label: str = typer.Argument("Pick the parent data folder's sub-folder."),
     x_axis: str = typer.Argument(..., help="X-axis column."),
     y_axis: str = typer.Argument(..., help="Y-axis column."),
     output_dir: Path = typer.Option(
@@ -85,7 +79,7 @@ def boxplt(
         file_okay=False,
     ),
 ):
-    logger.info(f"Box plot {x_axis} vs. {y_axis} from '{dir_label}/{input_file}'")
+    logger.info(f"Generating Box plot of {x_axis} vs. {y_axis} from '{dir_label}/{input_file}'")
     box_plot(
         input_file=input_file,
         dir_label=dir_label,
