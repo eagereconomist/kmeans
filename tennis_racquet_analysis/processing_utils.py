@@ -7,7 +7,7 @@ from tennis_racquet_analysis.config import PROCESSED_DATA_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data  # noqa: F401
 
 
-def write_csv(dataframe, subfolder, file_label):
+def write_csv(dataframe, file_label):
     file_path = PROCESSED_DATA_DIR / f"tennis_racquets_{file_label}.csv"
     dataframe.to_csv(file_path, index=False)
     print(f"csv written to {file_path}")
