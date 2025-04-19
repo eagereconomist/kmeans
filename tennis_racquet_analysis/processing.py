@@ -53,7 +53,7 @@ def main(
     ):
         logger.info(f"Applying scaling: {scaling_name}")
         df_processed = scaling_func(df_preprocessed)
-        processed_results[scaling_name] = write_csv(df_processed, "", file_label)
+        processed_results[scaling_name] = write_csv(df_processed, file_label)
 
     logger.success("Data processing complete!")
     typer.echo("Wrote processed files to " + str(PROCESSED_DATA_DIR))
