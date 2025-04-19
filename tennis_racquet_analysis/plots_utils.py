@@ -29,7 +29,7 @@ def histogram(
     ax.set(
         xlabel=x_axis.capitalize(),
         ylabel="Frequency",
-        title=f"{x_axis.capitalize()} Histogram ({input_file})",
+        title=f"{x_axis.capitalize()} Histogram from {dir_label.capitalize()} DataFrame",
     )
     stem = Path(input_file).stem
     output_path = output_dir / f"{stem}_{x_axis}_hist.png"
@@ -59,7 +59,7 @@ def scatter_plot(
     ax.set(
         xlabel=x_axis.capitalize(),
         ylabel=y_axis.capitalize(),
-        title=f"{x_axis.capitalize()} vs. {y_axis.capitalize()} Scatterplot ({input_file})",
+        title=f"{x_axis.capitalize()} vs. {y_axis.capitalize()} Scatterplot from {dir_label.capitalize()} DataFrame",
     )
     stem = Path(input_file).stem
     output_path = output_dir / f"{stem}_{x_axis}_scatter.png"
@@ -89,7 +89,7 @@ def box_plot(
     ax.set(
         xlabel=x_axis.capitalize(),
         ylabel=y_axis.capitalize(),
-        title=f"{x_axis.capitalize()} vs. {y_axis.capitalize()} Box Plot ({input_file})",
+        title=f"{x_axis.capitalize()} vs. {y_axis.capitalize()} Box Plot from {dir_label.capitalize()} DataFrame",
     )
     stem = Path(input_file).stem
     output_path = output_dir / f"{stem}_{x_axis}_boxplot.png"
