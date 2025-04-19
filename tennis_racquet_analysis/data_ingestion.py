@@ -10,7 +10,7 @@ app = typer.Typer()
 
 @app.command()
 def main(
-    input_file: str = typer.Argument(..., help="Raw data csv.")
+    input_file: str = typer.Argument(..., help="Raw data csv."),
     preview: bool = typer.Option(
         False, "--preview/--no-preview", help="Show first 5 rows of the loaded DataFrame."
     ),
