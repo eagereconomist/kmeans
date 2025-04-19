@@ -1,56 +1,99 @@
 import typer
 import matplotlib.pyplot as plt
+from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
-from tennis_racquet_analysis.plots_utils import histogram, scatter_plot
+from tennis_racquet_analysis.config import FIGURES_DIR
+from tennis_racquet_analysis.plots_utils import (
+    histogram,
+    scatter_plot,
+    box_plot,
+)
 
 app = typer.Typer()
 
 
 @app.command("hist")
 def hist(
-    dir_label: str,
-    file_label: str,
-    output_path: str,
-    x_axis: str,
-    num_bins: int,
+    input_file: str = typer.Argument("csv filename."),
+    dir_label: str = typer.Option(
+        "processed", "--dir-label", "-d", help="Which sub-folder under data/ to read from."
+    ),
+    x_axis: str = typer.Argument(..., help="Column to histogram."),
+    num_bins: int = typer.Option(10, "--bins", "-b", help="Number of bins."),
+    output_dir: Path = typer.Option(
+        FIGURES_DIR,
+        "--output-dir",
+        "-o",
+        dir_okay=True,
+        file_okay=False,
+        help="Where to save the .png plot.",
+    ),
 ):
-    logger.info(
-        f"Histogram: Plotting '{x_axis}' from {file_label} DataFrame in '{dir_label}' data folder."
+    logger.info(f"Histogram of '{x_axis}' from '{dir_label}/{input_file}'")
+    histogram(
+        input_file=input_file,
+        dir_label=dir_label,
+        x_axis=x_axis,
+        num_bins=num_bins,
+        output_dir=output_dir,
     )
-    progress_bar = tqdm(total=3, desc="Histogram Steps", ncols=80)
-    progress_bar.set_description("Reading csv...")
-    df = histogram(dir_label, file_label, output_path, x_axis, num_bins)
-    progress_bar.update(1)
-    progress_bar.set_description("Plotting & Saving...")
-    progress_bar.update(2)
-    progress_bar.close()
-    logger.success(f"Saved histogram to {output_path} folder.")
-    plt.show()
-    return df
+    logger.success(f"Histogram saved to {output_dir}")
 
 
 @app.command("scatter")
 def scatter(
-    dir_label: str,
-    file_label: str,
-    output_path: str,
-    x_axis: str,
-    y_axis: str,
+    input_file: str = typer.Argument(..., help="csv filename."),
+    dir_label: str = typer.Option(
+        "processed",
+        "--dir-label",
+        "-d",
+        help="Data sub-folder.",
+    ),
+    x_axis: str = typer.Argument(..., help="X-axis column."),
+    y_axis: str = typer.Argument(..., help="Y-axis column."),
+    output_dir: Path = typer.Option(
+        FIGURES_DIR,
+        "--output-dir",
+        "-o",
+        dir_okay=True,
+        file_okay=False,
+    ),
 ):
-    logger.info(
-        f"Scatter plot: Plotting {x_axis} vs. {y_axis} from {file_label} DataFrame in '{dir_label}' data folder."
+    logger.info(f"Scatterplot {x_axis} vs. {y_axis} from '{dir_label}/{input_file}'")
+    scatter_plot(
+        input_file=input_file,
+        dir_label=dir_label,
+        x_axis=x_axis,
+        y_axis=y_axis,
+        output_dir=output_dir,
     )
-    progress_bar_2 = tqdm(total=3, desc="Scatter Plot Steps", ncols=80)
-    progress_bar_2.set_description("Reading csv...")
-    df = scatter_plot(dir_label, file_label, output_path, x_axis, y_axis)
-    progress_bar_2.update(1)
-    progress_bar_2.set_description("Plotting & Saving...")
-    progress_bar_2.update(2)
-    progress_bar_2.close()
-    logger.success(f"Saved scatter plot to {output_path} folder.")
-    plt.show()
-    return df
+    logger.success(f"Scatter plot saved to {output_dir}!")
+
+
+@app.command("boxplot")
+def boxplt(
+    input_file: str = typer.Argument(..., help="csv filename."),
+    dir_label: str = typer.Option("processed", "--dir-label", "-d", help="Data sub-folder."),
+    x_axis: str = typer.Argument(..., help="X-axis column."),
+    y_axis: str = typer.Argument(..., help="Y-axis column."),
+    output_dir: Path = typer.Option(
+        FIGURES_DIR,
+        "--output-dir",
+        "-o",
+        dir_okay=True,
+        file_okay=False,
+    ),
+):
+    logger.info(f"Box plot {x_axis} vs. {y_axis} from '{dir_label}/{input_file}'")
+    box_plot(
+        input_file=input_file,
+        dir_label=dir_label,
+        x_axis=x_axis,
+        y_axis=y_axis,
+        output_dir=output_dir,
+    )
+    logger.success(f"Box plot saved to {output_dir}!")
 
 
 if __name__ == "__main__":
