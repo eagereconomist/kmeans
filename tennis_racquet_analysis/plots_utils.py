@@ -9,54 +9,90 @@ PALETTE = sns.cubehelix_palette(8, start=2, rot=0.3)
 plt.rc("axes", prop_cycle=plt.cycler("color", PALETTE))
 
 
-def histogram(dir_label: str, file_label: str, output_path: str, x_axis: str, num_bins: int):
-    file_path = DATA_DIR / dir_label / f"tennis_racquets_{file_label}.csv"
-    output_path = FIGURES_DIR / f"{x_axis}_{file_label}_hist.png"
-    df = pd.read_csv(file_path)
+def histogram(
+    input_file: str,
+    dir_label: str,
+    x_axis: str,
+    num_bins: int,
+    output_dir: Path = FIGURES_DIR,
+) -> pd.DataFrame:
+    """
+    Load data/{dir_label}/{input_file}, plot a Seaborn histplot of `x_axis`,
+    save to `output_dir`, return the DataFrame.
+    """
+    input_path = DATA_DIR / dir_label / input_file
+    df = pd.read_csv(input_path)
     if x_axis not in df.columns:
-        raise ValueError(f"Column '{x_axis}' not found in the file: {file_path}")
+        raise ValueError(f"Column '{x_axis} not found in {input_path}")
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.hist(df[x_axis], bins=num_bins, color="blue", edgecolor="black")
-    ax.set_xlabel(x_axis.capitalize())
-    ax.set_ylabel("Frequency")
-    ax.set_title(
-        f"Tennis Racquet {x_axis.capitalize()} Histogram from {file_label.capitalize()} DataFrame"
+    sns.histplot(data=df, x=x_axis, bins=num_bins, ax=ax)
+    ax.set(
+        xlabel=x_axis.capitalize(),
+        ylabel="Frequency",
+        title=f"{x_axis.capitalize()} Histogram ({input_file})",
     )
+    stem = Path(input_file).stem
+    output_path = output_dir / f"{stem}_{x_axis}_hist.png"
     fig.savefig(output_path)
+    plt.close(fig)
     return df
 
 
-def scatter_plot(dir_label: str, file_label: str, output_path: str, x_axis: str, y_axis: str):
-    file_path = DATA_DIR / dir_label / f"tennis_racquets_{file_label}.csv"
-    output_path = FIGURES_DIR / f"{x_axis}_vs_{y_axis}_{file_label}_scatter.png"
-    df = pd.read_csv(file_path)
+def scatter_plot(
+    input_file: str,
+    dir_label: str,
+    x_axis: str,
+    y_axis: str,
+    output_dir: Path = FIGURES_DIR,
+) -> pd.DataFrame:
+    """
+    Load data/{dir_label}/{input_file}, plot `x_axis` vs. `y_axis` scatter,
+    save to `output_dir`, return the DataFrame.
+    """
+    input_path = DATA_DIR / dir_label / input_file
+    df = pd.read_csv(input_path)
     missing = [col for col in (x_axis, y_axis) if col not in df.columns]
     if missing:
-        raise ValueError(f"Column(s) not found in {file_path}: {', '.join(missing)}")
+        raise ValueError(f"Column(s) {missing} not found in {input_path}")
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.scatter(df[x_axis], df[y_axis], color="blue")
-    ax.set_xlabel(x_axis.capitalize())
-    ax.set_ylabel(y_axis.capitalize())
-    ax.set_title(
-        f"Tennis Racquet {x_axis.capitalize()} vs. {y_axis.capitalize()} Scatter Plot from {file_label.capitalize()} DataFrame"
+    sns.scatterplot(data=df, x=x_axis, y=y_axis, ax=ax)
+    ax.set(
+        xlabel=x_axis.capitalize(),
+        ylabel=y_axis.capitalize(),
+        title=f"{x_axis.capitalize()} vs. {y_axis.capitalize()} Scatterplot ({input_file})",
     )
+    stem = Path(input_file).stem
+    output_path = output_dir / f"{stem}_{x_axis}_scatter.png"
     fig.savefig(output_path)
+    plt.close(fig)
     return df
 
 
-def box_plot(dir_label: str, file_label: str, output_path: str, label: str, y_axis: str):
-    file_path = DATA_DIR / dir_label / f"tennis_racquets_{file_label}.csv"
-    output_path = FIGURES_DIR / f"{y_axis}_{label}_{file_label}.png"
-    df = pd.read_csv(file_path)
-    missing = [col for col in (label, y_axis) if col not in df.columns]
+def box_plot(
+    input_file: str,
+    dir_label: str,
+    x_axis: str,
+    y_axis: str,
+    output_dir: Path = FIGURES_DIR,
+) -> pd.DataFrame:
+    """
+    Load data/{dir_label}/{input_file}, plot boxplot of `x_axis` vs. `y_axis`,
+    save to `output_dir`, return the DataFrame.
+    """
+    input_path = DATA_DIR / dir_label / input_file
+    df = pd.read_csv(input_path)
+    missing = [col for col in (x_axis, y_axis) if col not in df.columns]
     if missing:
-        raise ValueError(f"Column(s) not found in {file_path}: {', '.join(missing)}")
+        raise ValueError(f"Column(s) {missing} not found in {input_path}")
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.boxplot(df[label], df[y_axis], color="blue", edgecolors="black")
-    ax.set_xlabel(label.capitalize())
-    ax.set_ylabel(y_axis.capitalize())
-    ax.set_title(
-        f"Tennis Racquet {label.capitalize()} vs. {y_axis.capitalize()} Box Plot from {file_label.capitalize()} DataFrame"
+    sns.boxplot(data=df, x=x_axis, y=y_axis, ax=ax)
+    ax.set(
+        xlabel=x_axis.capitalize(),
+        ylabel=y_axis.capitalize(),
+        title=f"{x_axis.capitalize()} vs. {y_axis.capitalize()} Box Plot ({input_file})",
     )
+    stem = Path(input_file).stem
+    output_path = output_dir / f"{stem}_{x_axis}_boxplot.png"
     fig.savefig(output_path)
+    plt.close(fig)
     return df
