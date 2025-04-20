@@ -112,6 +112,7 @@ def box_plot(
         x="Brand",
         y=y_axis,
         order=brands,
+        palette=palette,
         ax=ax,
     )
     sns.despine(ax=ax)
