@@ -69,7 +69,6 @@ def scatter(
 def boxplt(
     input_file: str = typer.Argument(..., help="csv filename."),
     dir_label: str = typer.Argument("Pick the parent data folder's sub-folder."),
-    x_axis: str = typer.Argument(..., help="X-axis column."),
     y_axis: str = typer.Argument(..., help="Y-axis column."),
     output_dir: Path = typer.Option(
         FIGURES_DIR,
@@ -79,11 +78,12 @@ def boxplt(
         file_okay=False,
     ),
 ):
-    logger.info(f"Generating Box plot of {x_axis} vs. {y_axis} from '{dir_label}/{input_file}'")
+    logger.info(
+        f"Generating Box plot of {y_axis.capitalize()} by Brand from '{dir_label}/{input_file}'"
+    )
     box_plot(
         input_file=input_file,
         dir_label=dir_label,
-        x_axis=x_axis,
         y_axis=y_axis,
         output_dir=output_dir,
     )

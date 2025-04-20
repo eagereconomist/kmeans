@@ -1,12 +1,15 @@
+import re
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 from tennis_racquet_analysis.config import FIGURES_DIR, DATA_DIR
 
-PALETTE = sns.cubehelix_palette(8, start=2, rot=0.3)
-
-plt.rc("axes", prop_cycle=plt.cycler("color", PALETTE))
+sns.set_theme(
+    style="ticks",
+    font_scale=1.2,
+    rc={"axes.spines.right": False, "axes.spines.top": False},
+)
 
 
 def histogram(
@@ -24,8 +27,12 @@ def histogram(
     df = pd.read_csv(input_path)
     if x_axis not in df.columns:
         raise ValueError(f"Column '{x_axis} not found in {input_path}")
+    palette = sns.cubehelix_palette(
+        n_colors=8, start=3, rot=1, reverse=True, gamma=0.4, light=0.7, dark=0.1
+    )
+    plt.rc("axes", prop_cycle=plt.cycler("color", palette))
     fig, ax = plt.subplots(figsize=(10, 6))
-    sns.histplot(data=df, x=x_axis, bins=num_bins, ax=ax)
+    sns.histplot(data=df, x=x_axis, bins=num_bins)
     ax.set(
         xlabel=x_axis.capitalize(),
         ylabel="Frequency",
@@ -54,6 +61,10 @@ def scatter_plot(
     missing = [col for col in (x_axis, y_axis) if col not in df.columns]
     if missing:
         raise ValueError(f"Column(s) {missing} not found in {input_path}")
+    palette = sns.cubehelix_palette(
+        n_colors=8, start=3, rot=1, reverse=True, gamma=0.4, light=0.7, dark=0.1
+    )
+    plt.rc("axes", prop_cycle=plt.cycler("color", palette))
     fig, ax = plt.subplots(figsize=(10, 6))
     sns.scatterplot(data=df, x=x_axis, y=y_axis, ax=ax)
     ax.set(
@@ -71,28 +82,46 @@ def scatter_plot(
 def box_plot(
     input_file: str,
     dir_label: str,
-    x_axis: str,
     y_axis: str,
     output_dir: Path = FIGURES_DIR,
 ) -> pd.DataFrame:
     """
-    Load data/{dir_label}/{input_file}, plot boxplot of `x_axis` vs. `y_axis`,
+    Load data/{dir_label}/{input_file}, plot boxplot of `x_axis` and `y_axis`,
     save to `output_dir`, return the DataFrame.
     """
     input_path = DATA_DIR / dir_label / input_file
     df = pd.read_csv(input_path)
-    missing = [col for col in (x_axis, y_axis) if col not in df.columns]
-    if missing:
-        raise ValueError(f"Column(s) {missing} not found in {input_path}")
+    if y_axis not in df.columns:
+        raise ValueError(f"Column '{y_axis}' not found in {input_path}")
+    df["Brand"] = df["Racquet"].apply(lambda s: re.findall(r"[A-Z][a-z]+", s)[0])
+    brands = sorted(df["Brand"].unique())
+    palette = sns.cubehelix_palette(
+        n_colors=len(brands),
+        start=3,
+        rot=1,
+        reverse=True,
+        gamma=0.4,
+        light=0.7,
+        dark=0.1,
+    )
+    sns.set_style("ticks")
+    plt.rc("axes", prop_cycle=plt.cycler("color", palette))
     fig, ax = plt.subplots(figsize=(10, 6))
-    sns.boxplot(data=df, x=x_axis, y=y_axis, ax=ax)
+    sns.boxplot(
+        data=df,
+        x="Brand",
+        y=y_axis,
+        order=brands,
+        ax=ax,
+    )
+    sns.despine(ax=ax)
     ax.set(
-        xlabel=x_axis.capitalize(),
+        xlabel="Brand",
         ylabel=y_axis.capitalize(),
-        title=f"{x_axis.capitalize()} vs. {y_axis.capitalize()} Box Plot from {dir_label.capitalize()} DataFrame",
+        title=(f"{y_axis.capitalize()} Box Plot by Racquet Brand"),
     )
     stem = Path(input_file).stem
-    output_path = output_dir / f"{stem}_{x_axis}_boxplot.png"
-    fig.savefig(output_path)
+    output_dir = output_dir / f"{stem}_by_brand_{y_axis}_boxplot.png"
+    fig.savefig(output_dir)
     plt.close(fig)
     return df
