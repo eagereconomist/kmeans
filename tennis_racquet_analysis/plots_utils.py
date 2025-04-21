@@ -134,7 +134,7 @@ def box_plot(
         title=(f"{y_axis.capitalize()} Box Plot by Racquet Brand"),
     )
     stem = Path(input_file).stem
-    output_dir = output_dir / f"{stem}_by_brand_{y_axis}_boxplot.png"
+    output_dir = output_dir / f"{stem}_{stem_label}_{y_axis}_boxplot.png"
     fig.savefig(output_dir)
     plt.close(fig)
     return df
