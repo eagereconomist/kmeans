@@ -7,6 +7,7 @@ from tennis_racquet_analysis.plots_utils import (
     histogram,
     scatter_plot,
     box_plot,
+    violin_plot,
 )
 
 app = typer.Typer()
@@ -97,6 +98,47 @@ def boxplt(
         output_dir=output_dir,
     )
     logger.success(f"Box plot saved to {output_dir}!")
+
+
+@app.command("violin")
+def violinplt(
+    input_file: str = typer.Argument(..., help="csv filename."),
+    dir_label: str = typer.Argument("Pick the parent data folder's sub-folder."),
+    y_axis: str = typer.Argument(..., help="Y-axis column."),
+    brand: str = typer.Option(
+        None,
+        "--brand",
+        "-b",
+        help="By default, 'brand' is None, but there is the option to pick a brand.",
+    ),
+    inner: str = typer.Option(
+        "box",
+        "--inner",
+        "-i",
+        help="Representation of the data in the interior of the violin plot.",
+    ),
+    output_dir: Path = typer.Option(
+        FIGURES_DIR,
+        "--output-dir",
+        "-o",
+        dir_okay=True,
+        file_okay=False,
+    ),
+):
+    logger.info(
+        f"Generating Violin plot of {y_axis.capitalize()}' "
+        f"{'for ' + brand if brand else 'by Brand'} "
+        f"from ' {dir_label}/{input_file}'"
+    )
+    violin_plot(
+        input_file=input_file,
+        dir_label=dir_label,
+        y_axis=y_axis,
+        brand=brand,
+        inner=inner,
+        output_dir=output_dir,
+    )
+    logger.success(f"Violin plot saved to {output_dir}!")
 
 
 if __name__ == "__main__":
