@@ -83,6 +83,7 @@ def box_plot(
     input_file: str,
     dir_label: str,
     y_axis: str,
+    brand: str = None,
     output_dir: Path = FIGURES_DIR,
 ) -> pd.DataFrame:
     """
@@ -95,6 +96,17 @@ def box_plot(
         raise ValueError(f"Column '{y_axis}' not found in {input_path}")
     df["Brand"] = df["Racquet"].apply(lambda s: re.findall(r"[A-Z][a-z]+", s)[0])
     brands = sorted(df["Brand"].unique())
+    if brand:
+        if brand not in brands:
+            raise ValueError(f"Brand '{brand}' not found. Available brands are: {brands!r}")
+        df = df[df["Brand"] == brand]
+        x_col = "Racquet"
+        categories = sorted(df[x_col].unique())
+        stem_label = brand.lower()
+    else:
+        x_col = "Brand"
+        categories = brands
+        stem_label = "by_brand"
     palette = sns.cubehelix_palette(
         n_colors=len(brands),
         start=3,
@@ -109,9 +121,9 @@ def box_plot(
     fig, ax = plt.subplots(figsize=(10, 6))
     sns.boxplot(
         data=df,
-        x="Brand",
+        x=x_col,
         y=y_axis,
-        order=brands,
+        order=categories,
         palette=palette,
         ax=ax,
     )

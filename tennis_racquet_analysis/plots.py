@@ -70,6 +70,12 @@ def boxplt(
     input_file: str = typer.Argument(..., help="csv filename."),
     dir_label: str = typer.Argument("Pick the parent data folder's sub-folder."),
     y_axis: str = typer.Argument(..., help="Y-axis column."),
+    brand: str = typer.Option(
+        None,
+        "--brand",
+        "-b",
+        help="By default, 'brand' is None, but there is the option to pick a brand.",
+    ),
     output_dir: Path = typer.Option(
         FIGURES_DIR,
         "--output-dir",
@@ -79,12 +85,15 @@ def boxplt(
     ),
 ):
     logger.info(
-        f"Generating Box plot of {y_axis.capitalize()} by Brand from '{dir_label}/{input_file}'"
+        f"Generating Box plot of {y_axis.capitalize()}' "
+        f"{'for ' + brand if brand else 'by Brand'} "
+        f"from ' {dir_label}/{input_file}'"
     )
     box_plot(
         input_file=input_file,
         dir_label=dir_label,
         y_axis=y_axis,
+        brand=brand,
         output_dir=output_dir,
     )
     logger.success(f"Box plot saved to {output_dir}!")
