@@ -36,7 +36,7 @@ def histogram(
     ax.set(
         xlabel=x_axis.capitalize(),
         ylabel="Frequency",
-        title=f"{x_axis.capitalize()} Histogram from {dir_label.capitalize()} DataFrame",
+        title=f"Histogram of {x_axis.capitalize()} from {dir_label.capitalize()} DataFrame",
     )
     stem = Path(input_file).stem
     output_path = output_dir / f"{stem}_{x_axis}_hist.png"
