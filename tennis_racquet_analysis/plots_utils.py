@@ -155,13 +155,13 @@ def box_plot(
         ax.set(
             xlabel=y_axis.capitalize(),
             ylabel=x_col.capitalize(),
-            title=f"Box Plot of {y_axis.capitalize()} for {brand or 'All Brands'}",
+            title=f"Box Plot of {y_axis.capitalize()} for {brand or 'All Brands'} Racquets",
         )
     else:
         ax.set(
             xlabel=x_col.capitalize(),
             ylabel=y_axis.capitalize(),
-            title=f"Box Plot of {y_axis.capitalize()} for {brand or 'All Brands'}",
+            title=f"Box Plot of {y_axis.capitalize()} for {brand or 'All Brands'} Racquets",
         )
     stem = Path(input_file).stem
     output_dir = output_dir / f"{stem}_{stem_label}_{y_axis}_boxplot.png"
@@ -249,13 +249,13 @@ def violin_plot(
         ax.set(
             xlabel=y_axis.capitalize(),
             ylabel=x_col.capitalize(),
-            title=f"Violin Plot of {y_axis.capitalize()} for {brand or 'All Brands'}",
+            title=f"Violin Plot of {y_axis.capitalize()} for {brand or 'All Brands'} Racquets",
         )
     else:
         ax.set(
             xlabel=x_col.capitalize(),
             ylabel=y_axis.capitalize(),
-            title=f"Violin Plot of {y_axis.capitalize()} for {brand or 'All Brands'}",
+            title=f"Violin Plot of {y_axis.capitalize()} for {brand or 'All Brands'} Racquets",
         )
     stem = Path(input_file).stem
     output_dir = output_dir / f"{stem}_{stem_label}_{y_axis}_violinplot.png"
