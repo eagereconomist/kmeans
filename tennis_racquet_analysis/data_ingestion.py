@@ -22,7 +22,6 @@ def main(
     pbar.set_description("Finalizing Data Ingestion")
     pbar.update(1)
     pbar.close()
-    # Only show the first 5 rows of DataFrame if --preview is set
     if preview:
         typer.echo(df.head())
     logger.info(f"Ingested DataFrame type: {type(df)}")
