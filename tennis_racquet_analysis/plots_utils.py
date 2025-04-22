@@ -123,8 +123,11 @@ def box_plot(
         data=df,
         x=x_col,
         y=y_axis,
+        hue=x_col,
         order=categories,
         palette=palette,
+        dodge=False,
+        legend=False,
         ax=ax,
     )
     sns.despine(ax=ax)
@@ -185,16 +188,19 @@ def violin_plot(
         data=df,
         x=x_col,
         y=y_axis,
+        hue=x_col,
         order=categories,
         palette=palette,
+        dodge=False,
         inner=inner,
+        legend=False,
         ax=ax,
     )
     sns.despine(ax=ax)
     ax.set(
         xlabel="Brand",
         ylabel=y_axis.capitalize(),
-        title=(f"{y_axis.capitalize()} Violin Plot by Racquet Brand"),
+        title=(f"Violin Plot of {y_axis.capitalize()} for {brand or 'All Brands'} Racquets"),
     )
     stem = Path(input_file).stem
     output_dir = output_dir / f"{stem}_{stem_label}_{y_axis}_violinplot.png"
