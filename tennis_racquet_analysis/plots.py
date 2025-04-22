@@ -77,6 +77,7 @@ def boxplt(
         "-b",
         help="By default, 'brand' is None, but there is the option to pick a brand.",
     ),
+    orient: str = typer.Option("v", "--orient", "-a", help="Orientation of the plot."),
     output_dir: Path = typer.Option(
         FIGURES_DIR,
         "--output-dir",
@@ -95,6 +96,7 @@ def boxplt(
         dir_label=dir_label,
         y_axis=y_axis,
         brand=brand,
+        orient=orient,
         output_dir=output_dir,
     )
     logger.success(f"Box plot saved to {output_dir}!")
@@ -111,6 +113,7 @@ def violinplt(
         "-b",
         help="By default, 'brand' is None, but there is the option to pick a brand.",
     ),
+    orient: str = typer.Option("v", "--orient", "-a", help="Orientation of the plot."),
     inner: str = typer.Option(
         "box",
         "--inner",
@@ -135,6 +138,7 @@ def violinplt(
         dir_label=dir_label,
         y_axis=y_axis,
         brand=brand,
+        orient=orient,
         inner=inner,
         output_dir=output_dir,
     )

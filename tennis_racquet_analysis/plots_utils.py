@@ -84,10 +84,11 @@ def box_plot(
     dir_label: str,
     y_axis: str,
     brand: str = None,
+    orient: str = "v",
     output_dir: Path = FIGURES_DIR,
 ) -> pd.DataFrame:
     """
-    Load data/{dir_label}/{input_file}, plot boxplot of `x_axis` and `y_axis`,
+    Load data/{dir_label}/{input_file}, plot boxplot of `y_axis` and an option of `brand`,
     save to `output_dir`, return the DataFrame.
     """
     input_path = DATA_DIR / dir_label / input_file
@@ -112,30 +113,56 @@ def box_plot(
         start=3,
         rot=1,
         reverse=True,
-        gamma=0.4,
         light=0.7,
         dark=0.1,
+        gamma=0.4,
     )
     sns.set_style("ticks")
     plt.rc("axes", prop_cycle=plt.cycler("color", palette))
+
+    orient = orient.lower()
+    if orient.startswith("h"):
+        plot_args = dict(
+            x=y_axis,
+            y=x_col,
+            order=categories,
+            palette=palette,
+            hue=x_col,
+            dodge=False,
+            legend=False,
+        )
+    else:
+        plot_args = dict(
+            x=x_col,
+            y=y_axis,
+            order=categories,
+            palette=palette,
+            hue=x_col,
+            dodge=False,
+            legend=False,
+        )
+
     fig, ax = plt.subplots(figsize=(10, 6))
     sns.boxplot(
         data=df,
-        x=x_col,
-        y=y_axis,
-        hue=x_col,
-        order=categories,
-        palette=palette,
-        dodge=False,
-        legend=False,
+        orient=orient,
+        **plot_args,
         ax=ax,
     )
     sns.despine(ax=ax)
-    ax.set(
-        xlabel="Brand",
-        ylabel=y_axis.capitalize(),
-        title=(f"{y_axis.capitalize()} Box Plot by Racquet Brand"),
-    )
+
+    if orient.startswith("h"):
+        ax.set(
+            xlabel=y_axis.capitalize(),
+            ylabel=x_col.capitalize(),
+            title=f"Box Plot of {y_axis.capitalize()} for {brand or 'All Brands'}",
+        )
+    else:
+        ax.set(
+            xlabel=x_col.capitalize(),
+            ylabel=y_axis.capitalize(),
+            title=f"Box Plot of {y_axis.capitalize()} for {brand or 'All Brands'}",
+        )
     stem = Path(input_file).stem
     output_dir = output_dir / f"{stem}_{stem_label}_{y_axis}_boxplot.png"
     fig.savefig(output_dir)
@@ -148,11 +175,12 @@ def violin_plot(
     dir_label: str,
     y_axis: str,
     brand: str = None,
+    orient: str = "v",
     inner: str = "box",
     output_dir: Path = FIGURES_DIR,
 ) -> pd.DataFrame:
     """
-    Load data/{dir_label}/{input_file}, plot violinplot of `x_axis` and `y_axis`,
+    Load data/{dir_label}/{input_file}, plot violinplot of `y_axis` and an option of `brand`,
     save to `output_dir`, return the DataFrame.
     """
     input_path = DATA_DIR / dir_label / input_file
@@ -177,31 +205,58 @@ def violin_plot(
         start=3,
         rot=1,
         reverse=True,
-        gamma=0.4,
         light=0.7,
         dark=0.1,
+        gamma=0.4,
     )
     sns.set_style("ticks")
     plt.rc("axes", prop_cycle=plt.cycler("color", palette))
+
+    orient = orient.lower()
+    if orient.startswith("h"):
+        plot_args = dict(
+            x=y_axis,
+            y=x_col,
+            order=categories,
+            palette=palette,
+            hue=x_col,
+            dodge=False,
+            legend=False,
+            inner=inner,
+        )
+    else:
+        plot_args = dict(
+            x=x_col,
+            y=y_axis,
+            order=categories,
+            palette=palette,
+            hue=x_col,
+            dodge=False,
+            legend=False,
+            inner=inner,
+        )
+
     fig, ax = plt.subplots(figsize=(10, 6))
     sns.violinplot(
         data=df,
-        x=x_col,
-        y=y_axis,
-        hue=x_col,
-        order=categories,
-        palette=palette,
-        dodge=False,
-        inner=inner,
-        legend=False,
+        orient=orient,
+        **plot_args,
         ax=ax,
     )
     sns.despine(ax=ax)
-    ax.set(
-        xlabel="Brand",
-        ylabel=y_axis.capitalize(),
-        title=(f"Violin Plot of {y_axis.capitalize()} for {brand or 'All Brands'} Racquets"),
-    )
+
+    if orient.startswith("h"):
+        ax.set(
+            xlabel=y_axis.capitalize(),
+            ylabel=x_col.capitalize(),
+            title=f"Violin Plot of {y_axis.capitalize()} for {brand or 'All Brands'}",
+        )
+    else:
+        ax.set(
+            xlabel=x_col.capitalize(),
+            ylabel=y_axis.capitalize(),
+            title=f"Violin Plot of {y_axis.capitalize()} for {brand or 'All Brands'}",
+        )
     stem = Path(input_file).stem
     output_dir = output_dir / f"{stem}_{stem_label}_{y_axis}_violinplot.png"
     fig.savefig(output_dir)
