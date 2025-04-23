@@ -39,10 +39,11 @@ def main(
         help="Directory where processed csv's will be written.",
     ),
     prefix: str = typer.Option(
-        "tennis_racquets",
+        None,
         "--prefix",
         "-p",
-        help="Base name for the output files (before the scaling suffix).",
+        help="By default, `prefix` is None, but there is the option to pick a `prefix. "
+        "Base name for the output files (before the scaling suffix).",
     ),
 ):
     """
@@ -52,7 +53,10 @@ def main(
     input_path = input_dir / input_file
     logger.info(f"Loading feature-engineered data from {input_path!r}")
     df = load_data(input_path)
-    stem = Path(input_file).stem
+    if prefix is None:
+        prefix = Path(input_file).stem
+    if not isinstance(prefix, str):
+        prefix = Path(input_file).stem
     steps = [
         ("normalized", apply_normalizer, "normalized"),
         ("standardized", apply_standardization, "standardized"),
@@ -68,7 +72,7 @@ def main(
         df_scaled = scaler_func(df)
         output_path = write_csv(
             df_scaled,
-            prefix=f"{prefix}_{stem}",
+            prefix=prefix,
             suffix=suffix,
             output_dir=output_dir,
         )
