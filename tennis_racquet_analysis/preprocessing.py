@@ -48,6 +48,7 @@ def main(
     logger.info(f"Preprocessed DataFrame type: {type(df)}")
     logger.info(f"Preprocessed DataFrame dimensions: {df.shape}")
     logger.success(f"Preprocessed csv saved to {output_path}")
+    return df
 
 
 if __name__ == "__main__":
