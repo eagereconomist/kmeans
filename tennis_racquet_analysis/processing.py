@@ -36,7 +36,7 @@ def main(
         exists=True,
         dir_okay=True,
         file_okay=False,
-        help="Where processed csv's will be written.",
+        help="Directory where processed csv's will be written.",
     ),
     prefix: str = typer.Option(
         "tennis_racquets",
@@ -61,18 +61,21 @@ def main(
         ("yeo_johnson", yeo_johnson, "yeo_johnson"),
     ]
 
-    out_paths = {}
+    processed_paths = {}
 
-    for name, func in tqdm(steps, desc="Scaling Steps", ncols=100):
-        logger.info(f"Applying '{name}' scaler")
-        df_scaled = func(df)
-        file_name = f"{prefix}_{stem}_{name}.csv"
-        destination = output_dir / file_name
-        df_scaled.to_csv(destination, index=False)
-        logger.success(f"Wrote {name} -> {destination!r}")
-        out_paths[name] = destination
-        typer.echo(f"All done - files written to {output_dir}")
-        return out_paths
+    for step_name, scaler_func, suffix in tqdm(steps, desc="Scaling Steps", ncols=100):
+        logger.info(f"Applying '{step_name}' scaler...")
+        df_scaled = scaler_func(df)
+        output_path = write_csv(
+            df_scaled,
+            prefix=f"{prefix}_{stem}",
+            suffix=suffix,
+            output_dir=output_dir,
+        )
+        processed_paths[step_name] = output_path
+        logger.success(f"-> Wrote {step_name} to {output_path!r}")
+    typer.echo(f"All done. Files written to {output_dir}")
+    return processed_paths
 
 
 if __name__ == "__main__":
