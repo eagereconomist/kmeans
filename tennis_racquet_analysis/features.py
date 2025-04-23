@@ -58,6 +58,7 @@ def main(
     logger.info(f"Feature-engineered DataFrame type: {type(df)}")
     logger.info(f"Feature-engineered DataFrame dimensions: {df.shape}")
     logger.success(f"Feature-engineered DataFrame saved to {output_path!r}")
+    return df
 
 
 if __name__ == "__main__":
