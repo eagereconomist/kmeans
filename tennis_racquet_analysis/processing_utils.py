@@ -4,25 +4,18 @@ from pathlib import Path
 from sklearn import preprocessing
 from sklearn.preprocessing import Normalizer, StandardScaler, MinMaxScaler
 from sklearn.preprocessing import FunctionTransformer
-from tennis_racquet_analysis.config import PROCESSED_DATA_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data  # noqa: F401
 
 
-def write_csv(
-    dataframe: pd.DataFrame,
-    file_label: str,
-    output_dir: Path = PROCESSED_DATA_DIR,
-    prefix: str = "tennis_racquets",
-) -> pd.DataFrame:
+def write_csv(dataframe: pd.DataFrame, prefix: str, suffix: str, output_dir: Path) -> Path:
     """
-    Write `dataframe` to csv named `{prefix}_{file_label}.csv` under
-    `output_dir`. Returns the same DataFrame for easy chaining.
+    Write `dataframe` to {output_dir}/{prefix}_{suffix}.csv,
+    returns the Path to the file.
     """
-    filename = f"{prefix}_{file_label}.csv"
-    file_path: Path = output_dir / filename
+    output_dir.mkdir(parents=True, exist_ok=True)
+    file_path = output_dir / f"{prefix}_{suffix}.csv"
     dataframe.to_csv(file_path, index=False)
-    print(f"csv written to {file_path}")
-    return dataframe
+    return file_path
 
 
 def apply_normalizer(dataframe):
