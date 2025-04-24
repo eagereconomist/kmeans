@@ -3,8 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
-from tennis_racquet_analysis.config import DATA_DIR, FIGURES_DIR
-from tennis_racquet_analysis.preprocessing_utils import load_data
 
 sns.set_theme(
     style="ticks",
@@ -13,81 +11,78 @@ sns.set_theme(
 )
 
 
-def _init_plot(n_colors: int):
+def _init_fig(figsize=(10, 6)):
+    """
+    Create a fig + ax with shared cubehelix palette.
+    """
     palette = sns.cubehelix_palette(
-        n_colors=n_colors, start=3, rot=1, reverse=True, light=0.7, dark=0.1, gamma=0.4
+        n_colors=8, start=3, rot=1, reverse=True, light=0.7, dark=0.1, gamma=0.4
     )
     plt.rc("axes", prop_cycle=plt.cycler("color", palette))
-    return plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=figsize)
+    return fig, ax
 
 
-def _save_fig(fig: plt.Figure, stem: str, suffix: str, output_dir: Path):
-    output_dir.mkdir(parents=True, exist_ok=True)
-    figure_output = output_dir / f"{stem}_{suffix}.png"
-    fig.savefig(figure_output)
+def _save_fig(fig: plt.Figure, path: Path):
+    """
+    Ensure directory exists, save and close.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path)
     plt.close(fig)
-    return figure_output
 
 
 def histogram(
-    input_file: str,
-    dir_label: str,
+    df: pd.DataFrame,
     x_axis: str,
     num_bins: int,
-    output_dir: Path = FIGURES_DIR,
+    output_path: Path,
+    save: bool = True,
 ) -> pd.DataFrame:
-    input_path = DATA_DIR / dir_label / input_file
-    df = load_data(input_path)
     if x_axis not in df.columns:
-        raise ValueError(f"Column '{x_axis} not found in {input_path!r}")
-    fig, ax = _init_plot(n_colors=8)
+        raise ValueError(f"Column '{x_axis}' not in DataFrame.")
+    fig, ax = _init_fig()
     sns.histplot(data=df, x=x_axis, bins=num_bins, ax=ax)
     ax.set(
-        xlabel=x_axis.capitalize(),
-        ylabel="Frequency",
-        title=f"Histogram of {x_axis.capitalize()} from {dir_label.capitalize()} DataFrame",
+        xlabel=x_axis.capitalize(), ylabel="Frequency", title=f"Histogram of {x_axis.capitalize()}"
     )
-    stem = Path(input_file).stem
-    _save_fig(fig, stem, f"{x_axis}_hist", output_dir)
-    return df
+    if save:
+        _save_fig(fig, output_path)
+        return df
 
 
 def scatter_plot(
-    input_file: str,
-    dir_label: str,
+    df: pd.DataFrame,
     x_axis: str,
     y_axis: str,
-    output_dir: Path = FIGURES_DIR,
+    output_path: Path,
+    save: bool = True,
 ) -> pd.DataFrame:
-    input_path = DATA_DIR / dir_label / input_file
-    df = load_data(input_path)
-    for col in (x_axis, y_axis):
-        if col not in df.columns:
-            raise ValueError(f"Column '{col}' not found in {input_path!r}")
-    fig, ax = _init_plot(n_colors=8)
+    missing = [col for col in (x_axis, y_axis) if col not in df.columns]
+    if missing:
+        raise ValueError(f"Columns {missing} not in DataFrame.")
+    fig, ax = _init_fig()
     sns.scatterplot(data=df, x=x_axis, y=y_axis, ax=ax)
     ax.set(
         xlabel=x_axis.capitalize(),
         ylabel=y_axis.capitalize(),
-        title=f"{x_axis.capitalize()} vs. {y_axis.capitalize()} Scatterplot from {dir_label.capitalize()} DataFrame",
+        title=f"{x_axis.capitalize()} vs. {y_axis.capitalize()}",
     )
-    stem = Path(input_file).stem
-    _save_fig(fig, stem, f"{x_axis}_scatter", output_dir)
-    return df
+    if save:
+        _save_fig(fig, output_path)
+        return df
 
 
 def box_plot(
-    input_file: str,
-    dir_label: str,
+    df: pd.DataFrame,
     y_axis: str,
+    output_path: Path,
     brand: str = None,
     orient: str = "v",
-    output_dir: Path = FIGURES_DIR,
+    save: bool = True,
 ) -> pd.DataFrame:
-    input_path = DATA_DIR / dir_label / input_file
-    df = load_data(input_path)
     if y_axis not in df.columns:
-        raise ValueError(f"Column '{y_axis}' not found in {input_path!r}")
+        raise ValueError(f"Column '{y_axis}' not found in DataFrame.")
     df["Brand"] = df["Racquet"].apply(lambda s: re.findall(r"[A-Z][a-z]+", s)[0])
     all_brands = sorted(df["Brand"].unique())
     if brand:
@@ -96,45 +91,40 @@ def box_plot(
         df = df[df["Brand"] == brand]
         x_col = "Racquet"
         order = sorted(df[x_col].unique())
-        stem_label = brand.lower()
     else:
         x_col = "Brand"
         order = all_brands
-        stem_label = "by_brand"
-        fig, ax = _init_plot(n_colors=len(all_brands))
-        sns.boxplot(
-            data=df,
-            x=(x_col if orient == "v" else y_axis),
-            y=(y_axis if orient == "v" else x_col),
-            order=order,
-            orient=orient,
-            ax=ax,
-        )
-        sns.despine(ax=ax)
-        xlabel, ylabel = (x_col, y_axis) if orient == "v" else (y_axis, x_col)
-        ax.set(
-            xlabel=xlabel.capitalize(),
-            ylabel=ylabel.capitalize(),
-            title=f"Box Plot of {y_axis.capitalize()} for {brand or 'All Brands'}",
-        )
-        stem = Path(input_file).stem
-        _save_fig(fig, stem, f"{stem_label}_{y_axis}_boxplot", output_dir)
-        return df
+    fig, ax = _init_fig()
+    sns.boxplot(
+        data=df,
+        x=(x_col if orient == "v" else y_axis),
+        y=(y_axis if orient == "v" else x_col),
+        order=order,
+        orient=orient,
+        ax=ax,
+    )
+    xlabel, ylabel = (x_col, y_axis) if orient == "v" else (y_axis, x_col)
+    ax.set(
+        xlabel=xlabel.capitalize(),
+        ylabel=ylabel.capitalize(),
+        title=f"Box Plot of {y_axis.capitalize()} for {brand or 'All Brands'}",
+    )
+    if save:
+        _save_fig(fig, output_path)
+    return df
 
 
 def violin_plot(
-    input_file: str,
-    dir_label: str,
+    df: pd.DataFrame,
     y_axis: str,
+    output_path: Path,
     brand: str = None,
     orient: str = "v",
     inner: str = "box",
-    output_dir: Path = FIGURES_DIR,
+    save: bool = True,
 ) -> pd.DataFrame:
-    input_path = DATA_DIR / dir_label / input_file
-    df = load_data(input_path)
     if y_axis not in df.columns:
-        raise ValueError(f"Column '{y_axis}' not found in {input_path!r}")
+        raise ValueError(f"Column '{y_axis}' not found in DataFrame.")
     df["Brand"] = df["Racquet"].apply(lambda s: re.findall(r"[A-Z][a-z]+", s)[0])
     all_brands = sorted(df["Brand"].unique())
     if brand:
@@ -143,28 +133,25 @@ def violin_plot(
         df = df[df["Brand"] == brand]
         x_col = "Racquet"
         order = sorted(df[x_col].unique())
-        stem_label = brand.lower()
     else:
         x_col = "Brand"
-        categories = all_brands
-        stem_label = "by_brand"
-        fig, ax = _init_plot(n_colors=len(all_brands))
-        sns.violinplot(
-            data=df,
-            x=(x_col if orient == "v" else y_axis),
-            y=(y_axis if orient == "v" else x_col),
-            order=order,
-            orient=orient,
-            inner=inner,
-            ax=ax,
-        )
-        sns.despine(ax=ax)
-        xlabel, ylabel = (x_col, y_axis) if orient == "v" else (y_axis, x_col)
-        ax.set(
-            xlabel=xlabel.capitalize(),
-            ylabel=ylabel.capitalize(),
-            title=f"Violin Plot of {y_axis.capitalize()} for {brand or 'All Brands'}",
-        )
-        stem = Path(input_file).stem
-        _save_fig(fig, stem, f"{stem_label}_{y_axis}_violin", output_dir)
-        return df
+        order = all_brands
+    fig, ax = _init_fig()
+    sns.violinplot(
+        data=df,
+        x=(x_col if orient == "v" else y_axis),
+        y=(y_axis if orient == "v" else x_col),
+        order=order,
+        orient=orient,
+        inner=inner,
+        ax=ax,
+    )
+    xlabel, ylabel = (x_col, y_axis) if orient == "v" else (y_axis, x_col)
+    ax.set(
+        xlabel=xlabel.capitalize(),
+        ylabel=ylabel.capitalize(),
+        title=f"Violin Plot of {y_axis.capitalize()} for {brand or 'All Brands'}",
+    )
+    if save:
+        _save_fig(fig, output_path)
+    return df
