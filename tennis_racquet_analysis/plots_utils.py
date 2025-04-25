@@ -31,6 +31,7 @@ def _save_fig(fig: plt.Figure, path: Path):
     fig.savefig(path)
     plt.close(fig)
 
+
 def _set_axis_bounds(ax, vals: pd.Series, axis: str = "x"):
     """
     Set axis limits so that
@@ -53,13 +54,17 @@ def histogram(
     num_bins: int,
     output_path: Path,
     save: bool = True,
+    ax: plt.Axes = None,
 ) -> pd.DataFrame:
     if x_axis not in df.columns:
         raise ValueError(f"Column '{x_axis}' not in DataFrame.")
-    fig, ax = _init_fig()
+    if ax is None:
+        fig, ax = _init_fig()
+    else:
+        fig = ax.figure
     sns.histplot(data=df, x=x_axis, bins=num_bins, ax=ax)
     vals = df[x_axis]
-    ax.set_xlim(0, vals.max()+1)
+    ax.set_xlim(0, vals.max() + 1)
     ax.set(
         xlabel=x_axis.capitalize(), ylabel="Frequency", title=f"Histogram of {x_axis.capitalize()}"
     )
@@ -125,14 +130,10 @@ def box_plot(
     )
     vals = df[y_axis]
     if orient.lower().startswith("h"):
-       _set_axis_bounds(ax, vals, axis="x")
+        _set_axis_bounds(ax, vals, axis="x")
     else:
-       _set_axis_bounds(ax, vals, axis="y")
-       xlabel, ylabel = (
-           (x_col, y_axis)
-           if orient.lower().startswith("v")
-           else (y_axis, x_col)
-       )
+        _set_axis_bounds(ax, vals, axis="y")
+        xlabel, ylabel = (x_col, y_axis) if orient.lower().startswith("v") else (y_axis, x_col)
     ax.set(
         xlabel=xlabel.capitalize(),
         ylabel=ylabel.capitalize(),
@@ -180,11 +181,7 @@ def violin_plot(
         _set_axis_bounds(ax, vals, axis="x")
     else:
         _set_axis_bounds(ax, vals, axis="y")
-        xlabel, ylabel = (
-            (x_col, y_axis)
-            if orient.lower().startswith("v")
-            else (y_axis, x_col)
-        )
+        xlabel, ylabel = (x_col, y_axis) if orient.lower().startswith("v") else (y_axis, x_col)
     ax.set(
         xlabel=xlabel.capitalize(),
         ylabel=ylabel.capitalize(),
