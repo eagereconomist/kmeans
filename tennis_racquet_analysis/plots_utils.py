@@ -33,13 +33,6 @@ def _save_fig(fig: plt.Figure, path: Path):
 
 
 def _set_axis_bounds(ax, vals: pd.Series, axis: str = "x"):
-    """
-    Set axis limits so that
-        - lower = min(vals.min(), 0)
-        - upper = vals.max() + 1
-        axis: "x" or "y"
-        pad: absolute padding to add to the high end
-    """
     lower = min(vals.min(), 0)
     higher = vals.max() + 1
     if axis == "x":
