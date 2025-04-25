@@ -31,6 +31,21 @@ def _save_fig(fig: plt.Figure, path: Path):
     fig.savefig(path)
     plt.close(fig)
 
+def _set_axis_bounds(ax, vals: pd.Series, axis: str = "x", pad: float = 1.0):
+    """
+    Set axis limits so that
+        - lower = min(vals.min(), 0)
+        - upper = vals.max() + pad
+        axis: "x" or "y"
+        pad: absolute padding to add to the high end
+    """
+    lower = min(vals.min(), 0)
+    higher = vals.max() + pad
+    if axis == "x":
+        ax.set_xlim(lower, higher)
+    else:
+        ax.set_ylim(lower, higher)
+
 
 def histogram(
     df: pd.DataFrame,
@@ -43,6 +58,8 @@ def histogram(
         raise ValueError(f"Column '{x_axis}' not in DataFrame.")
     fig, ax = _init_fig()
     sns.histplot(data=df, x=x_axis, bins=num_bins, ax=ax)
+    vals = df[x_axis]
+    _set_axis_bounds(ax, vals, axis="x", pad=1.0)
     ax.set(
         xlabel=x_axis.capitalize(), ylabel="Frequency", title=f"Histogram of {x_axis.capitalize()}"
     )
@@ -63,6 +80,9 @@ def scatter_plot(
         raise ValueError(f"Columns {missing} not in DataFrame.")
     fig, ax = _init_fig()
     sns.scatterplot(data=df, x=x_axis, y=y_axis, ax=ax)
+    x_vals, y_vals = df[x_axis], df[y_axis]
+    _set_axis_bounds(ax, x_axis, axis="x", pad=1.0)
+    _set_axis_bounds(ax, y_vals, axis="y", pad=1.0)
     ax.set(
         xlabel=x_axis.capitalize(),
         ylabel=y_axis.capitalize(),
@@ -103,7 +123,16 @@ def box_plot(
         orient=orient,
         ax=ax,
     )
-    xlabel, ylabel = (x_col, y_axis) if orient == "v" else (y_axis, x_col)
+    vals = df[y_axis]
+    if orient.lower().startswith("h"):
+       _set_axis_bounds(ax, vals, axis="y", pad=1.0)
+    else:
+       _set_axis_bounds(ax, vals, axis="y", pad=1.0)
+       xlabel, ylabel = (
+           (x_col, y_axis)
+           if orient.lower().startswith("v")
+           else (y_axis, x_col)
+       )
     ax.set(
         xlabel=xlabel.capitalize(),
         ylabel=ylabel.capitalize(),
@@ -146,7 +175,16 @@ def violin_plot(
         inner=inner,
         ax=ax,
     )
-    xlabel, ylabel = (x_col, y_axis) if orient == "v" else (y_axis, x_col)
+    vals = df[y_axis]
+    if orient.lower().startswith("h"):
+        _set_axis_bounds(ax, vals, axis="x", pad=1.0)
+    else:
+        _set_axis_bounds(ax, vals, axis="y", pad=1.0)
+        xlabel, ylabel = (
+            (x_col, y_axis)
+            if orient.lower().startswith("v")
+            else (y_axis, x_col)
+        )
     ax.set(
         xlabel=xlabel.capitalize(),
         ylabel=ylabel.capitalize(),
