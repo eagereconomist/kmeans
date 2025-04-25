@@ -79,11 +79,15 @@ def scatter_plot(
     y_axis: str,
     output_path: Path,
     save: bool = True,
+    ax: plt.Axes = None,
 ) -> pd.DataFrame:
     missing = [col for col in (x_axis, y_axis) if col not in df.columns]
     if missing:
         raise ValueError(f"Columns {missing} not in DataFrame.")
-    fig, ax = _init_fig()
+    if ax is None:
+        fig, ax = _init_fig()
+    else:
+        fig = ax.figure
     sns.scatterplot(data=df, x=x_axis, y=y_axis, ax=ax)
     x_vals, y_vals = df[x_axis], df[y_axis]
     _set_axis_bounds(ax, x_vals, axis="x")
@@ -105,6 +109,7 @@ def box_plot(
     brand: str = None,
     orient: str = "v",
     save: bool = True,
+    ax: plt.Axes = None,
 ) -> pd.DataFrame:
     if y_axis not in df.columns:
         raise ValueError(f"Column '{y_axis}' not found in DataFrame.")
@@ -119,7 +124,10 @@ def box_plot(
     else:
         x_col = "Brand"
         order = all_brands
-    fig, ax = _init_fig()
+    if ax is None:
+        fig, ax = _init_fig()
+    else:
+        fig = ax.figure
     sns.boxplot(
         data=df,
         x=(x_col if orient == "v" else y_axis),
@@ -152,6 +160,7 @@ def violin_plot(
     orient: str = "v",
     inner: str = "box",
     save: bool = True,
+    ax: plt.Axes = None,
 ) -> pd.DataFrame:
     if y_axis not in df.columns:
         raise ValueError(f"Column '{y_axis}' not found in DataFrame.")
@@ -166,7 +175,10 @@ def violin_plot(
     else:
         x_col = "Brand"
         order = all_brands
-    fig, ax = _init_fig()
+    if ax is None:
+        ax, fig = _init_fig()
+    else:
+        fig = ax.figure
     sns.violinplot(
         data=df,
         x=(x_col if orient == "v" else y_axis),
