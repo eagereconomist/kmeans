@@ -81,7 +81,7 @@ def scatter_plot(
     fig, ax = _init_fig()
     sns.scatterplot(data=df, x=x_axis, y=y_axis, ax=ax)
     x_vals, y_vals = df[x_axis], df[y_axis]
-    _set_axis_bounds(ax, x_axis, axis="x")
+    _set_axis_bounds(ax, x_vals, axis="x")
     _set_axis_bounds(ax, y_vals, axis="y")
     ax.set(
         xlabel=x_axis.capitalize(),
