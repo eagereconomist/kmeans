@@ -59,7 +59,7 @@ def histogram(
     fig, ax = _init_fig()
     sns.histplot(data=df, x=x_axis, bins=num_bins, ax=ax)
     vals = df[x_axis]
-    _set_axis_bounds(ax, vals, axis="x")
+    ax.set_xlim(0, vals.max()+1)
     ax.set(
         xlabel=x_axis.capitalize(), ylabel="Frequency", title=f"Histogram of {x_axis.capitalize()}"
     )
