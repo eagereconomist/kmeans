@@ -169,7 +169,7 @@ def violin_plot(
         x_col = "Brand"
         order = all_brands
     if ax is None:
-        ax, fig = _init_fig()
+        fig, ax = _init_fig()
     else:
         fig = ax.figure
     sns.violinplot(
