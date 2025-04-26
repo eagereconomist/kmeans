@@ -33,8 +33,7 @@ def _save_fig(fig: plt.Figure, path: Path):
 
 
 def _set_axis_bounds(ax, vals: pd.Series, axis: str = "x"):
-    lower = min(vals.min(), 0)
-    higher = vals.max() + 1
+    lower, higher = 0, vals.max() + 1
     if axis == "x":
         ax.set_xlim(lower, higher)
     else:
@@ -132,6 +131,7 @@ def box_plot(
     vals = df[y_axis]
     if orient.lower().startswith("h"):
         _set_axis_bounds(ax, vals, axis="x")
+        xlabel, ylabel = x_col, y_axis
     else:
         _set_axis_bounds(ax, vals, axis="y")
         xlabel, ylabel = (x_col, y_axis) if orient.lower().startswith("v") else (y_axis, x_col)
