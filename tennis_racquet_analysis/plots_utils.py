@@ -184,6 +184,7 @@ def violin_plot(
     vals = df[y_axis]
     if orient.lower().startswith("h"):
         _set_axis_bounds(ax, vals, axis="x")
+        xlabel, ylabel = x_col, y_axis
     else:
         _set_axis_bounds(ax, vals, axis="y")
         xlabel, ylabel = (x_col, y_axis) if orient.lower().startswith("v") else (y_axis, x_col)
