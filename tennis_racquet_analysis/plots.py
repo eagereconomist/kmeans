@@ -2,7 +2,6 @@ import typer
 from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
-import numpy as np
 
 from tennis_racquet_analysis.config import DATA_DIR, FIGURES_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data
@@ -235,6 +234,9 @@ def dendrogram_plt(
 ):
     input_path = DATA_DIR / dir_label / input_file
     df = load_data(input_path)
+    stem = Path(input_file).stem
+    file_name = f"{stem}_{linkage_method}_{distance_metric}_dendrogram.png"
+    output_path = output_path / file_name
     array = df_to_array(df)
     label = df_to_labels(df, label_col)
     Z = compute_linkage(
@@ -247,7 +249,7 @@ def dendrogram_plt(
         orient=orient,
         save=not no_save,
     )
-    typer.echo(f"Dendrogram {'generated' if no_save else 'saved to'} {output_path}")
+    logger.success(f"Dendrogram {'generated' if no_save else 'saved to'} {output_path}")
 
 
 if __name__ == "__main__":
