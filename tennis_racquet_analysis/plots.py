@@ -2,10 +2,15 @@ import typer
 from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
+import numpy as np
 
 from tennis_racquet_analysis.config import DATA_DIR, FIGURES_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data
 from tennis_racquet_analysis.plots_utils import (
+    df_to_array,
+    df_to_labels,
+    compute_linkage,
+    dendrogram_plot,
     histogram,
     scatter_plot,
     box_plot,
@@ -177,6 +182,72 @@ def violinplt(
         logger.success("Violin plot generated (not saved to disk).")
     else:
         logger.success(f"Violin plot saved to {output_path!r}")
+
+
+@app.command("dendrogram")
+def dendrogram_plt(
+    input_file: Path = typer.Argument(..., help="csv filename."),
+    dir_label: str = typer.Argument("Sub-folder under data/"),
+    label_col: str = typer.Option(
+        "Racquet", "--label", "-l", help="Which column to use for leaf labels."
+    ),
+    linkage_method: str = typer.Option(
+        "centroid",
+        "--method",
+        "-m",
+        help="Methods for calculating the distance between clusters are: 'single', 'complete', 'average', 'weighted', 'centroid' (default), 'median', and 'ward'.",
+    ),
+    distance_metric: str = typer.Option(
+        "euclidean",
+        "--metric",
+        "-d",
+        help="Pairwise distances between observations in n-dimensional space. The different distance metrics that are available to use are:"
+        "'braycurtis', 'canberra', 'chebyshev', 'cityblock', 'correlation', 'cosine', 'dice', 'euclidean' (default), 'hamming', 'jaccard', "
+        "'jensenshannon', 'kulczynski1', 'mahalanobis', 'matching', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener',"
+        "'sokalsneath', 'sqeuclidean', 'yule'.",
+    ),
+    ordering: bool = typer.Option(
+        True,
+        "--ordering",
+        "-ord",
+        help="Optimal ordering set to 'True' by default, which results in more intuitive tree structure when the data are visualized."
+        "However, the algorithm can be slow especially with larger datasets.",
+    ),
+    output_path: Path = typer.Option(
+        FIGURES_DIR,
+        "--output-path",
+        "-o",
+        dir_okay=True,
+        file_okay=False,
+    ),
+    orient: str = typer.Option(
+        "right",
+        "--orient",
+        "-ort",
+        help="Direction to plot the dendrogram. The following directions are: 'top', 'bottom', 'left', and 'right' (default).",
+    ),
+    no_save: bool = typer.Option(
+        False,
+        "--no-save",
+        "-n",
+        help="Generate plot, but don't write to disk.",
+    ),
+):
+    input_path = DATA_DIR / dir_label / input_file
+    df = load_data(input_path)
+    array = df_to_array(df)
+    label = df_to_labels(df, label_col)
+    Z = compute_linkage(
+        array, method=linkage_method, metric=distance_metric, optimal_ordering=ordering
+    )
+    dendrogram_plot(
+        Z=Z,
+        labels=label,
+        output_path=output_path,
+        orient=orient,
+        save=not no_save,
+    )
+    typer.echo(f"Dendrogram {'generated' if no_save else 'saved to'} {output_path}")
 
 
 if __name__ == "__main__":
