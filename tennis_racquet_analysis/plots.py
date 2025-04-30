@@ -1,3 +1,4 @@
+from typing import Optional
 import typer
 from pathlib import Path
 from loguru import logger
@@ -187,8 +188,11 @@ def violinplt(
 def dendrogram_plt(
     input_file: Path = typer.Argument(..., help="csv filename."),
     dir_label: str = typer.Argument("Sub-folder under data/"),
-    label_col: str = typer.Option(
-        "Racquet", "--label", "-l", help="Which column to use for leaf labels."
+    label_col: Optional[str] = typer.Option(
+        None,
+        "--label",
+        "-l",
+        help="Column to use for leaf labels; if omitted leabes are numbered by index.",
     ),
     linkage_method: str = typer.Option(
         "centroid",
@@ -235,16 +239,23 @@ def dendrogram_plt(
     input_path = DATA_DIR / dir_label / input_file
     df = load_data(input_path)
     stem = Path(input_file).stem
-    file_name = f"{stem}_{linkage_method}_{distance_metric}_dendrogram.png"
+    file_name = f"{stem}_{label_col}_{linkage_method}_{distance_metric}_dendrogram.png"
     output_path = output_path / file_name
     array = df_to_array(df)
-    label = df_to_labels(df, label_col)
+    if label_col is None:
+        labels = None
+    else:
+        if label_col not in df.columns:
+            raise typer.BadParameter(
+                f"`{label_col}` is not a column in your data. Available: {list(df.columns)}"
+            )
+        labels = df_to_labels(df, label_col)
     Z = compute_linkage(
         array, method=linkage_method, metric=distance_metric, optimal_ordering=ordering
     )
     dendrogram_plot(
         Z=Z,
-        labels=label,
+        labels=labels,
         output_path=output_path,
         orient=orient,
         save=not no_save,
