@@ -86,6 +86,11 @@ def dendrogram_plot(
             orientation=orient,
             ax=ax,
         ),
+        ax.set(
+            title=("Hierarchical Clustering Dendrogram (all leaves)"),
+            xlabel=("Distance"),
+            ylabel=("Racquet Model"),
+        ),
     )
     if save:
         _save_fig(fig, output_path)
