@@ -253,6 +253,7 @@ def dendrogram_plt(
     Z = compute_linkage(
         array, method=linkage_method, metric=distance_metric, optimal_ordering=ordering
     )
+    steps = tqdm(total=1, desc="Dendrogram", ncols=100)
     dendrogram_plot(
         Z=Z,
         labels=labels,
@@ -260,6 +261,8 @@ def dendrogram_plt(
         orient=orient,
         save=not no_save,
     )
+    steps.update(1)
+    steps.close()
     logger.success(f"Dendrogram {'generated' if no_save else 'saved to'} {output_path}")
 
 
