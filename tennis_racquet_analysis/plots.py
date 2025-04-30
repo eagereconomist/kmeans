@@ -192,7 +192,7 @@ def dendrogram_plt(
         None,
         "--label",
         "-l",
-        help="Column to use for leaf labels; if omitted leabes are numbered by index.",
+        help="Column to use for leaf labels; if omitted leaves are numbered by index.",
     ),
     linkage_method: str = typer.Option(
         "centroid",
