@@ -15,6 +15,7 @@ from tennis_racquet_analysis.plots_utils import (
     scatter_plot,
     box_plot,
     violin_plot,
+    correlation_matrix_heatmap,
 )
 
 app = typer.Typer()
@@ -264,6 +265,38 @@ def dendrogram_plt(
     steps.update(1)
     steps.close()
     logger.success(f"Dendrogram {'generated' if no_save else 'saved to'} {output_path}")
+
+
+@app.command("heatmap")
+def corr_heat(
+    input_file: str = typer.Argument("csv filename."),
+    dir_label: str = typer.Argument("Sub-folder under data/"),
+    output_dir: Path = typer.Option(
+        FIGURES_DIR,
+        "--output-dir",
+        "-o",
+        dir_okay=True,
+        file_okay=False,
+        help="Where to save the .png plot.",
+    ),
+    no_save: bool = typer.Option(
+        False,
+        "--no-save",
+        "-n",
+        help="Generate plot, but don't write to disk.",
+    ),
+):
+    input_path = DATA_DIR / dir_label / input_file
+    df = load_data(input_path)
+    output_path = output_dir / f"{Path(input_file).stem}_heatmap.png"
+    steps = tqdm(total=1, desc="Heatmap", ncols=100)
+    correlation_matrix_heatmap(df, output_path, save=not no_save)
+    steps.update(1)
+    steps.close()
+    if not no_save:
+        logger.success(f"Heatmap saved to {output_path}")
+    else:
+        logger.success("Heatmap generated (not saved to disk).")
 
 
 if __name__ == "__main__":
