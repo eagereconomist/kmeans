@@ -15,7 +15,7 @@ sns.set_theme(
 )
 
 
-def _init_fig(figsize=(10, 6)):
+def _init_fig(figsize=(20, 14)):
     """
     Create a fig + ax with shared cubehelix palette.
     """
@@ -37,7 +37,7 @@ def _save_fig(fig: plt.Figure, path: Path):
 
 
 def _set_axis_bounds(ax, vals: pd.Series, axis: str = "x"):
-    lower, higher = 0, vals.max() + 1
+    lower, higher = 0, vals.max() + 50
     if axis == "x":
         ax.set_xlim(lower, higher)
     else:
@@ -113,7 +113,7 @@ def histogram(
         fig = ax.figure
     sns.histplot(data=df, x=x_axis, bins=num_bins, ax=ax)
     vals = df[x_axis]
-    ax.set_xlim(0, vals.max() + 1)
+    _set_axis_bounds(ax, vals, axis="x")
     ax.set(
         xlabel=x_axis.capitalize(), ylabel="Frequency", title=f"Histogram of {x_axis.capitalize()}"
     )
@@ -250,6 +250,40 @@ def violin_plot(
         ylabel=ylabel.capitalize(),
         title=f"Violin Plot of {y_axis.capitalize()} for {brand or 'All Brands'}",
     )
+    if save:
+        _save_fig(fig, output_path)
+    return df
+
+
+def correlation_matrix_heatmap(
+    df: pd.DataFrame,
+    output_path: Path,
+    save: bool = True,
+    ax: plt.Axes = None,
+) -> pd.DataFrame:
+    corr = df.corr(method="pearson")
+    if ax is None:
+        fig, ax = _init_fig()
+    else:
+        fig = ax.figure
+    sns.heatmap(
+        corr,
+        annot=True,
+        fmt=".2f",
+        center=0,
+        cmap="crest",
+        linewidths=0.5,
+        vmin=-1,
+        vmax=1,
+        ax=ax,
+    )
+    ax.set(
+        title=f"Correlation Matrix Heatmap {output_path.stem}",
+        xlabel="Features",
+    )
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
+    plt.tight_layout()
     if save:
         _save_fig(fig, output_path)
     return df
