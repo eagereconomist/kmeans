@@ -31,8 +31,7 @@ def main(
         None,
         "-dropped-column",
         "-dc",
-        help="Name of column to drop; repeat flag to add more. By default"
-        "'Racquet' will be dropped from DataFrame.",
+        help="Name of column to drop; repeat flag to add more.",
     ),
     renamed_columns: Optional[List[str]] = typer.Option(
         None,
