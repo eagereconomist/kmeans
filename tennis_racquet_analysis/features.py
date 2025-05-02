@@ -1,7 +1,7 @@
 from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
-from typing import List, Optional
+from typing import List
 from itertools import combinations
 import typer
 from tennis_racquet_analysis.config import INTERIM_DATA_DIR
@@ -38,16 +38,14 @@ def main(
         "-l",
         help="Suffix for the output file before `.csv`.",
     ),
-    squared_columns: Optional[List[str]] = typer.Option(
-        None,
+    squared_columns: List[str] = typer.Option(
+        [],
         "--squared-column",
         "-sc",
-        help="Name of column to square; repeat flag to add more. By default"
-        "'headsize' and 'swingweight' will be squared",
-        show_default=True,
+        help="Name of column to square; repeat flag to add more.",
     ),
     interaction_columns: List[str] = typer.Option(
-        ["length", "staticweight", "balance", "swingweight", "headsize", "beamwidth"],
+        [],
         "--interaction-column",
         "-ic",
         help="Name of columns to multiply; repeat flag to add more.",
@@ -60,16 +58,9 @@ def main(
     input_path = input_dir / input_file
     logger.info(f"Loading preprocessed dataset from {input_path!r}")
     df = load_data(input_path)
-    default_cols = ["headsize", "swingweight"]
-    squared_cols = squared_columns if squared_columns is not None else default_cols
-    missing_sq = set(squared_cols) - set(df.columns)
-    if missing_sq:
-        raise typer.BadParameter(f"Columns not found in DataFrame: {missing_sq!r}")
-    missing_int = set(interaction_columns) - set(df.columns)
-    if missing_int:
-        raise typer.BadParameter(f"Interaction columns not found: {missing_int!r}")
-
-    feature_steps = [(f"squared_columns {col}", squared, {"column": col}) for col in squared_cols]
+    feature_steps = [
+        (f"squared_columns {col}", squared, {"column": col}) for col in squared_columns
+    ]
     for col_1, col_2 in combinations(interaction_columns, 2):
         feature_steps.append(
             (
