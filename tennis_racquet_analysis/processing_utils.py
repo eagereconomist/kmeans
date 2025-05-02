@@ -3,7 +3,6 @@ import numpy as np
 from pathlib import Path
 from sklearn import preprocessing
 from sklearn.preprocessing import Normalizer, StandardScaler, MinMaxScaler
-from sklearn.preprocessing import FunctionTransformer
 from tennis_racquet_analysis.preprocessing_utils import load_data  # noqa: F401
 
 
@@ -28,14 +27,14 @@ def apply_normalizer(df: pd.DataFrame) -> pd.DataFrame:
 def apply_standardization(df: pd.DataFrame) -> pd.DataFrame:
     num_cols = df.select_dtypes(include=np.number).columns
     scaler = StandardScaler().fit(df[num_cols])
-    df[num_cols] = scaler.transfrom(df[num_cols])
+    df[num_cols] = scaler.transform(df[num_cols])
     return df
 
 
 def apply_minmax(df: pd.DataFrame) -> pd.DataFrame:
     num_cols = df.select_dtypes(include=np.number).columns
     scaler = MinMaxScaler().fit(df[num_cols])
-    df[num_cols] = scaler.transfrom(df[num_cols])
+    df[num_cols] = scaler.transform(df[num_cols])
     return df
 
 
