@@ -28,13 +28,13 @@ def main(
         help="Suffix for the ouput file before .csv",
     ),
     dropped_columns: Optional[List[str]] = typer.Option(
-        None,
+        [],
         "-dropped-column",
         "-dc",
         help="Name of column to drop; repeat flag to add more.",
     ),
     renamed_columns: Optional[List[str]] = typer.Option(
-        None,
+        [],
         "--rename-column",
         "-rc",
         help="Name of column to rename (dots -> underscores)"
@@ -44,19 +44,11 @@ def main(
     input_path = input_dir / input_file
     logger.info(f"Loading raw dataset from: {input_path}...")
     df = load_data(input_path)
-    dropped_cols = dropped_columns or []
-    if dropped_cols:
-        missing = set(dropped_cols) - set(df.columns)
-        if missing:
-            raise typer.BadParameter(f"Column(s) not found in DataFrame: {missing!r}")
-    renamed_cols = renamed_columns or []
-    if renamed_cols:
-        missing = set(renamed_cols) - set(df.columns)
-        if missing:
-            raise typer.BadParameter(f"Column(s) to rename not found: {missing!r}")
     cleaning_steps: list[tuple[str, callable, dict]] = []
-    cleaning_steps += [("drop_column", drop_column, {"column": col}) for col in dropped_cols]
-    cleaning_steps += [("rename_column", rename_column, {"column": col}) for col in renamed_cols]
+    cleaning_steps += [("drop_column", drop_column, {"column": col}) for col in dropped_columns]
+    cleaning_steps += [
+        ("rename_column", rename_column, {"column": col}) for col in renamed_columns
+    ]
     for step_name, func, kwargs in tqdm(
         cleaning_steps, total=len(cleaning_steps), ncols=100, desc="Data Preprocessing Steps:"
     ):
@@ -65,10 +57,10 @@ def main(
 
     stem = Path(input_file).stem
     suffix_parts: list[str] = []
-    if dropped_cols:
-        suffix_parts.append("drop-" + "-".join(dropped_cols))
-    if renamed_cols:
-        suffix_parts.append("rename-" + "-".join(renamed_cols))
+    if dropped_columns:
+        suffix_parts.append("drop-" + "-".join(dropped_columns))
+    if renamed_columns:
+        suffix_parts.append("rename-" + "-".join(renamed_columns))
     suffix = "_".join(suffix_parts)
     output_file = f"{stem}_{file_label}" + (f"_{suffix}" if suffix else "") + ".csv"
     output_path = INTERIM_DATA_DIR / output_file
