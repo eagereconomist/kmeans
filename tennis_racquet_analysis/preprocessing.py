@@ -64,7 +64,13 @@ def main(
         df = func(df, **kwargs)
 
     stem = Path(input_file).stem
-    output_file = f"{stem}_{file_label}_{dropped_columns}_{renamed_columns}.csv"
+    suffix_parts: list[str] = []
+    if dropped_cols:
+        suffix_parts.append("drop-" + "-".join(dropped_cols))
+    if renamed_cols:
+        suffix_parts.append("rename-" + "-".join(renamed_cols))
+    suffix = "_".join(suffix_parts)
+    output_file = f"{stem}_{file_label}" + (f"_{suffix}" if suffix else "") + ".csv"
     output_path = INTERIM_DATA_DIR / output_file
     df.to_csv(output_path, index=False)
     logger.info(f"Preprocessed DataFrame type: {type(df)}")
