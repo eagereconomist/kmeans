@@ -1,7 +1,7 @@
 from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
-from typing import List, Optional
+from typing import List
 import typer
 from tennis_racquet_analysis.config import RAW_DATA_DIR, INTERIM_DATA_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data, drop_column, rename_column
@@ -27,13 +27,13 @@ def main(
         "-l",
         help="Suffix for the ouput file before .csv",
     ),
-    dropped_columns: Optional[List[str]] = typer.Option(
+    dropped_columns: List[str] = typer.Option(
         [],
         "-dropped-column",
         "-dc",
         help="Name of column to drop; repeat flag to add more.",
     ),
-    renamed_columns: Optional[List[str]] = typer.Option(
+    renamed_columns: List[str] = typer.Option(
         [],
         "--rename-column",
         "-rc",
