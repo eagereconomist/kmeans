@@ -13,10 +13,10 @@ def load_data(input_path: Path) -> pd.DataFrame:
         raise FileNotFoundError(f"File not found. Please check your path: {input_path}")
 
 
-def drop_column(dataframe, column):
-    return dataframe.drop(columns=[column])
+def drop_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    return df.drop(columns=[column])
 
 
-def rename_column(dataframe, column):
+def rename_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
     new_column = column.replace(".", "")
-    return dataframe.rename(columns={column: new_column})
+    return df.rename(columns={column: new_column})
