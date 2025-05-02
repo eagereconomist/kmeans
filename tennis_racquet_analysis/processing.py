@@ -78,6 +78,8 @@ def main(
         )
         processed_paths[step_name] = output_path
         logger.success(f"-> Wrote {step_name} to {output_path!r}")
+    logger.info(f"Processed DataFrame type: {type(df)}")
+    logger.info(f"Processed DataFrame dimensions: {df.shape}")
     typer.echo(f"All done. Files written to {output_dir}")
     return processed_paths
 
