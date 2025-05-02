@@ -37,7 +37,7 @@ def _save_fig(fig: plt.Figure, path: Path):
 
 
 def _set_axis_bounds(ax, vals: pd.Series, axis: str = "x"):
-    lower, higher = 0, vals.max() + 50
+    lower, higher = 0, vals.max() + 1
     if axis == "x":
         ax.set_xlim(lower, higher)
     else:
