@@ -18,31 +18,35 @@ def write_csv(dataframe: pd.DataFrame, prefix: str, suffix: str, output_dir: Pat
     return file_path
 
 
-def apply_normalizer(dataframe):
-    scaler = Normalizer()
-    scaled = scaler.fit_transform(dataframe)
-    return pd.DataFrame(scaled, columns=dataframe.columns)
+def apply_normalizer(df: pd.DataFrame) -> pd.DataFrame:
+    num_cols = df.select_dtypes(include=np.number).columns
+    scaler = Normalizer().fit(df[num_cols])
+    df[num_cols] = scaler.transform(df[num_cols])
+    return df
 
 
-def apply_standardization(dataframe):
-    scaler = StandardScaler()
-    scaled = scaler.fit_transform(dataframe)
-    return pd.DataFrame(scaled, columns=dataframe.columns)
+def apply_standardization(df: pd.DataFrame) -> pd.DataFrame:
+    num_cols = df.select_dtypes(include=np.number).columns
+    scaler = StandardScaler().fit(df[num_cols])
+    df[num_cols] = scaler.transfrom(df[num_cols])
+    return df
 
 
-def apply_minmax(dataframe):
-    scaler = MinMaxScaler()
-    scaled = scaler.fit_transform(dataframe)
-    return pd.DataFrame(scaled, columns=dataframe.columns)
+def apply_minmax(df: pd.DataFrame) -> pd.DataFrame:
+    num_cols = df.select_dtypes(include=np.number).columns
+    scaler = MinMaxScaler().fit(df[num_cols])
+    df[num_cols] = scaler.transfrom(df[num_cols])
+    return df
 
 
-def log_transform(dataframe):
-    scaler = FunctionTransformer(np.log1p, validate=True)
-    scaled = scaler.fit_transform(dataframe)
-    return pd.DataFrame(scaled, columns=dataframe.columns)
+def log_transform(df: pd.DataFrame) -> pd.DataFrame:
+    num_cols = df.select_dtypes(include=np.number).columns
+    df[num_cols] = np.log1p(df[num_cols])
+    return df
 
 
-def yeo_johnson(dataframe):
-    scaler = preprocessing.PowerTransformer(method="yeo-johnson", standardize=True)
-    scaled = scaler.fit_transform(dataframe)
-    return pd.DataFrame(scaled, columns=dataframe.columns)
+def yeo_johnson(df: pd.DataFrame) -> pd.DataFrame:
+    num_cols = df.select_dtypes(include=np.number).columns
+    scaler = preprocessing.PowerTransformer(method="yeo-johnson").fit(df[num_cols])
+    df[num_cols] = scaler.transform(df[num_cols])
+    return df
