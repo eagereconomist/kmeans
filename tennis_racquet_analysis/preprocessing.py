@@ -4,7 +4,12 @@ from tqdm import tqdm
 from typing import List
 import typer
 from tennis_racquet_analysis.config import RAW_DATA_DIR, INTERIM_DATA_DIR
-from tennis_racquet_analysis.preprocessing_utils import load_data, drop_column, rename_column
+from tennis_racquet_analysis.preprocessing_utils import (
+    load_data,
+    check_iqr_outliers,
+    drop_column,
+    rename_column,
+)
 
 app = typer.Typer()
 
@@ -33,6 +38,12 @@ def main(
         "-dc",
         help="Name of column to drop; repeat flag to add more.",
     ),
+    iqr_check: bool = typer.Option(
+        False,
+        "--iqr-check",
+        "-iqr",
+        help="If set, identify IQR outliers in the cleaned DataFrame and print them.",
+    ),
     renamed_columns: List[str] = typer.Option(
         [],
         "--rename-column",
@@ -54,6 +65,14 @@ def main(
     ):
         logger.info(f"Applying {step_name}...")
         df = func(df, **kwargs)
+    if iqr_check:
+        logger.info("Checking for IQR outliers...")
+        outliers = check_iqr_outliers(df)
+        if outliers.empty:
+            logger.info("No IQR-based outliers detected.")
+        else:
+            typer.echo("\nDetected IQR outliers (row, column, value):")
+            typer.echo(outliers.to_frame(name="outlier_value"))
 
     stem = Path(input_file).stem
     suffix_parts: list[str] = []
