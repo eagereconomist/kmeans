@@ -8,6 +8,7 @@ from tennis_racquet_analysis.preprocessing_utils import (
     load_data,
     check_iqr_outliers,
     drop_column,
+    drop_row,
     rename_column,
 )
 
@@ -44,6 +45,9 @@ def main(
         "-iqr",
         help="If set, identify IQR outliers in the cleaned DataFrame and print them.",
     ),
+    drop_rows: List[int] = typer.Option(
+        [], "-dropped-row", "-dr", help="Drop rows by integer index."
+    ),
     renamed_columns: List[str] = typer.Option(
         [],
         "--rename-column",
@@ -60,8 +64,9 @@ def main(
     cleaning_steps += [
         ("rename_column", rename_column, {"column": col}) for col in renamed_columns
     ]
+    cleaning_steps += [("drop_row", drop_row, {"index_list": [row]}) for row in drop_rows]
     for step_name, func, kwargs in tqdm(
-        cleaning_steps, total=len(cleaning_steps), ncols=100, desc="Data Preprocessing Steps:"
+        cleaning_steps, total=len(cleaning_steps), ncols=100, desc="Data Preprocessing Steps"
     ):
         logger.info(f"Applying {step_name}...")
         df = func(df, **kwargs)
@@ -73,13 +78,14 @@ def main(
         else:
             typer.echo("\nDetected IQR outliers (row, column, value):")
             typer.echo(outliers.to_frame(name="outlier_value"))
-
     stem = Path(input_file).stem
     suffix_parts: list[str] = []
     if dropped_columns:
         suffix_parts.append("drop-" + "-".join(dropped_columns))
     if renamed_columns:
         suffix_parts.append("rename-" + "-".join(renamed_columns))
+    if drop_rows:
+        suffix_parts.append("drop-rows-" + "-".join(str(r) for r in drop_rows))
     suffix = "_".join(suffix_parts)
     output_file = f"{stem}_{file_label}" + (f"_{suffix}" if suffix else "") + ".csv"
     output_path = INTERIM_DATA_DIR / output_file
