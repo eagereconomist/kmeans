@@ -5,6 +5,7 @@ import pandas as pd
 import seaborn as sns
 import scipy.cluster.hierarchy as sch
 from scipy.spatial.distance import pdist
+import statsmodels.api as sm
 import re
 
 
@@ -287,3 +288,49 @@ def correlation_matrix_heatmap(
     if save:
         _save_fig(fig, output_path)
     return df
+
+
+def qq_plot(
+    df: pd.DataFrame, column: str, output_path: Path, save: bool = True, ax: plt.Axes | None = None
+) -> plt.Axes:
+    if column not in df.columns:
+        raise ValueError(f"Column {column!r} not found")
+    series = df[column]
+    if ax is None:
+        fig, ax = _init_fig()
+    sm.qqplot(series, line="45", ax=ax)
+    ax.set_title(f"Q-Q Plot: {column.capitalize()}")
+    if save:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig = ax.figure
+        fig.savefig(output_path)
+        plt.close(fig)
+    return ax
+
+
+def qq_plots_all(
+    df: pd.DataFrame,
+    output_dir: Path,
+    columns: list[str] | None = None,
+    ncols: int = 3,
+    save: bool = True,
+) -> plt.Figure:
+    if columns is None:
+        columns = df.select_dtypes(include="number").columns.tolist()
+    n = len(columns)
+    nrows = (n + ncols - 1) // ncols
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(4 * ncols, 4 * nrows))
+    axes = axes.flatten()
+    for ax, col in zip(axes, columns):
+        series = df[col]
+        sm.qqplot(series, line="45", ax=ax)
+        ax.set_title(col.capitalize())
+    for extra_ax in axes[n:]:
+        extra_ax.set_visible(False)
+    plt.tight_layout()
+    if save:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / "qq_plots_all.png"
+        fig.savefig(output_path)
+        plt.close(fig)
+    return fig
