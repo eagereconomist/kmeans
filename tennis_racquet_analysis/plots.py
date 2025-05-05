@@ -16,6 +16,8 @@ from tennis_racquet_analysis.plots_utils import (
     box_plot,
     violin_plot,
     correlation_matrix_heatmap,
+    qq_plot,
+    qq_plots_all,
 )
 
 app = typer.Typer()
@@ -297,6 +299,47 @@ def corr_heat(
         logger.success(f"Heatmap saved to {output_path}")
     else:
         logger.success("Heatmap generated (not saved to disk).")
+
+
+@app.command("qq")
+def qq(
+    input_file: str = typer.Argument(..., help="csv filename under the data subfolder."),
+    dir_label: str = typer.Argument(..., help="Sub-folder under data/"),
+    column: list[str] = typer.Option(
+        [], "--column", "-c", help="Column(s) to plot; repeat for multiple."
+    ),
+    all_cols: bool = typer.Option(
+        False,
+        "--all",
+        "-a",
+        help="Plot Q-Q for all numeric columns.",
+    ),
+    output_dir: Path = typer.Option(
+        FIGURES_DIR,
+        "--output-dir",
+        "-o",
+        help="Where to save plot(s).",
+    ),
+    no_save: bool = typer.Option(
+        False,
+        "--no-save",
+        "-n",
+        help="Generate plots, but don't write to disk.",
+    ),
+):
+    df = load_data(DATA_DIR / dir_label / input_file)
+    if column and not all_cols:
+        for col in column:
+            output_path = output_dir / f"{Path(input_file).stem}_{col}_qq.png"
+            qq_plot(df=df, column=col, output_path=output_path, save=not no_save)
+            if not no_save:
+                logger.success(f"Saved Q-Q Plot for {col.capitalize()} to {output_path!r}")
+    elif all_cols:
+        fig = qq_plots_all(df=df, output_dir=output_dir, columns=None, ncols=3, save=not no_save)
+        if not no_save:
+            logger.success(f"Saved combined Q-Q plots to {output_dir / 'qq_plots_all.png'!r}")
+    else:
+        raise typer.BadParameter("Specify one or more --column or use --all")
 
 
 if __name__ == "__main__":
