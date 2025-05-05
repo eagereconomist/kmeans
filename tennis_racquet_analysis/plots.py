@@ -335,7 +335,7 @@ def qq(
             if not no_save:
                 logger.success(f"Saved Q-Q Plot for {col.capitalize()} to {output_path!r}")
     elif all_cols:
-        fig = qq_plots_all(df=df, output_dir=output_dir, columns=None, ncols=3, save=not no_save)
+        qq_plots_all(df=df, output_dir=output_dir, columns=None, ncols=3, save=not no_save)
         if not no_save:
             logger.success(f"Saved combined Q-Q plots to {output_dir / 'qq_plots_all.png'!r}")
     else:
