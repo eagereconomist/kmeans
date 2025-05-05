@@ -6,10 +6,13 @@ import typer
 from tennis_racquet_analysis.config import RAW_DATA_DIR, INTERIM_DATA_DIR
 from tennis_racquet_analysis.preprocessing_utils import (
     load_data,
-    check_iqr_outliers,
+    find_iqr_outliers,
     drop_column,
     drop_row,
     rename_column,
+)
+from tennis_racquet_analysis.processing_utils import (
+    write_csv,
 )
 
 app = typer.Typer()
@@ -35,7 +38,7 @@ def main(
     ),
     dropped_columns: List[str] = typer.Option(
         [],
-        "-dropped-column",
+        "--dropped-column",
         "-dc",
         help="Name of column to drop; repeat flag to add more.",
     ),
@@ -45,8 +48,20 @@ def main(
         "-iqr",
         help="If set, identify IQR outliers in the cleaned DataFrame and print them.",
     ),
+    export_outliers: bool = typer.Option(
+        False,
+        "--export-outliers",
+        "-eo",
+        help="If set, write outliers to the default data/interim/iqr_outliers.csv",
+    ),
+    remove_outliers: bool = typer.Option(
+        False,
+        "--remove-outliers",
+        "-ro",
+        help="When set, drop all rows containing outliers from the working `df`.",
+    ),
     drop_rows: List[int] = typer.Option(
-        [], "-dropped-row", "-dr", help="Drop rows by integer index."
+        [], "--dropped-row", "-dr", help="Drop rows by integer index."
     ),
     renamed_columns: List[str] = typer.Option(
         [],
@@ -71,28 +86,45 @@ def main(
         logger.info(f"Applying {step_name}...")
         df = func(df, **kwargs)
     if iqr_check:
-        logger.info("Checking for IQR outliers...")
-        outliers = check_iqr_outliers(df)
-        if outliers.empty:
-            logger.info("No IQR-based outliers detected.")
+        logger.info("Finding IQR outliers…")
+        outlier_series = find_iqr_outliers(df)
+
+        if outlier_series.empty:
+            logger.info("No IQR‐based outliers detected.")
         else:
-            typer.echo("\nDetected IQR outliers (row, column, value):")
-            typer.echo(outliers.to_frame(name="outlier_value"))
+            outlier_df = outlier_series.reset_index().rename(
+                columns={"level_0": "row_index", "level_1": "column", 0: "outlier_value"}
+            )
+            if export_outliers:
+                write_csv(outlier_df, prefix="iqr", suffix="outliers", output_dir=INTERIM_DATA_DIR)
+                logger.success(f"Outliers written to {INTERIM_DATA_DIR / 'iqr_outliers.csv'!r}")
+            else:
+                typer.echo("\nDetected IQR outliers:")
+                typer.echo(outlier_df)
+            if remove_outliers:
+                rows_to_drop = outlier_df["row_index"].unique().tolist()
+                df = drop_row(df, rows_to_drop)
+                logger.success(f"Removed outlier rows: {rows_to_drop}")
     stem = Path(input_file).stem
-    suffix_parts: list[str] = []
-    if dropped_columns:
-        suffix_parts.append("drop-" + "-".join(dropped_columns))
-    if renamed_columns:
-        suffix_parts.append("rename-" + "-".join(renamed_columns))
-    if drop_rows:
-        suffix_parts.append("drop-rows-" + "-".join(str(r) for r in drop_rows))
-    suffix = "_".join(suffix_parts)
-    output_file = f"{stem}_{file_label}" + (f"_{suffix}" if suffix else "") + ".csv"
-    output_path = INTERIM_DATA_DIR / output_file
+    if file_label:
+        output_filename = f"{stem}_{file_label}.csv"
+    else:
+        suffix_parts: list[str] = []
+        if dropped_columns:
+            suffix_parts.append("drop-" + "-".join(dropped_columns))
+        if renamed_columns:
+            suffix_parts.append("rename-" + "-".join(renamed_columns))
+        if drop_rows:
+            suffix_parts.append("drop-rows-" + "-".join(map(str, drop_rows)))
+        base = "preprocessed"
+        if suffix_parts:
+            base += "_" + "_".join(suffix_parts)
+        output_filename = f"{stem}_{base}.csv"
+    output_path = INTERIM_DATA_DIR / output_filename
     df.to_csv(output_path, index=False)
     logger.info(f"Preprocessed DataFrame type: {type(df)}")
     logger.info(f"Preprocessed DataFrame dimensions: {df.shape}")
-    logger.success(f"Preprocessed csv saved to {output_path}")
+    logger.success(f"Preprocessed CSV saved to {output_path!r}")
     return df
 
 
