@@ -298,7 +298,7 @@ def qq_plot(
     series = df[column]
     if ax is None:
         fig, ax = _init_fig()
-    sm.qqplot(series, line="45", ax=ax)
+    sm.qqplot(series, line="r", ax=ax)
     ax.set_title(f"Q-Q Plot: {column.capitalize()}")
     if save:
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -323,7 +323,7 @@ def qq_plots_all(
     axes = axes.flatten()
     for ax, col in zip(axes, columns):
         series = df[col]
-        sm.qqplot(series, line="45", ax=ax)
+        sm.qqplot(series, line="r", ax=ax)
         ax.set_title(col.capitalize())
     for extra_ax in axes[n:]:
         extra_ax.set_visible(False)
