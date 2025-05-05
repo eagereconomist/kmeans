@@ -42,7 +42,7 @@ def main(
         None,
         "--prefix",
         "-p",
-        help="By default, `prefix` is None, but there is the option to pick a `prefix. "
+        help="By default, `prefix` is None, but there is the option to pick a `prefix`. "
         "Base name for the output files (before the scaling suffix).",
     ),
 ):
