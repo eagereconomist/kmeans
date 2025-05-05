@@ -13,7 +13,7 @@ def load_data(input_path: Path) -> pd.DataFrame:
         raise FileNotFoundError(f"File not found. Please check your path: {input_path}")
 
 
-def check_iqr_outliers(df: pd.DataFrame) -> pd.DataFrame:
+def find_iqr_outliers(df: pd.DataFrame) -> pd.DataFrame:
     q1 = df.quantile(0.25)
     q3 = df.quantile(0.75)
     iqr = q3 - q1
