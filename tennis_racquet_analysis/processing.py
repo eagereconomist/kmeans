@@ -61,7 +61,7 @@ def main(
         ("normalized", apply_normalizer, "normalized"),
         ("standardized", apply_standardization, "standardized"),
         ("minmax", apply_minmax, "minmax"),
-        ("log_transformed", log1p_transform, "log_scale"),
+        ("log1p_transformed", log1p_transform, "log_scale"),
         ("yeo_johnson", yeo_johnson, "yeo_johnson"),
     ]
 
