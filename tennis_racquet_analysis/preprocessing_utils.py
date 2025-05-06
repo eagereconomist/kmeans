@@ -13,14 +13,15 @@ def load_data(input_path: Path) -> pd.DataFrame:
         raise FileNotFoundError(f"File not found. Please check your path: {input_path}")
 
 
-def find_iqr_outliers(df: pd.DataFrame) -> pd.DataFrame:
-    q1 = df.quantile(0.25)
-    q3 = df.quantile(0.75)
+def find_iqr_outliers(df: pd.DataFrame) -> pd.Series:
+    num_df = df.select_dtypes(include="number")
+    q1 = num_df.quantile(0.25)
+    q3 = num_df.quantile(0.75)
     iqr = q3 - q1
     lower_lim = q1 - 1.5 * iqr
     upper_lim = q3 + 1.5 * iqr
-    outlier_mask = (df < lower_lim) | (df > upper_lim)
-    iqr_outliers = df.where(outlier_mask).stack()
+    outlier_mask = (num_df < lower_lim) | (num_df > upper_lim)
+    iqr_outliers = num_df.where(outlier_mask).stack()
     return iqr_outliers
 
 
