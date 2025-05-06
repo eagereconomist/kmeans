@@ -38,7 +38,7 @@ def apply_minmax(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def log_transform(df: pd.DataFrame) -> pd.DataFrame:
+def log1p_transform(df: pd.DataFrame) -> pd.DataFrame:
     num_cols = df.select_dtypes(include=np.number).columns
     df[num_cols] = np.log1p(df[num_cols])
     return df
