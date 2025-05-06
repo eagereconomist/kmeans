@@ -301,10 +301,7 @@ def qq_plot(
     sm.qqplot(series, line="r", ax=ax)
     ax.set_title(f"Q-Q Plot: {column.capitalize()}")
     if save:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        fig = ax.figure
-        fig.savefig(output_path)
-        plt.close(fig)
+        _save_fig(fig, output_path)
     return ax
 
 
@@ -329,8 +326,5 @@ def qq_plots_all(
         extra_ax.set_visible(False)
     plt.tight_layout()
     if save:
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / "qq_plots_all.png"
-        fig.savefig(output_path)
-        plt.close(fig)
+        _save_fig(fig, output_dir)
     return fig
