@@ -10,7 +10,7 @@ from tennis_racquet_analysis.processing_utils import (
     apply_normalizer,
     apply_standardization,
     apply_minmax,
-    log_transform,
+    log1p_transform,
     yeo_johnson,
 )
 
@@ -61,7 +61,7 @@ def main(
         ("normalized", apply_normalizer, "normalized"),
         ("standardized", apply_standardization, "standardized"),
         ("minmax", apply_minmax, "minmax"),
-        ("log_transformed", log_transform, "log_scale"),
+        ("log_transformed", log1p_transform, "log_scale"),
         ("yeo_johnson", yeo_johnson, "yeo_johnson"),
     ]
 
