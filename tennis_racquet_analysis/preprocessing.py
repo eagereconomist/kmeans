@@ -9,7 +9,7 @@ from tennis_racquet_analysis.preprocessing_utils import (
     find_iqr_outliers,
     drop_column,
     drop_row,
-    rename_column,
+    dotless_column,
 )
 from tennis_racquet_analysis.processing_utils import (
     write_csv,
@@ -31,7 +31,7 @@ def main(
         help="Directory where raw files live.",
     ),
     file_label: str = typer.Option(
-        "preprocessed",
+        None,
         "--label",
         "-l",
         help="Suffix for the ouput file before .csv",
@@ -63,12 +63,12 @@ def main(
     drop_rows: List[int] = typer.Option(
         [], "--dropped-row", "-dr", help="Drop rows by integer index."
     ),
-    renamed_columns: List[str] = typer.Option(
+    dotless_columns: List[str] = typer.Option(
         [],
-        "--rename-column",
-        "-rc",
-        help="Name of column to rename (dots -> underscores)"
-        "using `rename_column`; repeat flag to add more.",
+        "--dotless-column",
+        "-dot",
+        help="Name of column to switch out dot for empty string"
+        "using `dotless_column`; repeat flag to add more.",
     ),
 ):
     input_path = input_dir / input_file
@@ -77,7 +77,7 @@ def main(
     cleaning_steps: list[tuple[str, callable, dict]] = []
     cleaning_steps += [("drop_column", drop_column, {"column": col}) for col in dropped_columns]
     cleaning_steps += [
-        ("rename_column", rename_column, {"column": col}) for col in renamed_columns
+        ("dotless_column", dotless_column, {"column": col}) for col in dotless_columns
     ]
     cleaning_steps += [("drop_row", drop_row, {"index_list": [row]}) for row in drop_rows]
     for step_name, func, kwargs in tqdm(
@@ -111,15 +111,15 @@ def main(
     else:
         suffix_parts: list[str] = []
         if dropped_columns:
-            suffix_parts.append("drop-" + "-".join(dropped_columns))
-        if renamed_columns:
-            suffix_parts.append("rename-" + "-".join(renamed_columns))
+            suffix_parts.append("drop-" + "_".join(dropped_columns))
+        if dotless_columns:
+            suffix_parts.append("dotless-" + "_".join(dotless_columns))
         if drop_rows:
-            suffix_parts.append("drop-rows-" + "-".join(map(str, drop_rows)))
-        base = "preprocessed"
+            suffix_parts.append("drop-rows-" + "_".join(map(str, drop_rows)))
+        base_label = "preprocessed"
         if suffix_parts:
-            base += "_" + "_".join(suffix_parts)
-        output_filename = f"{stem}_{base}.csv"
+            base_label += "_" + "_".join(suffix_parts)
+        output_filename = f"{stem}_{suffix_parts}.csv"
     output_path = INTERIM_DATA_DIR / output_filename
     df.to_csv(output_path, index=False)
     logger.info(f"Preprocessed DataFrame type: {type(df)}")
