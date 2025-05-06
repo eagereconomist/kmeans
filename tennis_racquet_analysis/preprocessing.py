@@ -103,8 +103,13 @@ def main(
                 typer.echo(outlier_df)
             if remove_outliers:
                 rows_to_drop = outlier_df["row_index"].unique().tolist()
+                total_rows = df.shape[0]
                 df = drop_row(df, rows_to_drop)
-                logger.success(f"Removed outlier rows: {rows_to_drop}")
+                rows_after_outliers_dropped = df.shape[0]
+                logger.success(f"Removed {len(rows_to_drop)} outlier rows: {rows_to_drop}")
+                logger.success(
+                    f"DataFrame went from {total_rows} to {rows_after_outliers_dropped} rows"
+                )
     stem = Path(input_file).stem
     if file_label:
         output_filename = f"{stem}_{file_label}.csv"
