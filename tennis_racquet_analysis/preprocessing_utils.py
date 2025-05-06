@@ -32,6 +32,6 @@ def drop_row(df: pd.DataFrame, index_list: list[int]) -> pd.DataFrame:
     return df.drop(index=index_list).reset_index(drop=True)
 
 
-def rename_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+def dotless_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
     new_column = column.replace(".", "")
     return df.rename(columns={column: new_column})
