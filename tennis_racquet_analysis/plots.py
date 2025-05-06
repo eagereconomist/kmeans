@@ -7,6 +7,7 @@ from tqdm import tqdm
 from tennis_racquet_analysis.config import DATA_DIR, FIGURES_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data
 from tennis_racquet_analysis.plots_utils import (
+    _save_fig,
     df_to_array,
     df_to_labels,
     compute_linkage,
@@ -330,14 +331,24 @@ def qq(
     df = load_data(DATA_DIR / dir_label / input_file)
     if column and not all_cols:
         for col in column:
-            output_path = output_dir / f"{Path(input_file).stem}_{col}_qq.png"
+            stem = Path(input_file).stem
+            file_name = f"{stem}_{col}_qq.png"
+            output_path = output_dir / file_name
             qq_plot(df=df, column=col, output_path=output_path, save=not no_save)
             if not no_save:
                 logger.success(f"Saved Q-Q Plot for {col.capitalize()} to {output_path!r}")
     elif all_cols:
-        qq_plots_all(df=df, output_dir=output_dir, columns=None, ncols=3, save=not no_save)
+        stem = Path(input_file).stem
+        fig = qq_plots_all(df=df, output_dir=output_dir, columns=None, ncols=3, save=False)
+        fig.suptitle(f"Q-Q Plots: {stem} Data")
+        fig.tight_layout()
+        file_name = f"{stem}_qq_plots_all.png"
+        output_path = output_dir / file_name
         if not no_save:
-            logger.success(f"Saved combined Q-Q plots to {output_dir / 'qq_plots_all.png'!r}")
+            _save_fig(fig, output_path)
+            logger.success(f"Saved combined Q-Q plots to {output_path!r}")
+        else:
+            fig.show()
     else:
         raise typer.BadParameter("Specify one or more --column or use --all")
 
