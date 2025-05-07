@@ -53,3 +53,21 @@ def compute_silhouette_scores(
         silhouette_vals.append({"n_clusters": k, "silhouette_score": silhouette_scores})
         silhouette_df = pd.DataFrame.from_records(silhouette_vals)
     return silhouette_df
+
+
+def fit_kmeans(
+    df: pd.DataFrame,
+    k: int,
+    feature_columns: Optional[Sequence[str]] = None,
+    random_state: int = 4572,
+    label_column: str = "cluster",
+) -> pd.DataFrame:
+    if feature_columns is None:
+        X = df.select_dtypes(include=np.number).values
+    else:
+        X = df[list(feature_columns)].values
+    km = KMeans(n_clusters=k, random_state=random_state)
+    labels = km.fit_predict(X)
+    df_km_labels = df.copy()
+    df_km_labels[f"{label_column}_{k}"] = labels
+    return df_km_labels
