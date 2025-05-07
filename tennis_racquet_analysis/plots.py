@@ -3,9 +3,8 @@ import typer
 from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
-import pandas as pd
 
-from tennis_racquet_analysis.config import DATA_DIR, PROCESSED_DATA_DIR, FIGURES_DIR
+from tennis_racquet_analysis.config import DATA_DIR, FIGURES_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data
 from tennis_racquet_analysis.plots_utils import (
     _save_fig,
