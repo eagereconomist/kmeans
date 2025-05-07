@@ -3,8 +3,9 @@ import typer
 from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
+import pandas as pd
 
-from tennis_racquet_analysis.config import DATA_DIR, FIGURES_DIR
+from tennis_racquet_analysis.config import DATA_DIR, PROCESSED_DATA_DIR, FIGURES_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data
 from tennis_racquet_analysis.plots_utils import (
     _save_fig,
@@ -19,6 +20,8 @@ from tennis_racquet_analysis.plots_utils import (
     correlation_matrix_heatmap,
     qq_plot,
     qq_plots_all,
+    inertia_plot,
+    silhouette_plot,
 )
 
 app = typer.Typer()
@@ -351,6 +354,65 @@ def qq(
             fig.show()
     else:
         raise typer.BadParameter("Specify one or more --column or use --all")
+
+
+@app.command("elbow")
+def elbow_plot(
+    input_file: str = typer.Argument(..., help="csv from `inertia` command."),
+    dir_label: str = typer.Argument(..., help="Sub-folder under processed data/"),
+    output_dir: Path = typer.Option(
+        FIGURES_DIR,
+        "--output-dir",
+        "-o",
+        dir_okay=True,
+        file_okay=False,
+        help="Where to save the elbow plot png.",
+    ),
+    no_save: bool = typer.Option(
+        False,
+        "--no-save",
+        "-n",
+        help="Show plot, but don't save.",
+    ),
+):
+    df = load_data(DATA_DIR / dir_label / input_file)
+    stem = Path(input_file).stem
+    output_path = output_dir / f"{stem}_elbow.png"
+    fig = inertia_plot(
+        df,
+        output_path,
+        save=no_save,
+    )
+    if not no_save:
+        _save_fig(fig, output_path)
+        logger.success(f"Elbow Plot saved to {output_path!r}")
+    else:
+        fig.show()
+
+
+@app.command("silhouette")
+def plot_silhouette(
+    input_file: str = typer.Argument(..., help="CSV from `silhouette` command."),
+    dir_label: str = typer.Argument(..., help="Sub-folder under processed data/"),
+    output_dir: Path = typer.Option(
+        FIGURES_DIR,
+        "--output-dir",
+        "-o",
+        dir_okay=True,
+        file_okay=False,
+        help="Where to save the silhouette plot PNG.",
+    ),
+    no_save: bool = typer.Option(False, "--no-save", "-n", help="Show plot but don’t save."),
+):
+    df = load_data(DATA_DIR / dir_label / input_file)
+    stem = Path(input_file).stem
+    output_path = output_dir / f"{stem}_silhouette.png"
+    fig = silhouette_plot(df, output_path, save=not no_save)
+    if not no_save:
+        _save_fig(fig, output_path)
+        logger.success(f"Silhouette Plot saved to {output_path!r}")
+    else:
+        fig.show()
 
 
 if __name__ == "__main__":
