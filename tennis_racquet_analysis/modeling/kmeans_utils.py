@@ -38,8 +38,10 @@ def compute_silhouette_scores(
         X = df.select_dtypes(include=np.number).values
     else:
         X = df[list(feature_columns)].values
+    n_samples = X.shape[0]
     if isinstance(k_range, tuple):
         k_start, k_end = k_range
+        k_end = min(k_end, n_samples - 1)
         ks = range(k_start, k_end + 1)
     else:
         ks = k_range
