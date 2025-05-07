@@ -328,3 +328,25 @@ def qq_plots_all(
     if save:
         _save_fig(fig, output_dir)
     return fig
+
+
+def inertia_plot(inertia_df: pd.DataFrame, output_path: Path, save: bool = True) -> plt.Axes:
+    fig, ax = _init_fig()
+    ax.plot(inertia_df["k"], inertia_df["inertia"], marker="o")
+    ax.set_xlabel("Number of Clusters (k)")
+    ax.set_ylabel("Inertia")
+    ax.set_title(f"Elbow Plot for K-Means Inertia from {output_path} ")
+    if save:
+        _save_fig(fig, output_path)
+    return fig
+
+
+def silhouette_plot(silhouette_df: pd.DataFrame, output_path: Path, save: bool = True) -> plt.Axes:
+    fig, ax = _init_fig()
+    ax.plot(silhouette_df["n_clusters"], silhouette_df["silhouette_score"], marker="o")
+    ax.set_xlabel("Number of Clusters (k)")
+    ax.set_ylabel("Silhouette Score")
+    ax.set_title(f"Silhouette Score vs. Number of Clusters from {output_path}")
+    if save:
+        _save_fig(fig, output_path)
+    return fig
