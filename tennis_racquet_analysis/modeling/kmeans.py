@@ -2,12 +2,14 @@ import typer
 from loguru import logger
 from pathlib import Path
 from typing import List
+from tqdm import tqdm
 
 from tennis_racquet_analysis.config import DATA_DIR, PROCESSED_DATA_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data
 from tennis_racquet_analysis.modeling.kmeans_utils import (
     compute_kmeans_inertia,
     compute_silhouette_scores,
+    fit_kmeans,
 )
 from tennis_racquet_analysis.processing_utils import write_csv
 
@@ -57,10 +59,19 @@ def km_inertia(
 ):
     input_path = input_dir / input_file
     df = load_data(input_path)
-    inertia_df = compute_kmeans_inertia(
-        df,
-        feature_columns if feature_columns else None,
-        (start, stop),
+    progress_bar = (
+        tqdm(
+            range(start, stop + 1),
+            desc="Inertia",
+            ncols=100,
+        ),
+    )
+    inertia_df = (
+        compute_kmeans_inertia(
+            df,
+            feature_columns if feature_columns else None,
+            progress_bar,
+        ),
     )
     stem = Path(input_file).stem
     output_filename = f"{stem}_inertia.csv"
@@ -102,15 +113,66 @@ def km_silhouette(
     ),
 ):
     df = load_data(DATA_DIR / dir_label / input_file)
+    progress_bar = (
+        tqdm(
+            range(start, stop + 1),
+            desc="Silhouette",
+            ncols=100,
+        ),
+    )
     silhouette_df = compute_silhouette_scores(
         df,
         feature_columns if feature_columns else None,
-        (start, stop),
+        progress_bar,
     )
     stem = Path(input_file).stem
     output_filename = f"{stem}_silhouette.csv"
     write_csv(silhouette_df, prefix=stem, suffix="silhouette", output_dir=output_dir)
     logger.success(f"Inertia results saved to {(output_dir / output_filename)!r}")
+
+
+@app.command("cluster")
+def km_cluster(
+    input_file: str = typer.Argument(..., help="csv filename under processed data/"),
+    dir_label: str = typer.Argument(..., help="Sub-folder under data/"),
+    k: int = typer.Option(
+        ...,
+        "--k",
+        "-k",
+        help="Number of clusters to fit",
+    ),
+    feature_columns: List[str] = typer.Option(
+        None,
+        "--feature-column",
+        "-f",
+        help="Which numeric columns to use; repeat to supply mulitple. Defaults to all numeric.",
+    ),
+    output_dir: Path = typer.Option(
+        PROCESSED_DATA_DIR,
+        "--output-dir",
+        "-o",
+        exists=True,
+        dir_okay=True,
+        file_okay=False,
+        help="Directory to write the labeled csv (default: data/processed).",
+    ),
+):
+    input_path = DATA_DIR / dir_label / input_file
+    df = load_data(input_path)
+    steps = tqdm(total=2, desc="Clustering", ncols=100)
+    df_labeled = fit_kmeans(
+        df,
+        k=k,
+        feature_columns=feature_columns if feature_columns else None,
+        label_column="cluster",
+    )
+    steps.update(1)
+    stem = Path(input_file).stem
+    output_filename = f"{stem}_clustered_{k}.csv"
+    write_csv(df_labeled, prefix=stem, suffix=f"clustered_{k}", output_dir=output_dir)
+    steps.update(1)
+    steps.close()
+    logger.success(f"Clustered data saved to {(output_dir / output_filename)!r}")
 
 
 if __name__ == "__main__":
