@@ -498,7 +498,7 @@ def cluster_3d_plot(
         False,
         "--no-save",
         "-n",
-        help="Don't write to disk.",
+        help="Don't write to disk. Opens html plot in browser.",
     ),
 ):
     df = load_data(DATA_DIR / dir_label / input_file)
@@ -528,25 +528,16 @@ def cluster_3d_plot(
         ),
     )
     if not no_save:
-        fig.show()
-    else:
         png_path = output_dir / f"{base}.png"
-        if not no_save:
-            fig = cluster_scatter_3d(
-                df=df,
-                features=chosen,
-                label_column=label_column,
-                output_path=png_path,
-            )
-            logger.success(f"Static PNG saved to {png_path!r}")
-        else:
-            fig = cluster_scatter_3d(
-                df=df,
-                features=chosen,
-                label_column=label_column,
-                output_path=png_path,
-            )
-            fig.show()
+        fig = cluster_scatter_3d(
+            df=df,
+            features=chosen,
+            label_column=label_column,
+            output_path=png_path,
+        )
+        logger.success(f"Static PNG saved to {png_path!r}")
+    else:
+        fig.show()
 
 
 if __name__ == "__main__":
