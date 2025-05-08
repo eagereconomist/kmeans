@@ -3,6 +3,8 @@ import typer
 from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
+import plotly.express as px
+
 
 from tennis_racquet_analysis.config import DATA_DIR, FIGURES_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data
@@ -22,6 +24,7 @@ from tennis_racquet_analysis.plots_utils import (
     inertia_plot,
     silhouette_plot,
     cluster_scatter,
+    cluster_scatter_3d,
 )
 
 app = typer.Typer()
@@ -415,7 +418,7 @@ def plot_silhouette(
         fig.show()
 
 
-@app.command("cluster-plot")
+@app.command("cluster")
 def cluster_plot(
     input_file: str = typer.Argument(..., help="csv filename under data subfolder."),
     dir_label: str = typer.Argument(..., help="Sub-folder under data/"),
@@ -466,6 +469,84 @@ def cluster_plot(
         logger.success(f"Cluster Scatter saved to {output_path!r}")
     else:
         logger.success("Cluster Scatter generated (not saved to disk).")
+
+
+@app.command("cluster-3d")
+def cluster_3d_plot(
+    input_file: str = typer.Argument(..., help="Clustered csv filename"),
+    dir_label: str = typer.Argument(..., help="Sub-folder under data/"),
+    features: list[str] = typer.Option(
+        None,
+        "--feature",
+        "-f",
+        help="Exactly three numeric columns to plot; defaults to first three.",
+    ),
+    label_column: str = typer.Option(
+        ...,
+        "--label-column",
+        "-l",
+        help="Name of the cluster label column (e.g. cluster_5).",
+    ),
+    output_dir: Path = typer.Option(
+        FIGURES_DIR,
+        "--output-dir",
+        "-o",
+        dir_okay=True,
+        file_okay=False,
+    ),
+    no_save: bool = typer.Option(
+        False,
+        "--no-save",
+        "-n",
+        help="Don't write to disk.",
+    ),
+):
+    df = load_data(DATA_DIR / dir_label / input_file)
+    num_cols = df.select_dtypes(include="number").columns.tolist()
+    chosen = features or num_cols[:3]
+    if len(chosen) != 3:
+        raise typer.BadParameter("Must specify exactly three features for 3D.")
+    stem = Path(input_file).stem
+    base = f"{stem}_{label_column}_3d"
+    fig = px.scatter_3d(
+        df,
+        x=chosen[0],
+        y=chosen[1],
+        z=chosen[2],
+        color=label_column,
+        title=f"3D Cluster Scatter (k={label_column.split('_')[-1]})",
+        width=800,
+        height=600,
+    )
+    fig.update_traces(marker=dict(size=5, opacity=0.8))
+    fig.update_layout(
+        legend_title_text="Cluster",
+        scene=dict(
+            xaxis_title=chosen[0],
+            yaxis_title=chosen[1],
+            zaxis_title=chosen[2],
+        ),
+    )
+    if not no_save:
+        fig.show()
+    else:
+        png_path = output_dir / f"{base}.png"
+        if not no_save:
+            fig = cluster_scatter_3d(
+                df=df,
+                features=chosen,
+                label_column=label_column,
+                output_path=png_path,
+            )
+            logger.success(f"Static PNG saved to {png_path!r}")
+        else:
+            fig = cluster_scatter_3d(
+                df=df,
+                features=chosen,
+                label_column=label_column,
+                output_path=png_path,
+            )
+            fig.show()
 
 
 if __name__ == "__main__":
