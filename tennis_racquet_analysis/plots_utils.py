@@ -7,7 +7,7 @@ import scipy.cluster.hierarchy as sch
 from scipy.spatial.distance import pdist
 import statsmodels.api as sm
 import re
-
+import plotly.express as px
 
 sns.set_theme(
     style="ticks",
@@ -371,9 +371,40 @@ def cluster_scatter(
         y=y_axis,
         hue=label_column,
         palette="tab10",
-        ax=ax,
     )
     ax.set_title(f"{x_axis.capitalize()} vs. {y_axis.capitalize()} by {label_column}")
     if save:
         _save_fig(fig, output_path)
     return ax
+
+
+def cluster_scatter_3d(
+    df: pd.DataFrame,
+    features: list[str],
+    label_column: str,
+    output_path: Path | None = None,
+    save: bool = True,
+) -> px.scatter_3d:
+    if len(features) < 3:
+        raise ValueError("Need at least 3 features for a 3D plot.")
+    x, y, z = features[:3]
+    fig = px.scatter_3d(
+        df,
+        x=x,
+        y=y,
+        z=z,
+        color=label_column,
+        title=f"3D Cluster Scatter (k={label_column.split('_')[-1]})",
+    )
+    fig.update_traces(marker=dict(size=len(features), opacity=0.8))
+    fig.update_layout(
+        legend_title_text="Cluster",
+        scene=dict(
+            xaxis_title=x,
+            yaxis_title=y,
+            zaxis_title=z,
+        ),
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.write_image(str(output_path))
+    return fig
