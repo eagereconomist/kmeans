@@ -21,6 +21,7 @@ from tennis_racquet_analysis.plots_utils import (
     qq_plots_all,
     inertia_plot,
     silhouette_plot,
+    cluster_scatter,
 )
 
 app = typer.Typer()
@@ -412,6 +413,59 @@ def plot_silhouette(
         logger.success(f"Silhouette Plot saved to {output_path!r}")
     else:
         fig.show()
+
+
+@app.command("cluster-plot")
+def cluster_plot(
+    input_file: str = typer.Argument(..., help="csv filename under data subfolder."),
+    dir_label: str = typer.Argument(..., help="Sub-folder under data/"),
+    x_axis: Optional[str] = typer.Option(
+        None,
+        "--x-axis",
+        "-x",
+        help="Feature for X axis.",
+    ),
+    y_axis: Optional[str] = typer.Option(None, "--y-axis", "-y", help="Feature for Y axis."),
+    label_column: str = typer.Option(
+        "cluster",
+        "--label-column",
+        "-l",
+        help="Column with cluster labels.",
+    ),
+    output_dir: Path = typer.Option(
+        FIGURES_DIR,
+        "--output-dir",
+        "-o",
+        help="Where to save the plot.",
+    ),
+    no_save: bool = typer.Option(
+        False,
+        "--no-save",
+        "-n",
+        help="Don't write to disk.",
+    ),
+):
+    df = load_data(DATA_DIR / dir_label / input_file)
+    numeric_columns = df.select_dtypes(include="number").columns.tolist()
+    x_col = x_axis or numeric_columns[0]
+    y_col = y_axis or (numeric_columns[1] if len(numeric_columns) > 1 else numeric_columns[0])
+    with tqdm(total=1, desc="Generating Cluster Scatter", ncols=100) as pbar:
+        output_path = output_dir / f"{Path(input_file).stem}_{x_col}_vs_{y_col}_cluster.png"
+        (
+            cluster_scatter(
+                df=df,
+                x_axis=x_col,
+                y_axis=y_col,
+                label_column=label_column,
+                output_path=output_path,
+                save=not no_save,
+            ),
+        )
+        pbar.update(1)
+    if not no_save:
+        logger.success(f"Cluster Scatter saved to {output_path!r}")
+    else:
+        logger.success("Cluster Scatter generated (not saved to disk).")
 
 
 if __name__ == "__main__":
