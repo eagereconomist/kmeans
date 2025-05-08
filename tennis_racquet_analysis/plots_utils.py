@@ -350,3 +350,30 @@ def silhouette_plot(silhouette_df: pd.DataFrame, output_path: Path, save: bool =
     if save:
         _save_fig(fig, output_path)
     return fig
+
+
+def cluster_scatter(
+    df: pd.DataFrame,
+    x_axis: str,
+    y_axis: str,
+    output_path: Path,
+    label_column: str = "cluster",
+    save: bool = True,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    if ax is None:
+        fig, ax = _init_fig()
+    else:
+        fig = ax.figure
+    sns.scatterplot(
+        data=df,
+        x=x_axis,
+        y=y_axis,
+        hue=label_column,
+        palette="tab10",
+        ax=ax,
+    )
+    ax.set_title(f"{x_axis.capitalize()} vs. {y_axis.capitalize()} by {label_column}")
+    if save:
+        _save_fig(fig, output_path)
+    return ax
