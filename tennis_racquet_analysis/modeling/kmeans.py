@@ -12,7 +12,6 @@ from tennis_racquet_analysis.modeling.kmeans_utils import (
     fit_kmeans,
     batch_kmeans,
 )
-from tennis_racquet_analysis.preprocessing_utils import load_data
 from tennis_racquet_analysis.processing_utils import write_csv
 
 app = typer.Typer()
