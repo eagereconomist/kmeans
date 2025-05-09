@@ -506,6 +506,8 @@ def cluster_3d_plot(
     chosen = features or num_cols[:3]
     if len(chosen) != 3:
         raise typer.BadParameter("Must specify exactly three features for 3D.")
+    df[label_column] = df[label_column].astype(str)
+    cluster_order = sorted(df[label_column].unique(), key=lambda x: int(x))
     stem = Path(input_file).stem
     base = f"{stem}_{label_column}_3d"
     fig = px.scatter_3d(
@@ -514,6 +516,7 @@ def cluster_3d_plot(
         y=chosen[1],
         z=chosen[2],
         color=label_column,
+        category_orders={label_column: cluster_order},
         title=f"3D Cluster Scatter (k={label_column.split('_')[-1]})",
         width=800,
         height=600,
