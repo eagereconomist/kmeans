@@ -382,7 +382,7 @@ def cluster_scatter_3d(
     df: pd.DataFrame,
     features: list[str],
     label_column: str,
-    output_path: Path | None = None,
+    output_path: Path,
     save: bool = True,
 ) -> px.scatter_3d:
     if len(features) < 3:
