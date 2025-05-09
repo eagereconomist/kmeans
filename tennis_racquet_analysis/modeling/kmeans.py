@@ -10,7 +10,9 @@ from tennis_racquet_analysis.modeling.kmeans_utils import (
     compute_kmeans_inertia,
     compute_silhouette_scores,
     fit_kmeans,
+    batch_kmeans,
 )
+from tennis_racquet_analysis.preprocessing_utils import load_data
 from tennis_racquet_analysis.processing_utils import write_csv
 
 app = typer.Typer()
@@ -173,6 +175,41 @@ def km_cluster(
     steps.update(1)
     steps.close()
     logger.success(f"Clustered data saved to {(output_dir / output_filename)!r}")
+
+
+@app.command("batch-cluster")
+def batch_cluster_export(
+    input_file: str = typer.Argument(..., help="csv filename under data subfolder."),
+    dir_label: str = typer.Argument(..., help="Sub-folder under data/"),
+    start: int = typer.Option(
+        1,
+        "--start",
+        "-s",
+        help="Minimum k (inclusive).",
+    ),
+    stop: int = typer.Option(
+        10,
+        "--stop",
+        "-e",
+        help="Maximum k (inclusive).",
+    ),
+    output_dir: Path = typer.Option(
+        PROCESSED_DATA_DIR,
+        "--output-dir",
+        "-o",
+        exists=True,
+        dir_okay=True,
+        file_okay=False,
+        help="Where to write the labeled csv.",
+    ),
+):
+    df = load_data(DATA_DIR / dir_label / input_file)
+    progress_bar = tqdm(range(start, stop + 1), desc="Batch Clustering:", ncols=100)
+    df_labeled = batch_kmeans(df, k_range=progress_bar)
+    prefix = Path(input_file).stem
+    suffix = "clusters_" + "_".join(str(k) for k in range(start, stop + 1))
+    output_path = write_csv(df_labeled, prefix=prefix, suffix=suffix, output_dir=output_dir)
+    logger.success(f"Saved batch clusters for k={start}-{stop} -> {output_path!r}")
 
 
 if __name__ == "__main__":
