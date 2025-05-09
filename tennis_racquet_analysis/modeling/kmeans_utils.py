@@ -71,3 +71,27 @@ def fit_kmeans(
     df_km_labels = df.copy()
     df_km_labels[f"{label_column}_{k}"] = labels
     return df_km_labels
+
+
+def batch_kmeans(
+    df: pd.DataFrame,
+    k_range: Union[Tuple[int, int], range] = (2, 10),
+    feature_columns: Optional[Sequence[str]] = None,
+    random_state: int = 4572,
+    label_column: str = "cluster",
+) -> pd.DataFrame:
+    X = (
+        df.select_dtypes(include=np.number).values
+        if feature_columns is None
+        else df[list(feature_columns)].values
+    )
+    if isinstance(k_range, tuple):
+        k_start, k_end = k_range
+        ks = range(k_start, k_end + 1)
+    else:
+        ks = k_range
+    df_labeled = df.copy()
+    for k in ks:
+        km = KMeans(n_clusters=k, random_state=random_state).fit(X)
+        df_labeled[f"{label_column}_{k}"] = km.labels_
+    return df_labeled
