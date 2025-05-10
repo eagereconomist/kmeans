@@ -25,6 +25,7 @@ from tennis_racquet_analysis.plots_utils import (
     silhouette_plot,
     cluster_scatter,
     cluster_scatter_3d,
+    plot_batch_clusters,
 )
 
 app = typer.Typer()
@@ -541,6 +542,61 @@ def cluster_3d_plot(
         logger.success(f"Static PNG saved to {png_path!r}")
     else:
         fig.show()
+
+
+@app.command("cluster-subplot")
+def batch_cluster_plot(
+    input_file: str = typer.Argument(..., help="csv filename under data subfolder"),
+    dir_label: str = typer.Argument(..., help="Sub-folder under data/"),
+    x_axis: Optional[str] = typer.Option(
+        None,
+        "--x-axis",
+        "-x",
+        help="Feature for X axis (defaults to first numeric column).",
+    ),
+    y_axis: Optional[str] = typer.Option(
+        None,
+        "--y-axis",
+        "-y",
+        help="Feature for Y axis (defaults to second numeric column).",
+    ),
+    label_column: str = typer.Option(
+        "cluster_",
+        "--label",
+        "-l",
+        help="Name of the column containing clusters in DataFrame from `input_file`",
+    ),
+    output_dir: Path = typer.Option(
+        FIGURES_DIR,
+        "--output-dir",
+        "-o",
+        dir_okay=True,
+        file_okay=False,
+        help="Where to save the batch-cluster plot.",
+    ),
+):
+    df = load_data(DATA_DIR / dir_label / input_file)
+    numeric_columns = df.select_dtypes(include="number").columns.tolist()
+    if not numeric_columns:
+        raise typer.BadParameter("No numeric columns found in your data.")
+    x_col = x_axis or numeric_columns[0]
+    y_col = y_axis or (numeric_columns[1] if len(numeric_columns) > 1 else numeric_columns[0])
+    cluster_columns = sorted(
+        (c for c in df.columns if c.startswith(label_column)),
+        key=lambda c: int(c.replace(label_column, "")),
+    )
+    if not cluster_columns:
+        raise typer.BadParameter(f"No columns found with prefix {label_column!r}")
+    output_path = output_dir / f"{Path(input_file).stem}_{x_col}_vs_{y_col}_batch.png"
+    plot_batch_clusters(
+        df,
+        x_axis=x_col,
+        y_axis=y_col,
+        cluster_columns=cluster_columns,
+        output_path=output_path,
+        save=True,
+    )
+    logger.success(f"Saved batch-cluster plot for {cluster_columns} -> {output_path!r}")
 
 
 if __name__ == "__main__":
