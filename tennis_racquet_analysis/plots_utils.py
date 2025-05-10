@@ -408,3 +408,54 @@ def cluster_scatter_3d(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.write_image(str(output_path))
     return fig
+
+
+def plot_batch_clusters(
+    df: pd.DataFrame,
+    x_axis: str,
+    y_axis: str,
+    cluster_columns: list[str],
+    output_path: Path,
+    save: bool = True,
+    columns_per_row: int = 3,
+    figsize_per_plot: tuple[int, int] = (12, 12),
+) -> plt.Figure:
+    n = len(cluster_columns)
+    columns = columns_per_row or n
+    rows = (n + columns - 1) // columns
+    fig, axes = plt.subplots(
+        rows,
+        columns,
+        figsize=(columns * figsize_per_plot[0], rows * figsize_per_plot[1]),
+        squeeze=False,
+    )
+    fig.patch.set_facecolor("black")
+    for ax in axes.flat:
+        ax.set_facecolor("black")
+
+    for ax, column in zip(axes.flat, cluster_columns):
+        sns.scatterplot(
+            data=df,
+            x=x_axis,
+            y=y_axis,
+            hue=column,
+            palette="dark",
+            ax=ax,
+            edgecolor="black",
+            legend=True,
+        )
+        ax.set_title(f"{column} ", color="white")
+        ax.set_xlabel(x_axis, color="white")
+        ax.set_ylabel(y_axis, color="white")
+        ax.tick_params(colors="white")
+        ax.set_title(f"{column} ")
+
+        for spine in ax.spines.values():
+            spine.set_color("white")
+
+    for ax in axes.flat[n:]:
+        fig.delaxes(ax)
+    fig.tight_layout()
+    if save:
+        _save_fig(fig, output_path)
+    return fig
