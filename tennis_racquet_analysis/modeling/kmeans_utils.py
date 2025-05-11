@@ -5,7 +5,7 @@ import numpy as np
 from typing import Optional, Sequence, Union, Tuple
 
 
-def compute_kmeans_inertia(
+def compute_inertia_scores(
     df: pd.DataFrame,
     feature_columns: Optional[Sequence[str]] = None,
     k_range: Union[Tuple[int, int], range] = (1, 10),
