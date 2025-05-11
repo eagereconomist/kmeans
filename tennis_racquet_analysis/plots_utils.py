@@ -393,22 +393,17 @@ def cluster_scatter_3d(
     if len(features) < 3:
         raise ValueError("Need at least 3 features for a 3D plot.")
     x, y, z = features[:3]
+    cluster_order = sorted(df[label_column].unique(), key=lambda x: int(x))
     fig = px.scatter_3d(
         df,
         x=x,
         y=y,
         z=z,
         color=label_column,
+        category_orders={label_column: cluster_order},
         title=f"3D Cluster Scatter (k={label_column.split('_')[-1]})",
-    )
-    fig.update_traces(marker=dict(size=len(features), opacity=0.8))
-    fig.update_layout(
-        legend_title_text="Cluster",
-        scene=dict(
-            xaxis_title=x,
-            yaxis_title=y,
-            zaxis_title=z,
-        ),
+        width=1400,
+        height=1000,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.write_image(str(output_path))
