@@ -45,11 +45,6 @@ def _set_axis_bounds(ax, vals: pd.Series, axis: str = "x"):
         ax.set_ylim(lower, higher)
 
 
-# def cluster_marker_map(
-#         lae
-# )
-
-
 def df_to_array(df: pd.DataFrame, columns: list[str] | None = None) -> np.ndarray:
     if columns:
         return df[columns].to_numpy()
