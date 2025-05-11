@@ -374,8 +374,11 @@ def cluster_scatter(
         data=df,
         x=x_axis,
         y=y_axis,
+        style=label_column,
+        marker=True,
         hue=label_column,
-        palette="tab10",
+        palette="dark",
+        legend="full",
     )
     ax.set_title(f"{x_axis.capitalize()} vs. {y_axis.capitalize()} by {label_column}")
     if save:
