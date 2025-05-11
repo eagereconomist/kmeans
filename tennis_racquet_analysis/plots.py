@@ -522,7 +522,7 @@ def cluster_3d_plot(
         width=800,
         height=600,
     )
-    fig.update_traces(marker=dict(size=5, opacity=0.8))
+    fig.update_traces(marker=dict(size=5, opacity=1))
     fig.update_layout(
         legend_title_text="Cluster",
         scene=dict(
