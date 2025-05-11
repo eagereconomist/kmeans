@@ -431,7 +431,7 @@ def cluster_plot(
     ),
     y_axis: Optional[str] = typer.Option(None, "--y-axis", "-y", help="Feature for Y axis."),
     label_column: str = typer.Option(
-        "cluster",
+        "cluster_",
         "--label-column",
         "-l",
         help="Column with cluster labels.",
@@ -483,7 +483,7 @@ def cluster_3d_plot(
         help="Exactly three numeric columns to plot; defaults to first three.",
     ),
     label_column: str = typer.Option(
-        ...,
+        "cluster_",
         "--label-column",
         "-l",
         help="Name of the cluster label column (e.g. cluster_5).",
@@ -502,46 +502,51 @@ def cluster_3d_plot(
         help="Don't write to disk. Opens html plot in browser.",
     ),
 ):
-    df = load_data(DATA_DIR / dir_label / input_file)
-    num_cols = df.select_dtypes(include="number").columns.tolist()
-    chosen = features or num_cols[:3]
-    if len(chosen) != 3:
-        raise typer.BadParameter("Must specify exactly three features for 3D.")
-    df[label_column] = df[label_column].astype(str)
-    cluster_order = sorted(df[label_column].unique(), key=lambda x: int(x))
-    stem = Path(input_file).stem
-    base = f"{stem}_{label_column}_3d"
-    fig = px.scatter_3d(
-        df,
-        x=chosen[0],
-        y=chosen[1],
-        z=chosen[2],
-        color=label_column,
-        category_orders={label_column: cluster_order},
-        title=f"3D Cluster Scatter (k={label_column.split('_')[-1]})",
-        width=800,
-        height=600,
-    )
-    fig.update_traces(marker=dict(size=5, opacity=1))
-    fig.update_layout(
-        legend_title_text="Cluster",
-        scene=dict(
-            xaxis_title=chosen[0],
-            yaxis_title=chosen[1],
-            zaxis_title=chosen[2],
-        ),
-    )
-    if not no_save:
-        png_path = output_dir / f"{base}.png"
-        fig = cluster_scatter_3d(
-            df=df,
-            features=chosen,
-            label_column=label_column,
-            output_path=png_path,
+    with tqdm(total=3, desc="Cluster-3D", ncols=100) as progress_bar:
+        df = load_data(DATA_DIR / dir_label / input_file)
+        progress_bar.update(1)
+        num_cols = df.select_dtypes(include="number").columns.tolist()
+        chosen = features or num_cols[:3]
+        if len(chosen) != 3:
+            raise typer.BadParameter("Must specify exactly three features for 3D.")
+        df[label_column] = df[label_column].astype(str)
+        cluster_order = sorted(df[label_column].unique(), key=lambda x: int(x))
+        stem = Path(input_file).stem
+        base = f"{stem}_{label_column}_3d"
+        fig = px.scatter_3d(
+            df,
+            x=chosen[0],
+            y=chosen[1],
+            z=chosen[2],
+            color=label_column,
+            category_orders={label_column: cluster_order},
+            title=f"3D Cluster Scatter (k={label_column.split('_')[-1]})",
+            width=800,
+            height=600,
         )
-        logger.success(f"Static PNG saved to {png_path!r}")
-    else:
-        fig.show()
+        fig.update_traces(marker=dict(size=5, opacity=1))
+        fig.update_layout(
+            legend_title_text="Cluster",
+            scene=dict(
+                xaxis_title=chosen[0],
+                yaxis_title=chosen[1],
+                zaxis_title=chosen[2],
+            ),
+        )
+        progress_bar.update(1)
+        if not no_save:
+            png_path = output_dir / f"{base}.png"
+            _ = cluster_scatter_3d(
+                df=df,
+                features=chosen,
+                label_column=label_column,
+                output_path=png_path,
+            )
+            logger.success(f"Static PNG saved to {png_path!r}")
+            progress_bar.update(1)
+        else:
+            fig.show()
+            progress_bar.update(1)
 
 
 @app.command("cluster-subplot")
@@ -588,14 +593,16 @@ def batch_cluster_plot(
     if not cluster_columns:
         raise typer.BadParameter(f"No columns found with prefix {label_column!r}")
     output_path = output_dir / f"{Path(input_file).stem}_{x_col}_vs_{y_col}_batch.png"
-    plot_batch_clusters(
-        df,
-        x_axis=x_col,
-        y_axis=y_col,
-        cluster_columns=cluster_columns,
-        output_path=output_path,
-        save=True,
-    )
+    with tqdm(total=1, desc="Generating Batch Subplots", ncols=100) as progress_bar:
+        plot_batch_clusters(
+            df,
+            x_axis=x_col,
+            y_axis=y_col,
+            cluster_columns=cluster_columns,
+            output_path=output_path,
+            save=True,
+        )
+        progress_bar.update(1)
     logger.success(f"Saved batch-cluster plot for {cluster_columns} -> {output_path!r}")
 
 
