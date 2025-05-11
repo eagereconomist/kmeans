@@ -7,7 +7,7 @@ from tqdm import tqdm
 from tennis_racquet_analysis.config import DATA_DIR, PROCESSED_DATA_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data
 from tennis_racquet_analysis.modeling.kmeans_utils import (
-    compute_kmeans_inertia,
+    compute_inertia_scores,
     compute_silhouette_scores,
     fit_kmeans,
     batch_kmeans,
@@ -68,7 +68,7 @@ def km_inertia(
         ),
     )
     inertia_df = (
-        compute_kmeans_inertia(
+        compute_inertia_scores(
             df,
             feature_columns if feature_columns else None,
             progress_bar,
