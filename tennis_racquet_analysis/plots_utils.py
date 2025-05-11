@@ -45,6 +45,11 @@ def _set_axis_bounds(ax, vals: pd.Series, axis: str = "x"):
         ax.set_ylim(lower, higher)
 
 
+# def cluster_marker_map(
+#         lae
+# )
+
+
 def df_to_array(df: pd.DataFrame, columns: list[str] | None = None) -> np.ndarray:
     if columns:
         return df[columns].to_numpy()
@@ -429,30 +434,24 @@ def plot_batch_clusters(
         figsize=(columns * figsize_per_plot[0], rows * figsize_per_plot[1]),
         squeeze=False,
     )
-    fig.patch.set_facecolor("black")
-    for ax in axes.flat:
-        ax.set_facecolor("black")
-
     for ax, column in zip(axes.flat, cluster_columns):
         sns.scatterplot(
             data=df,
             x=x_axis,
             y=y_axis,
             hue=column,
+            style=column,
+            markers=True,
+            s=100,
+            alpha=1,
             palette="dark",
             ax=ax,
-            edgecolor="black",
-            legend=True,
+            edgecolor="grey",
+            legend="full",
         )
-        ax.set_title(f"{column} ", color="white")
-        ax.set_xlabel(x_axis, color="white")
-        ax.set_ylabel(y_axis, color="white")
-        ax.tick_params(colors="white")
         ax.set_title(f"{column} ")
-
-        for spine in ax.spines.values():
-            spine.set_color("white")
-
+        ax.set_xlabel(x_axis.capitalize())
+        ax.set_ylabel(y_axis.capitalize())
     for ax in axes.flat[n:]:
         fig.delaxes(ax)
     fig.tight_layout()
