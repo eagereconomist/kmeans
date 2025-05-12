@@ -6,7 +6,7 @@ from tqdm import tqdm
 import plotly.express as px
 
 
-from tennis_racquet_analysis.config import DATA_DIR, FIGURES_DIR
+from tennis_racquet_analysis.config import DATA_DIR, FIGURES_DIR, PROCESSED_DATA_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data
 from tennis_racquet_analysis.plots_utils import (
     _save_fig,
@@ -363,7 +363,15 @@ def qq(
 @app.command("elbow")
 def elbow_plot(
     input_file: str = typer.Argument(..., help="csv from `inertia` command."),
-    dir_label: str = typer.Argument(..., help="Sub-folder under processed data/"),
+    input_dir: Path = typer.Option(
+        PROCESSED_DATA_DIR,
+        "--input_dir",
+        "-d",
+        exists=True,
+        dir_okay=True,
+        file_okay=True,
+        help="Directory where feature-engineered files live.",
+    ),
     output_dir: Path = typer.Option(
         FIGURES_DIR,
         "--output-dir",
@@ -379,7 +387,7 @@ def elbow_plot(
         help="Show plot, but don't save.",
     ),
 ):
-    df = load_data(DATA_DIR / dir_label / input_file)
+    df = load_data(DATA_DIR / input_dir / input_file)
     stem = Path(input_file).stem
     output_path = output_dir / f"{stem}_elbow.png"
     fig = inertia_plot(
@@ -397,7 +405,15 @@ def elbow_plot(
 @app.command("silhouette")
 def plot_silhouette(
     input_file: str = typer.Argument(..., help="CSV from `silhouette` command."),
-    dir_label: str = typer.Argument(..., help="Sub-folder under processed data/"),
+    input_dir: Path = typer.Option(
+        PROCESSED_DATA_DIR,
+        "--input_dir",
+        "-d",
+        exists=True,
+        dir_okay=True,
+        file_okay=True,
+        help="Directory where feature-engineered files live.",
+    ),
     output_dir: Path = typer.Option(
         FIGURES_DIR,
         "--output-dir",
@@ -408,7 +424,7 @@ def plot_silhouette(
     ),
     no_save: bool = typer.Option(False, "--no-save", "-n", help="Show plot but don’t save."),
 ):
-    df = load_data(DATA_DIR / dir_label / input_file)
+    df = load_data(DATA_DIR / input_dir / input_file)
     stem = Path(input_file).stem
     output_path = output_dir / f"{stem}_silhouette.png"
     fig = silhouette_plot(df, output_path, save=not no_save)
@@ -422,7 +438,15 @@ def plot_silhouette(
 @app.command("cluster")
 def cluster_plot(
     input_file: str = typer.Argument(..., help="csv filename under data subfolder."),
-    dir_label: str = typer.Argument(..., help="Sub-folder under data/"),
+    input_dir: Path = typer.Option(
+        PROCESSED_DATA_DIR,
+        "--input_dir",
+        "-d",
+        exists=True,
+        dir_okay=True,
+        file_okay=True,
+        help="Directory where feature-engineered files live.",
+    ),
     x_axis: Optional[str] = typer.Option(
         None,
         "--x-axis",
@@ -449,7 +473,7 @@ def cluster_plot(
         help="Don't write to disk.",
     ),
 ):
-    df = load_data(DATA_DIR / dir_label / input_file)
+    df = load_data(DATA_DIR / input_dir / input_file)
     numeric_columns = df.select_dtypes(include="number").columns.tolist()
     x_col = x_axis or numeric_columns[0]
     y_col = y_axis or (numeric_columns[1] if len(numeric_columns) > 1 else numeric_columns[0])
@@ -475,7 +499,15 @@ def cluster_plot(
 @app.command("cluster-3d")
 def cluster_3d_plot(
     input_file: str = typer.Argument(..., help="Clustered csv filename"),
-    dir_label: str = typer.Argument(..., help="Sub-folder under data/"),
+    input_dir: Path = typer.Option(
+        PROCESSED_DATA_DIR,
+        "--input_dir",
+        "-d",
+        exists=True,
+        dir_okay=True,
+        file_okay=True,
+        help="Directory where feature-engineered files live.",
+    ),
     features: list[str] = typer.Option(
         None,
         "--feature",
@@ -503,7 +535,7 @@ def cluster_3d_plot(
     ),
 ):
     with tqdm(total=3, desc="Cluster-3D", ncols=100) as progress_bar:
-        df = load_data(DATA_DIR / dir_label / input_file)
+        df = load_data(DATA_DIR / input_dir / input_file)
         progress_bar.update(1)
         num_cols = df.select_dtypes(include="number").columns.tolist()
         chosen = features or num_cols[:3]
@@ -552,7 +584,15 @@ def cluster_3d_plot(
 @app.command("cluster-subplot")
 def batch_cluster_plot(
     input_file: str = typer.Argument(..., help="csv filename under data subfolder"),
-    dir_label: str = typer.Argument(..., help="Sub-folder under data/"),
+    input_dir: Path = typer.Option(
+        PROCESSED_DATA_DIR,
+        "--input_dir",
+        "-d",
+        exists=True,
+        dir_okay=True,
+        file_okay=True,
+        help="Directory where feature-engineered files live.",
+    ),
     x_axis: Optional[str] = typer.Option(
         None,
         "--x-axis",
@@ -580,7 +620,7 @@ def batch_cluster_plot(
         help="Where to save the batch-cluster plot.",
     ),
 ):
-    df = load_data(DATA_DIR / dir_label / input_file)
+    df = load_data(DATA_DIR / input_dir / input_file)
     numeric_columns = df.select_dtypes(include="number").columns.tolist()
     if not numeric_columns:
         raise typer.BadParameter("No numeric columns found in your data.")
