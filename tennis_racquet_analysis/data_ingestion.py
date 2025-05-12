@@ -12,7 +12,7 @@ app = typer.Typer()
 def main(
     input_file: str = typer.Argument(..., help="Raw data csv."),
     preview: bool = typer.Option(
-        False, "--preview/--no-preview", help="Show first 5 rows of the loaded DataFrame."
+        False, "--preview", "-p", help="Show first 5 rows of the loaded DataFrame."
     ),
 ):
     logger.info("Starting data ingestion pipeline...")
