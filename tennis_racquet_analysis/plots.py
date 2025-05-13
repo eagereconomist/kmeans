@@ -23,6 +23,8 @@ from tennis_racquet_analysis.plots_utils import (
     qq_plots_all,
     inertia_plot,
     silhouette_plot,
+    scree_plot,
+    cumulative_prop_var_plot,
     cluster_scatter,
     cluster_scatter_3d,
     plot_batch_clusters,
@@ -431,6 +433,90 @@ def plot_silhouette(
     if not no_save:
         _save_fig(fig, output_path)
         logger.success(f"Silhouette Plot saved to {output_path!r}")
+    else:
+        fig.show()
+
+
+@app.command("scree")
+def plot_scree(
+    input_file: str = typer.Argument(..., help="csv file."),
+    input_dir: Path = typer.Option(
+        PROCESSED_DATA_DIR,
+        "--input_dir",
+        "-d",
+        exists=True,
+        dir_okay=True,
+        file_okay=True,
+        help="Directory where feature-engineered files live.",
+    ),
+    output_dir: Path = typer.Option(
+        FIGURES_DIR,
+        "--output-dir",
+        "-o",
+        dir_okay=True,
+        file_okay=False,
+        help="Where to save the elbow plot png.",
+    ),
+    no_save: bool = typer.Option(
+        False,
+        "--no-save",
+        "-n",
+        help="Show plot, but don't save.",
+    ),
+):
+    df = load_data(DATA_DIR / input_dir / input_file)
+    stem = Path(input_file).stem
+    output_path = output_dir / f"{stem}_scree.png"
+    fig = scree_plot(
+        df,
+        output_path,
+        save=no_save,
+    )
+    if not no_save:
+        _save_fig(fig, output_path)
+        logger.success(f"Scree Plot saved to {output_path!r}")
+    else:
+        fig.show()
+
+
+@app.command("cumulative-prop-var")
+def plot_cumulative_prop_var(
+    input_file: str = typer.Argument(..., help="csv file."),
+    input_dir: Path = typer.Option(
+        PROCESSED_DATA_DIR,
+        "--input_dir",
+        "-d",
+        exists=True,
+        dir_okay=True,
+        file_okay=True,
+        help="Directory where feature-engineered files live.",
+    ),
+    output_dir: Path = typer.Option(
+        FIGURES_DIR,
+        "--output-dir",
+        "-o",
+        dir_okay=True,
+        file_okay=False,
+        help="Where to save the elbow plot png.",
+    ),
+    no_save: bool = typer.Option(
+        False,
+        "--no-save",
+        "-n",
+        help="Show plot, but don't save.",
+    ),
+):
+    df = load_data(DATA_DIR / input_dir / input_file)
+    stem = Path(input_file).stem
+    output_path = output_dir / f"{stem}_cumulative_prop_var.png"
+    fig = cumulative_prop_var_plot(
+        df,
+        output_path,
+        save=no_save,
+    )
+    if not no_save:
+        _save_fig(fig, output_path)
+        logger.success(f"Cumulative Prop. Variance Plot saved to {output_path!r}")
     else:
         fig.show()
 
