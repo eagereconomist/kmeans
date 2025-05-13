@@ -352,6 +352,39 @@ def silhouette_plot(silhouette_df: pd.DataFrame, output_path: Path, save: bool =
     return fig
 
 
+def scree_plot(
+    df: pd.DataFrame,
+    output_path: Path,
+    save: bool = True,
+) -> plt.Axes:
+    fig, ax = _init_fig()
+    x = range(1, len(df["prop_var"]) + 1)
+    y = df["prop_var"].values
+    ax.plot(x, y, marker="o")
+    ax.set_xlabel("Principal Component")
+    ax.set_ylabel("Prop. Variance Explained")
+    ax.set_title(f"Scree Plot ({output_path.name})")
+    if save:
+        _save_fig(fig, output_path)
+    return fig
+
+
+def cumulative_prop_variance_plot(
+    df: pd.DataFrame,
+    output_path: Path,
+    save: bool = True,
+) -> plt.Axes:
+    fig, ax = _init_fig()
+    x = range(1, len(df["cumulative_prop_var"]) + 1)
+    y = df["cumulative_prop_var"].values
+    ax.plot(x, y, marker="o")
+    ax.set_xlabel("Principal Component")
+    ax.set_ylabel("Cumulative Prop. Variance Explained")
+    if save:
+        _save_fig(fig, output_path)
+    return fig
+
+
 def cluster_scatter(
     df: pd.DataFrame,
     x_axis: str,
