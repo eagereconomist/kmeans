@@ -369,7 +369,7 @@ def scree_plot(
     return fig
 
 
-def cumulative_prop_variance_plot(
+def cumulative_prop_var_plot(
     df: pd.DataFrame,
     output_path: Path,
     save: bool = True,
