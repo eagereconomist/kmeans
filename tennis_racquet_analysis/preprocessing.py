@@ -12,7 +12,7 @@ from tennis_racquet_analysis.config import (
 from tennis_racquet_analysis.preprocessing_utils import (
     load_data,
     find_iqr_outliers,
-    compute_pca_components,
+    compute_pca_summary,
     drop_column,
     drop_row,
     dotless_column,
@@ -139,7 +139,7 @@ def main(
     return df
 
 
-@app.command("pca-components")
+@app.command("pca")
 def pca(
     input_file: str = typer.Argument(..., help="csv filename under data subfolder."),
     input_dir: Path = typer.Option(
@@ -162,26 +162,42 @@ def pca(
     ),
     output_dir: Path = typer.Option(
         PROCESSED_DATA_DIR,
-        "--output-dir",
         "-o",
+        "--output-dir",
         exists=True,
         dir_okay=True,
         file_okay=False,
-        help="Directroy to write the PCA variance csv.",
+        help="Directory to write the PCA summary csv's.",
     ),
 ):
     input_path = DATA_DIR / input_dir / input_file
     df = load_data(input_path)
-    df_loadings = compute_pca_components(
+    dict_pca = compute_pca_summary(
         df=df,
         feature_columns=feature_columns,
         random_state=random_state,
     )
     stem = Path(input_file).stem
-    output_path = write_csv(
-        df_loadings, prefix=stem, suffix="pca_components", output_dir=output_dir
+    loadings_path = write_csv(
+        dict_pca["loadings"], prefix=stem, suffix="pca_loadings", output_dir=output_dir
     )
-    logger.success(f"Saved PCA Components -> {output_path!r}")
+    logger.success(f"Saved PCA loadings → {loadings_path!r}")
+
+    pve_path = write_csv(
+        dict_pca["Proportion of Variance Explained"].to_frame(),
+        prefix=stem,
+        suffix="pca_proportion_variance_explained",
+        output_dir=output_dir,
+    )
+    logger.success(f"Saved explained variance ratio → {pve_path!r}")
+
+    cpve_path = write_csv(
+        dict_pca["Cumulative Proportion of Variance Explained"].to_frame(),
+        prefix=stem,
+        suffix="pca_cumulative_variance_explained",
+        output_dir=output_dir,
+    )
+    logger.success(f"Saved cumulative variance ratio → {cpve_path!r}")
 
 
 if __name__ == "__main__":
