@@ -1,7 +1,7 @@
 from pathlib import Path
 import pandas as pd
 from loguru import logger
-from typing import Optional, Sequence, Iterable
+from typing import Optional, Sequence, Dict, Union
 from sklearn.decomposition import PCA
 
 
@@ -27,20 +27,30 @@ def find_iqr_outliers(df: pd.DataFrame) -> pd.Series:
     return iqr_outliers
 
 
-def compute_pca_components(
+def compute_pca_summary(
     df: pd.DataFrame,
     feature_columns: Optional[Sequence[str]] = None,
     n_components: Optional[int] = None,
     random_state: int = 4572,
-) -> pd.DataFrame:
+) -> Dict[str, Union[pd.DataFrame, pd.Series]]:
     if feature_columns is None:
         feature_columns = df.select_dtypes(include="number").columns.tolist()
     X = df[feature_columns].values
-    pca = PCA(n_components=n_components, random_state=random_state)
-    pca.fit(X)
+    pca = PCA(n_components=n_components, random_state=random_state).fit(X)
     components = pca.components_
-    pc_names = [f"PC{i + 1}" for i in range(components.shape[0])]
-    return pd.DataFrame(components, index=pc_names, columns=feature_columns)
+    pc_labels = [f"PC{i + 1}" for i in range(components.shape[0])]
+    loadings = pd.DataFrame(components, index=pc_labels, columns=feature_columns)
+    pve = pd.Series(
+        pca.explained_variance_ratio_, index=pc_labels, name="Proportion of Variance Explained"
+    )
+    cpve = pd.Series(
+        pve.cumsum(), index=pc_labels, name="Cumulative Proportion of Variance Explained"
+    )
+    return {
+        "loadings": loadings,
+        "Proportion of Variance Explained": pve,
+        "Cumulative Proportion of Variance Explained": cpve,
+    }
 
 
 def drop_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
