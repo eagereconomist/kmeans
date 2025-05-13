@@ -139,8 +139,8 @@ def main(
     return df
 
 
-@app.command("pca")
-def pca(
+@app.command("pca-summary")
+def pca_summary(
     input_file: str = typer.Argument(..., help="csv filename under data subfolder."),
     input_dir: Path = typer.Option(
         PROCESSED_DATA_DIR,
