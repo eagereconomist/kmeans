@@ -48,8 +48,8 @@ def compute_pca_summary(
     )
     return {
         "loadings": loadings,
-        "Proportion of Variance Explained": pve,
-        "Cumulative Proportion of Variance Explained": cpve,
+        "pve": pve,
+        "cpve": cpve,
     }
 
 
