@@ -40,12 +40,8 @@ def compute_pca_summary(
     components = pca.components_
     pc_labels = [f"PC{i + 1}" for i in range(components.shape[0])]
     loadings = pd.DataFrame(components, index=pc_labels, columns=feature_columns)
-    pve = pd.Series(
-        pca.explained_variance_ratio_, index=pc_labels, name="Proportion of Variance Explained"
-    )
-    cpve = pd.Series(
-        pve.cumsum(), index=pc_labels, name="Cumulative Proportion of Variance Explained"
-    )
+    pve = pd.Series(pca.explained_variance_ratio_, index=pc_labels, name="prop_var")
+    cpve = pd.Series(pve.cumsum(), index=pc_labels, name="cumulative_prop_var")
     return {
         "loadings": loadings,
         "pve": pve,
