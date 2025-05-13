@@ -3,10 +3,16 @@ from loguru import logger
 from tqdm import tqdm
 from typing import List
 import typer
-from tennis_racquet_analysis.config import RAW_DATA_DIR, INTERIM_DATA_DIR
+from tennis_racquet_analysis.config import (
+    RAW_DATA_DIR,
+    INTERIM_DATA_DIR,
+    PROCESSED_DATA_DIR,
+    DATA_DIR,
+)
 from tennis_racquet_analysis.preprocessing_utils import (
     load_data,
     find_iqr_outliers,
+    compute_pca_components,
     drop_column,
     drop_row,
     dotless_column,
@@ -131,6 +137,51 @@ def main(
     logger.info(f"Preprocessed DataFrame dimensions: {df.shape}")
     logger.success(f"Preprocessed CSV saved to {output_path!r}")
     return df
+
+
+@app.command("pca-components")
+def pca(
+    input_file: str = typer.Argument(..., help="csv filename under data subfolder."),
+    input_dir: Path = typer.Option(
+        PROCESSED_DATA_DIR,
+        "--input-dir",
+        "-d",
+        exists=True,
+        dir_okay=True,
+        file_okay=True,
+        help="Directory where scaled data files live.",
+    ),
+    feature_columns: list[str] = typer.Option(
+        None,
+        "--feature-column",
+        "-f",
+        help="Name of numeric column to include; repeat flag to add more. Defaults to all numeric.",
+    ),
+    random_state: int = typer.Option(
+        4572, "--seed", "-s", help="Random seed for reproducibility."
+    ),
+    output_dir: Path = typer.Option(
+        PROCESSED_DATA_DIR,
+        "--output-dir",
+        "-o",
+        exists=True,
+        dir_okay=True,
+        file_okay=False,
+        help="Directroy to write the PCA variance csv.",
+    ),
+):
+    input_path = DATA_DIR / input_dir / input_file
+    df = load_data(input_path)
+    df_loadings = compute_pca_components(
+        df=df,
+        feature_columns=feature_columns,
+        random_state=random_state,
+    )
+    stem = Path(input_file).stem
+    output_path = write_csv(
+        df_loadings, prefix=stem, suffix="pca_components", output_dir=output_dir
+    )
+    logger.success(f"Saved PCA Components -> {output_path!r}")
 
 
 if __name__ == "__main__":
