@@ -181,23 +181,23 @@ def pca_summary(
     loadings_path = write_csv(
         dict_pca["loadings"], prefix=stem, suffix="pca_loadings", output_dir=output_dir
     )
-    logger.success(f"Saved PCA loadings → {loadings_path!r}")
+    logger.success(f"Saved PCA Loadings → {loadings_path!r}")
 
     pve_path = write_csv(
-        dict_pca["Proportion of Variance Explained"].to_frame(),
+        dict_pca["pve"].to_frame(),
         prefix=stem,
-        suffix="pca_proportion_variance_explained",
+        suffix="pca_proportion_var",
         output_dir=output_dir,
     )
-    logger.success(f"Saved explained variance ratio → {pve_path!r}")
+    logger.success(f"Saved Explained Variance Ratio → {pve_path!r}")
 
     cpve_path = write_csv(
-        dict_pca["Cumulative Proportion of Variance Explained"].to_frame(),
+        dict_pca["cpve"].to_frame(),
         prefix=stem,
-        suffix="pca_cumulative_variance_explained",
+        suffix="pca_cumulative_var",
         output_dir=output_dir,
     )
-    logger.success(f"Saved cumulative variance ratio → {cpve_path!r}")
+    logger.success(f"Saved Cumulative Variance Ratio → {cpve_path!r}")
 
 
 if __name__ == "__main__":
