@@ -356,7 +356,7 @@ def qq(
         _apply_cubehelix_style()
         fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(4 * ncols, 4 * nrows))
         axes_flat = axes.flatten()
-        for i, col in enumerate(cols):
+        for i, col in enumerate(tqdm(cols, desc="Q-Q Plots")):
             ax = axes_flat[i]
             qq_plot(df=df, column=col, output_path=None, save=False, ax=ax)
             ax.set_title(col.capitalize())
