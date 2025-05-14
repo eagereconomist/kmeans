@@ -16,7 +16,7 @@ sns.set_theme(
 )
 
 
-def _init_fig(figsize=(14, 14)):
+def _init_fig(figsize=(20, 14)):
     """
     Create a fig + ax with shared cubehelix palette.
     """
