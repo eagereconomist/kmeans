@@ -32,6 +32,14 @@ def _apply_cubehelix_style():
     plt.rc("axes", prop_cycle=plt.cycler("color", palette))
 
 
+def _set_axis_bounds(ax, vals: pd.Series, axis: str = "x"):
+    lower, higher = 0, vals.max() + 1
+    if axis == "x":
+        ax.set_xlim(lower, higher)
+    else:
+        ax.set_ylim(lower, higher)
+
+
 def _save_fig(fig: plt.Figure, path: Path):
     """
     Ensure directory exists, save and close.
@@ -39,14 +47,6 @@ def _save_fig(fig: plt.Figure, path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path)
     plt.close(fig)
-
-
-def _set_axis_bounds(ax, vals: pd.Series, axis: str = "x"):
-    lower, higher = 0, vals.max() + 1
-    if axis == "x":
-        ax.set_xlim(lower, higher)
-    else:
-        ax.set_ylim(lower, higher)
 
 
 def df_to_array(df: pd.DataFrame, columns: list[str] | None = None) -> np.ndarray:
