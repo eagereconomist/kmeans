@@ -398,7 +398,7 @@ def pca_biplot(
 
         cmap = plt.get_cmap("tab10")
 
-        sc = ax.scatter(scores[:, pc_x], scores[:, pc_y], c=codes, cmap=cmap, alpha=0.7)
+        ax.scatter(scores[:, pc_x], scores[:, pc_y], c=codes, cmap=cmap, alpha=0.7)
 
         handles = [
             Line2D([], [], marker="o", color=cmap(i), linestyle="", markersize=6)
