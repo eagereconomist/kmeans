@@ -12,6 +12,7 @@ from tennis_racquet_analysis.config import DATA_DIR, FIGURES_DIR, PROCESSED_DATA
 from tennis_racquet_analysis.preprocessing_utils import load_data
 from tennis_racquet_analysis.plots_utils import (
     _save_fig,
+    _apply_cubehelix_style,
     df_to_array,
     df_to_labels,
     compute_linkage,
@@ -352,6 +353,7 @@ def qq(
         n = len(cols)
         ncols = 3
         nrows = ceil(n / ncols)
+        _apply_cubehelix_style()
         fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(4 * ncols, 4 * nrows))
         axes_flat = axes.flatten()
         for i, col in enumerate(cols):
