@@ -30,11 +30,13 @@ def find_iqr_outliers(df: pd.DataFrame) -> pd.Series:
 def compute_pca_summary(
     df: pd.DataFrame,
     feature_columns: Optional[Sequence[str]] = None,
+    hue_column: Optional[str] = None,
     n_components: Optional[int] = None,
     random_state: int = 4572,
 ) -> Dict[str, Union[pd.DataFrame, pd.Series]]:
     if feature_columns is None:
-        feature_columns = df.select_dtypes(include="number").columns.tolist()
+        all_numueric_cols = df.select_dtypes(include="number").columns.tolist()
+        feature_columns = [c for c in all_numueric_cols if c != hue_column]
     X = df[feature_columns].values
     pca = PCA(n_components=n_components, random_state=random_state).fit(X)
     pc_labels = [f"PC{i + 1}" for i in range(pca.components_.shape[0])]
