@@ -37,9 +37,8 @@ def compute_pca_summary(
         feature_columns = df.select_dtypes(include="number").columns.tolist()
     X = df[feature_columns].values
     pca = PCA(n_components=n_components, random_state=random_state).fit(X)
-    components = pca.components_
-    pc_labels = [f"PC{i + 1}" for i in range(components.shape[0])]
-    loadings = pd.DataFrame(components, index=pc_labels, columns=feature_columns)
+    pc_labels = [f"PC{i + 1}" for i in range(pca.components_.shape[0])]
+    loadings = pd.DataFrame(pca.components_, index=pc_labels, columns=feature_columns)
     pve = pd.Series(pca.explained_variance_ratio_, index=pc_labels, name="prop_var")
     cpve = pd.Series(pve.cumsum(), index=pc_labels, name="cumulative_prop_var")
     return {
