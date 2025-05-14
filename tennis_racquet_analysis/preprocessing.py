@@ -178,21 +178,27 @@ def pca_summary(
         random_state=random_state,
     )
     stem = Path(input_file).stem
+    df_loadings = dict_pca["loadings"]
+    df_loadings = df_loadings.reset_index().rename(columns={"index": "component"})
     loadings_path = write_csv(
-        dict_pca["loadings"], prefix=stem, suffix="pca_loadings", output_dir=output_dir
+        df_loadings, prefix=stem, suffix="pca_loadings", output_dir=output_dir
     )
     logger.success(f"Saved PCA Loadings → {loadings_path!r}")
 
+    df_pve = dict_pca["pve"]
+    df_pve = df_pve.reset_index().rename(columns={"index": "component"})
     pve_path = write_csv(
-        dict_pca["pve"].to_frame(),
+        df_pve,
         prefix=stem,
         suffix="pca_proportion_var",
         output_dir=output_dir,
     )
     logger.success(f"Saved Explained Variance Ratio → {pve_path!r}")
 
+    df_cpve = dict_pca["cpve"]
+    df_cpve = df_cpve.reset_index().rename(columns={"index": "component"})
     cpve_path = write_csv(
-        dict_pca["cpve"].to_frame(),
+        df_cpve,
         prefix=stem,
         suffix="pca_cumulative_var",
         output_dir=output_dir,
