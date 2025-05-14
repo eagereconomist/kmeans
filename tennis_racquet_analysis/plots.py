@@ -22,7 +22,6 @@ from tennis_racquet_analysis.plots_utils import (
     violin_plot,
     correlation_matrix_heatmap,
     qq_plot,
-    qq_plots_all,
     inertia_plot,
     silhouette_plot,
     scree_plot,
