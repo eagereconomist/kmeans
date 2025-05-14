@@ -27,10 +27,13 @@ from tennis_racquet_analysis.plots_utils import (
     silhouette_plot,
     scree_plot,
     cumulative_prop_var_plot,
+    pca_biplot,
     cluster_scatter,
     cluster_scatter_3d,
     plot_batch_clusters,
 )
+
+from tennis_racquet_analysis.preprocessing_utils import compute_pca_summary
 
 app = typer.Typer()
 
@@ -532,6 +535,76 @@ def plot_cumulative_prop_var(
         logger.success(f"Cumulative Prop. Variance Plot saved to {output_path!r}")
     else:
         fig.show()
+
+
+@app.command("pca-biplot")
+def plot_pca_biplot(
+    input_file: str = typer.Argument(..., help="CSV filename under data subfolder."),
+    input_dir: Path = typer.Option(
+        PROCESSED_DATA_DIR,
+        "-d",
+        "--input-dir",
+        exists=True,
+        dir_okay=True,
+        file_okay=True,
+        help="Directory where scaled data files live.",
+    ),
+    feature_columns: list[str] = typer.Option(
+        None,
+        "-f",
+        "--feature-column",
+        help="Numeric column(s) to include; repeat flag to add more. Defaults to all.",
+    ),
+    random_state: int = typer.Option(4572, "-s", "--seed", help="Random seed for PCA."),
+    pc_x: int = typer.Option(0, "--pc-x", help="Principal component for x-axis (0-indexed)."),
+    pc_y: int = typer.Option(1, "--pc-y", help="Principal component for y-axis (0-indexed)."),
+    scale: float = typer.Option(1.0, "--scale", help="Arrow length multiplier for loadings."),
+    figsize: tuple[float, float] = typer.Option(
+        (20, 14), "--figsize", help="Figure size (width height)."
+    ),
+    hue_column: Optional[str] = typer.Option(
+        None,
+        "--hue",
+        help="Column name for coloring samples (Will be excluded from PCA summary helper).",
+    ),
+    output_dir: Path = typer.Option(
+        FIGURES_DIR,
+        "-o",
+        "--output-dir",
+        exists=True,
+        dir_okay=True,
+        file_okay=False,
+        help="Directory to save the biplot PNG.",
+    ),
+):
+    df = load_data(input_dir / input_file)
+
+    summary = compute_pca_summary(
+        df=df, feature_columns=feature_columns, hue_column=hue_column, random_state=random_state
+    )
+    loadings = summary["loadings"]
+    pve = summary["pve"]
+
+    hue = df[hue_column] if hue_column else None
+
+    fig = pca_biplot(
+        df=df,
+        loadings=loadings,
+        pve=pve,
+        pc_x=pc_x,
+        pc_y=pc_y,
+        scale=scale,
+        figsize=figsize,
+        hue=hue,
+        save=False,
+        output_path=None,
+    )
+
+    stem = Path(input_file).stem
+    out_file = f"{stem}_pca_biplot_PC{pc_x + 1}_{pc_y + 1}.png"
+    out_path = output_dir / out_file
+    _save_fig(fig, out_path)
+    logger.success(f"Saved PCA biplot → {out_path!r}")
 
 
 @app.command("cluster")
