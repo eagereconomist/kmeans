@@ -16,16 +16,20 @@ sns.set_theme(
 )
 
 
-def _init_fig(figsize=(20, 14)):
+def _init_fig(figsize=(14, 14)):
     """
     Create a fig + ax with shared cubehelix palette.
     """
+    _apply_cubehelix_style()
+    fig, ax = plt.subplots(figsize=figsize)
+    return fig, ax
+
+
+def _apply_cubehelix_style():
     palette = sns.cubehelix_palette(
         n_colors=8, start=3, rot=1, reverse=True, light=0.7, dark=0.1, gamma=0.4
     )
     plt.rc("axes", prop_cycle=plt.cycler("color", palette))
-    fig, ax = plt.subplots(figsize=figsize)
-    return fig, ax
 
 
 def _save_fig(fig: plt.Figure, path: Path):
