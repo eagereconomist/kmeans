@@ -305,31 +305,6 @@ def qq_plot(
     return ax
 
 
-def qq_plots_all(
-    df: pd.DataFrame,
-    output_dir: Path,
-    columns: list[str] | None = None,
-    ncols: int = 3,
-    save: bool = True,
-) -> plt.Figure:
-    if columns is None:
-        columns = df.select_dtypes(include="number").columns.tolist()
-    n = len(columns)
-    nrows = (n + ncols - 1) // ncols
-    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(4 * ncols, 4 * nrows))
-    axes = axes.flatten()
-    for ax, col in zip(axes, columns):
-        series = df[col]
-        sm.qqplot(series, line="r", ax=ax)
-        ax.set_title(col.capitalize())
-    for extra_ax in axes[n:]:
-        extra_ax.set_visible(False)
-    plt.tight_layout()
-    if save:
-        _save_fig(fig, output_dir)
-    return fig
-
-
 def inertia_plot(inertia_df: pd.DataFrame, output_path: Path, save: bool = True) -> plt.Axes:
     fig, ax = _init_fig()
     ax.plot(inertia_df["k"], inertia_df["inertia"], marker="o")
