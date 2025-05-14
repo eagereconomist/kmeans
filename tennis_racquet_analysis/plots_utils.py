@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
+from typing import Optional, Sequence
+from matplotlib.lines import Line2D
 import pandas as pd
 import seaborn as sns
 import scipy.cluster.hierarchy as sch
@@ -361,6 +363,72 @@ def cumulative_prop_var_plot(
     ax.set_ylabel("Cumulative Prop. Variance Explained")
     if save:
         _save_fig(fig, output_path)
+    return fig
+
+
+def pca_biplot(
+    df: pd.DataFrame,
+    loadings: pd.DataFrame,
+    pve: pd.Series,
+    pc_x: int = 0,
+    pc_y: int = 1,
+    scale: float = 1.0,
+    figsize: tuple[float, float] = (20, 14),
+    hue: Optional[Sequence] = None,
+    save: bool = True,
+    output_path: Optional[Path] = None,
+) -> plt.Figure:
+    feature_cols = loadings.columns.tolist()
+    X = df[feature_cols].values
+    scores = X.dot(loadings.values.T)
+
+    var_x = pve.iloc[pc_x]
+    var_y = pve.iloc[pc_y]
+    x_label = f"PC{pc_x + 1} ({var_x:.1%})"
+    y_label = f"PC{pc_y + 1} ({var_y:.1%})"
+
+    fig, ax = _init_fig(figsize=figsize)
+
+    if hue is None:
+        ax.scatter(scores[:, pc_x], scores[:, pc_y], alpha=1)
+    else:
+        cat_hue = pd.Categorical(hue)
+        codes = cat_hue.codes
+        categories = cat_hue.categories
+
+        cmap = plt.get_cmap("tab10")
+
+        sc = ax.scatter(scores[:, pc_x], scores[:, pc_y], c=codes, cmap=cmap, alpha=0.7)
+
+        handles = [
+            Line2D([], [], marker="o", color=cmap(i), linestyle="", markersize=6)
+            for i in range(len(categories))
+        ]
+        labels = [str(cat) for cat in categories]
+        ax.legend(handles, labels, title="cluster", loc="best")
+
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    ax.set_title("PCA Biplot", pad=40, fontdict={"fontsize": 30})
+
+    for k, feature in enumerate(feature_cols):
+        x_arr = loadings.iat[pc_x, k] * scale
+        y_arr = loadings.iat[pc_y, k] * scale
+        ax.arrow(
+            0,
+            0,
+            x_arr,
+            y_arr,
+            head_width=0.02 * scale,
+            head_length=0.02 * scale,
+            length_includes_head=True,
+            color="black",
+        )
+        ax.text(x_arr * 1.1, y_arr * 1.1, feature, fontsize=10)
+
+    if save and output_path is not None:
+        _save_fig(fig, output_path)
+
     return fig
 
 
