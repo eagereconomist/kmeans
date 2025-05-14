@@ -3,6 +3,8 @@ import typer
 from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+from math import ceil
 import plotly.express as px
 
 
@@ -338,28 +340,38 @@ def qq(
     ),
 ):
     df = load_data(DATA_DIR / dir_label / input_file)
+    stem = Path(input_file).stem
     if column and not all_cols:
-        for col in column:
-            stem = Path(input_file).stem
+        for col in tqdm(column, desc="Q-Q Plot"):
             file_name = f"{stem}_{col}_qq.png"
             output_path = output_dir / file_name
             qq_plot(df=df, column=col, output_path=output_path, save=not no_save)
             if not no_save:
-                logger.success(f"Saved Q-Q Plot for {col.capitalize()} to {output_path!r}")
+                logger.success(f"Saved Q-Q Plot for '{col}' -> {output_path!r}")
     elif all_cols:
-        stem = Path(input_file).stem
-        fig = qq_plots_all(df=df, output_dir=output_dir, columns=None, ncols=3, save=False)
+        cols = df.select_dtypes(include="number").columns.tolist()
+        n = len(cols)
+        ncols = 3
+        nrows = ceil(n / ncols)
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(4 * ncols, 4 * nrows))
+        axes_flat = axes.flatten()
+        for i, col in enumerate(cols):
+            ax = axes_flat[i]
+            qq_plot(df=df, column=col, output_path=None, save=False, ax=ax)
+            ax.set_title(col.capitalize())
+        for ax in axes_flat[n:]:
+            ax.set_visible(False)
         fig.suptitle(f"Q-Q Plots: {stem} Data")
         fig.tight_layout()
-        file_name = f"{stem}_qq_plots_all.png"
+        file_name = f"{stem}_qq_all.png"
         output_path = output_dir / file_name
         if not no_save:
             _save_fig(fig, output_path)
-            logger.success(f"Saved combined Q-Q plots to {output_path!r}")
+            logger.success(f"Saved Combined Q-Q Plots -> {output_path!r}")
         else:
             fig.show()
     else:
-        raise typer.BadParameter("Specify one or more --column or use --all")
+        raise typer.BadParameter("Specify one or more --column or use --all.")
 
 
 @app.command("elbow")
