@@ -28,6 +28,7 @@ from tennis_racquet_analysis.plots_utils import (
     scree_plot,
     cumulative_prop_var_plot,
     pca_biplot,
+    pca_biplot_3d,
     cluster_scatter,
     cluster_scatter_3d,
     plot_batch_clusters,
@@ -605,6 +606,80 @@ def plot_pca_biplot(
     out_path = output_dir / out_file
     _save_fig(fig, out_path)
     logger.success(f"Saved PCA biplot → {out_path!r}")
+
+
+@app.command("pca-biplot-3d")
+def plot_3d_pca_biplot(
+    input_file: str = typer.Argument(..., help="CSV filename under data subfolder."),
+    input_dir: Path = typer.Option(
+        PROCESSED_DATA_DIR,
+        "-d",
+        "--input-dir",
+        exists=True,
+        dir_okay=True,
+        file_okay=True,
+        help="Directory of csv.",
+    ),
+    feature_columns: list[str] = typer.Option(
+        None,
+        "-f",
+        "--feature-column",
+        help="Numeric column(s) to include; repeat flag to add more. Defaults to all.",
+    ),
+    random_state: int = typer.Option(4572, "-s", "--seed", help="Random seed for PCA."),
+    pc_x: int = typer.Option(0, "--x", help="Principal component for x-axis (0-indexed)."),
+    pc_y: int = typer.Option(1, "--y", help="Principal component for y-axis (0-indexed)."),
+    pc_z: int = typer.Option(2, "--z", help="Principal component for z-axis (0-indexed)."),
+    scale: float = typer.Option(1.0, "--scale", help="Arrow length multiplier for loadings."),
+    hue_column: Optional[str] = typer.Option(
+        None,
+        "--hue",
+        help="Column name for coloring samples (Will be excluded from PCA summary helper).",
+    ),
+    output_dir: Path = typer.Option(
+        FIGURES_DIR,
+        "-o",
+        "--output-dir",
+        exists=True,
+        dir_okay=True,
+        file_okay=False,
+        help="Directory to save the biplot PNG.",
+    ),
+    no_save: bool = typer.Option(
+        False,
+        "--no-save",
+        "-n",
+        help="Show plot, but don't save.",
+    ),
+):
+    df = load_data(input_dir / input_file)
+
+    summary = compute_pca_summary(
+        df=df, feature_columns=feature_columns, hue_column=hue_column, random_state=random_state
+    )
+    loadings, pve = summary["loadings"], summary["pve"]
+    hue = df[hue_column] if hue_column else None
+
+    stem = Path(input_file).stem
+    png_path = output_dir / f"{stem}_3d_pca_biplot.png"
+
+    pca_biplot_3d(
+        df=df,
+        loadings=loadings,
+        pve=pve,
+        pc_x=pc_x,
+        pc_y=pc_y,
+        pc_z=pc_z,
+        scale=scale,
+        hue=hue,
+        output_path=None if no_save else png_path,
+        show=no_save,
+    )
+
+    if not no_save:
+        logger.success(f"Saved 3D Biplot -> {png_path!r}")
+    else:
+        logger.info("Displayed Interactive 3D PCA Biplot in browser.")
 
 
 @app.command("cluster")
