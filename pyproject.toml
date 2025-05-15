@@ -5,7 +5,7 @@ build-backend = "flit_core.buildapi"
 [project]
 name = "tennis_racquet_analysis"
 version = "0.0.1"
-description = "Quantitative Analysis and Segmentation of Tennis Racquet Data Using K-means and Hierarchical Clustering Methods in Python.."
+description = "Modular Data Segmentation Using PCA and K-Means in Python"
 authors = [
   { name = "eagereconomist" },
 ]
