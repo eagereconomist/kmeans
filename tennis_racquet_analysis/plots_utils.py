@@ -383,9 +383,7 @@ def pca_biplot(
     feature_cols = loadings.columns.tolist()
     X = df[feature_cols].values
     scores = X.dot(loadings.values.T)
-
-    var_x = pve.iloc[pc_x]
-    var_y = pve.iloc[pc_y]
+    var_x, var_y = pve.iloc[pc_x], pve.iloc[pc_y]
     x_label = f"PC{pc_x + 1} ({var_x:.1%})"
     y_label = f"PC{pc_y + 1} ({var_y:.1%})"
 
