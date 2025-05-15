@@ -800,8 +800,6 @@ def cluster_3d_plot(
             color=label_column,
             category_orders={label_column: cluster_order},
             title=f"3D Cluster Scatter (k={label_column.split('_')[-1]})",
-            width=800,
-            height=600,
         )
         fig.update_traces(marker=dict(size=5, opacity=1))
         fig.update_layout(
