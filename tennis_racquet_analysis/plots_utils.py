@@ -485,7 +485,7 @@ def pca_biplot_3d(
         color_discrete_sequence=px.colors.qualitative.T10,
         labels={"x": x_label, "y": y_label, "z": z_label},
         title="3D PCA Biplot",
-        width=1400,
+        width=1000,
         height=1000,
     )
 
@@ -600,11 +600,12 @@ def cluster_scatter_3d(
         color=label_column,
         category_orders={label_column: cluster_order},
         title=f"3D Cluster Scatter (k={label_column.split('_')[-1]})",
-        width=1400,
-        height=1000,
+        width=1300,
+        height=1300,
     )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.write_image(str(output_path))
+    if save:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.write_image(str(output_path))
     return fig
 
 
