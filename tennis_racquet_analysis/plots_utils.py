@@ -53,59 +53,6 @@ def _save_fig(fig: plt.Figure, path: Path):
     plt.close(fig)
 
 
-def df_to_array(df: pd.DataFrame, columns: list[str] | None = None) -> np.ndarray:
-    if columns:
-        return df[columns].to_numpy()
-    return df.select_dtypes(include="number").to_numpy()
-
-
-def df_to_labels(
-    df: pd.DataFrame,
-    label_col: str,
-) -> np.ndarray:
-    return df[label_col].astype(str).to_numpy()
-
-
-def compute_linkage(
-    array: np.ndarray,
-    method: str = "centroid",
-    metric: str = "euclidean",
-    optimal_ordering: bool = True,
-) -> np.ndarray:
-    dists = pdist(array, metric=metric)
-    return sch.linkage(y=dists, method=method, metric=metric, optimal_ordering=optimal_ordering)
-
-
-def dendrogram_plot(
-    Z: np.ndarray,
-    labels: np.ndarray,
-    output_path: Path,
-    orient: str = "right",
-    save: bool = True,
-    ax: plt.Axes | None = None,
-) -> dict:
-    if ax is None:
-        fig, ax = _init_fig()
-    else:
-        fig = ax.figure
-    result = (
-        sch.dendrogram(
-            Z,
-            labels=labels,
-            orientation=orient,
-            ax=ax,
-        ),
-        ax.set(
-            title=("Hierarchical Clustering Dendrogram (all leaves)"),
-            xlabel=("Distance"),
-            ylabel=("Racquet Model"),
-        ),
-    )
-    if save:
-        _save_fig(fig, output_path)
-    return result
-
-
 def histogram(
     df: pd.DataFrame,
     x_axis: str,
