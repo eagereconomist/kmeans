@@ -5,8 +5,6 @@ from typing import Optional, Sequence
 from matplotlib.lines import Line2D
 import pandas as pd
 import seaborn as sns
-import scipy.cluster.hierarchy as sch
-from scipy.spatial.distance import pdist
 import statsmodels.api as sm
 import re
 import plotly.express as px
