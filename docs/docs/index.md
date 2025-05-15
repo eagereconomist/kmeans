@@ -2,7 +2,7 @@
 
 ## Description
 
-Quantitative Analysis and Segmentation of Tennis Racquet Data Using K-means and Hierarchical Clustering Methods in Python.
+Modular Data Segmentation Using PCA and K-Means in Python
 
 ## Commands
 
