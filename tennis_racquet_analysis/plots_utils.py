@@ -10,6 +10,8 @@ from scipy.spatial.distance import pdist
 import statsmodels.api as sm
 import re
 import plotly.express as px
+import plotly.graph_objects as go
+
 
 sns.set_theme(
     style="ticks",
@@ -398,7 +400,7 @@ def pca_biplot(
 
         cmap = plt.get_cmap("tab10")
 
-        ax.scatter(scores[:, pc_x], scores[:, pc_y], c=codes, cmap=cmap, alpha=0.7)
+        ax.scatter(scores[:, pc_x], scores[:, pc_y], c=codes, cmap=cmap, alpha=1)
 
         handles = [
             Line2D([], [], marker="o", color=cmap(i), linestyle="", markersize=6)
@@ -428,6 +430,126 @@ def pca_biplot(
 
     if save and output_path is not None:
         _save_fig(fig, output_path)
+
+    return fig
+
+
+def pca_biplot_3d(
+    df: pd.DataFrame,
+    loadings: pd.DataFrame,
+    pve: pd.Series,
+    pc_x: int = 0,
+    pc_y: int = 1,
+    pc_z: int = 2,
+    scale: float = 1.0,
+    hue: pd.Series | None = None,
+    output_path: Path | None = None,
+    show: bool = False,
+) -> go.Figure:
+    feature_cols = loadings.columns.tolist()
+    if len(feature_cols) < 3:
+        raise ValueError("Need at least 3 features for a 3D plot.")
+    X = df[feature_cols].values
+    scores = X.dot(loadings.values.T)
+    x_vals, y_vals, z_vals = scores[:, pc_x], scores[:, pc_y], scores[:, pc_z]
+
+    x_label = f"PC{pc_x + 1} ({pve.iloc[pc_x]:.1%})"
+    y_label = f"PC{pc_y + 1} ({pve.iloc[pc_y]:.1%})"
+    z_label = f"PC{pc_z + 1} ({pve.iloc[pc_z]:.1%})"
+
+    plotly_df = pd.DataFrame(
+        {
+            "PC_x": x_vals,
+            "PC_y": y_vals,
+            "PC_z": z_vals,
+        }
+    )
+    plotly_df.rename(columns={"PC_x": x_label, "PC_y": y_label, "PC_z": z_label}, inplace=True)
+
+    if hue is not None:
+        hue_str = hue.astype(str).rename("cluster")
+        plotly_df["cluster"] = hue_str
+
+        try:
+            order = sorted(hue_str.unique(), key=int)
+        except ValueError:
+            order = list(hue_str.unique())
+    else:
+        order = None
+
+    fig = px.scatter_3d(
+        plotly_df,
+        x=x_label,
+        y=y_label,
+        z=z_label,
+        color="cluster" if hue is not None else None,
+        category_orders={"cluster": order} if order is not None else None,
+        color_discrete_sequence=px.colors.qualitative.T10,
+        labels={"x": x_label, "y": y_label, "z": z_label},
+        title="3D PCA Biplot",
+        width=1400,
+        height=1000,
+    )
+
+    for i, feature in enumerate(feature_cols):
+        xi = loadings.iat[pc_x, i] * scale
+        yi = loadings.iat[pc_y, i] * scale
+        zi = loadings.iat[pc_z, i] * scale
+
+        fig.add_trace(
+            go.Scatter3d(
+                x=[0, xi],
+                y=[0, yi],
+                z=[0, zi],
+                mode="lines",
+                line=dict(color="black", width=4),
+                showlegend=False,
+            )
+        )
+        vec = np.array([xi, yi, zi])
+        length = np.linalg.norm(vec)
+        if length > 0:
+            head_length = scale * 0.04
+            direction = vec / length
+            ux, uy, uz = direction * head_length
+        else:
+            uz = uy = uz = 0
+
+        fig.add_trace(
+            go.Cone(
+                x=[xi],
+                y=[yi],
+                z=[zi],
+                u=[ux],
+                v=[uy],
+                w=[uz],
+                anchor="tip",
+                sizemode="absolute",
+                sizeref=head_length,
+                showscale=False,
+                colorscale=[[0, "black"], [1, "black"]],
+                showlegend=False,
+            )
+        )
+        fig.add_trace(
+            go.Scatter3d(
+                x=[xi],
+                y=[yi],
+                z=[zi],
+                mode="text",
+                text=[feature],
+                textposition="top center",
+                showlegend=False,
+            )
+        )
+    fig.update_layout(
+        legend=dict(title="Cluster", traceorder="normal"),
+    )
+
+    if output_path:
+        fig.write_image(str(output_path))
+    if show:
+        fig.show()
 
     return fig
 
