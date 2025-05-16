@@ -24,7 +24,7 @@ def km_inertia(
         "processed",
         "--input-dir",
         "-d",
-        help="Sub-folder under data/ (e.g. interim, raw, processed).",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
     ),
     random_state: int = typer.Option(
         4572, "--seed", "-s", help="Random seed for reproducibility."
@@ -45,17 +45,15 @@ def km_inertia(
         help="Name of numeric column to include; repeat flag to add more."
         "Defaults to all numeric columns.",
     ),
-    output_dir: Path = typer.Option(
-        PROCESSED_DATA_DIR,
+    output_dir: str = typer.Option(
+        "processed",
         "--output-dir",
         "-o",
-        exists=True,
-        file_okay=False,
-        dir_okay=True,
-        help="Directory to write the inertia csv (default: data/processed).",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the file will be output.",
     ),
 ):
     input_path = DATA_DIR / input_dir / input_file
+    output_path = DATA_DIR / output_dir
     df = load_data(input_path)
     n_samples = df.shape[0]
     progress_bar = tqdm(range(1, n_samples + 1), desc="Inertia", ncols=100)
@@ -69,9 +67,8 @@ def km_inertia(
         init=init,
     )
     stem = Path(input_file).stem
-    output_filename = f"{stem}_inertia.csv"
-    write_csv(inertia_df, prefix=stem, suffix="inertia", output_dir=output_dir)
-    logger.success(f"Saved Inertia Scores -> {(output_dir / output_filename)!r}")
+    write_csv(inertia_df, prefix=stem, suffix="inertia", output_dir=output_path)
+    logger.success(f"Saved Inertia Scores -> {(output_dir / output_path)!r}")
 
 
 @app.command("silhouette")
