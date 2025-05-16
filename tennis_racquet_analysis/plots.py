@@ -310,12 +310,7 @@ def elbow_plot(
         file_okay=False,
         help="Save the silhouette plot PNG to the 'figures' directory.",
     ),
-    no_save: bool = typer.Option(
-        False,
-        "--no-save",
-        "-n",
-        help="Show plot, but don't save.",
-    ),
+    no_save: bool = typer.Option(False, "--no-save", "-n", help="Show plot, but don't save."),
 ):
     df = load_data(DATA_DIR / input_dir / input_file)
     stem = Path(input_file).stem
@@ -335,14 +330,11 @@ def elbow_plot(
 @app.command("silhouette")
 def plot_silhouette(
     input_file: str = typer.Argument(..., help="CSV from `silhouette` command."),
-    input_dir: Path = typer.Option(
-        PROCESSED_DATA_DIR,
-        "--input_dir",
+    input_dir: str = typer.Option(
+        "processed",
+        "--input-dir",
         "-d",
-        exists=True,
-        dir_okay=True,
-        file_okay=True,
-        help="Directory where feature-engineered files live.",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
     ),
     output_dir: Path = typer.Option(
         FIGURES_DIR,
@@ -350,13 +342,13 @@ def plot_silhouette(
         "-o",
         dir_okay=True,
         file_okay=False,
-        help="Where to save the silhouette plot PNG.",
+        help="Save the silhouette plot PNG to the 'figures' directory.",
     ),
     no_save: bool = typer.Option(False, "--no-save", "-n", help="Show plot but don’t save."),
 ):
     df = load_data(DATA_DIR / input_dir / input_file)
     stem = Path(input_file).stem
-    output_path = output_dir / f"{stem}_silhouette.png"
+    output_path = output_dir / f"{stem}.png"
     fig = silhouette_plot(df, output_path, save=not no_save)
     if not no_save:
         _save_fig(fig, output_path)
