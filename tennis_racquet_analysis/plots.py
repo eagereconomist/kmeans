@@ -729,14 +729,11 @@ def cluster_3d_plot(
 @app.command("cluster-subplot")
 def batch_cluster_plot(
     input_file: str = typer.Argument(..., help="csv filename under data subfolder"),
-    input_dir: Path = typer.Option(
-        PROCESSED_DATA_DIR,
-        "--input_dir",
+    input_dir: str = typer.Option(
+        "processed",
+        "--input-dir",
         "-d",
-        exists=True,
-        dir_okay=True,
-        file_okay=True,
-        help="Directory where feature-engineered files live.",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
     ),
     x_axis: Optional[str] = typer.Option(
         None,
