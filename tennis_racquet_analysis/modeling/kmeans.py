@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List
 from tqdm import tqdm
 
-from tennis_racquet_analysis.config import DATA_DIR, PROCESSED_DATA_DIR
+from tennis_racquet_analysis.config import DATA_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data
 from tennis_racquet_analysis.modeling.kmeans_utils import (
     compute_inertia_scores,
