@@ -20,14 +20,11 @@ app = typer.Typer()
 @app.command("inertia")
 def km_inertia(
     input_file: str = typer.Argument(..., help="csv filename under the data subfolder."),
-    input_dir: Path = typer.Option(
-        PROCESSED_DATA_DIR,
-        "--input_dir",
+    input_dir: str = typer.Option(
+        "processed",
+        "--input-dir",
         "-d",
-        exists=True,
-        dir_okay=True,
-        file_okay=True,
-        help="Directory where files live.",
+        help="Sub-folder under data/ (e.g. interim, raw, processed).",
     ),
     random_state: int = typer.Option(
         4572, "--seed", "-s", help="Random seed for reproducibility."
@@ -58,7 +55,7 @@ def km_inertia(
         help="Directory to write the inertia csv (default: data/processed).",
     ),
 ):
-    input_path = input_dir / input_file
+    input_path = DATA_DIR / input_dir / input_file
     df = load_data(input_path)
     n_samples = df.shape[0]
     progress_bar = tqdm(range(1, n_samples + 1), desc="Inertia", ncols=100)
