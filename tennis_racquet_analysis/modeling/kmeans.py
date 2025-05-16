@@ -74,14 +74,11 @@ def km_inertia(
 @app.command("silhouette")
 def km_silhouette(
     input_file: str = typer.Argument(..., help="csv filename under the data subfolder."),
-    input_dir: Path = typer.Option(
-        PROCESSED_DATA_DIR,
-        "--input_dir",
+    input_dir: str = typer.Option(
+        "processed",
+        "--input-dir",
         "-d",
-        exists=True,
-        dir_okay=True,
-        file_okay=True,
-        help="Directory where files live.",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
     ),
     random_state: int = typer.Option(
         4572, "--seed", "-s", help="Random seed for reproducibility."
@@ -102,17 +99,15 @@ def km_silhouette(
         help="Name of numeric column to include; repeat flag to add more."
         "Defaults to all numeric columns.",
     ),
-    output_dir: Path = typer.Option(
-        PROCESSED_DATA_DIR,
+    output_dir: str = typer.Option(
+        "processed",
         "--output-dir",
         "-o",
-        exists=True,
-        file_okay=False,
-        dir_okay=True,
-        help="Directory to write the inertia csv (default: data/processed).",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the file will be output.",
     ),
 ):
     df = load_data(DATA_DIR / input_dir / input_file)
+    output_path = DATA_DIR / output_dir
     n_samples = df.shape[0]
     progress_bar = tqdm(range(2, n_samples), desc="Silhouette", ncols=100)
     silhouette_df = compute_silhouette_scores(
@@ -125,9 +120,8 @@ def km_silhouette(
         init=init,
     )
     stem = Path(input_file).stem
-    output_filename = f"{stem}_silhouette.csv"
-    write_csv(silhouette_df, prefix=stem, suffix="silhouette", output_dir=output_dir)
-    logger.success(f"Saved Silhouette Scores -> {(output_dir / output_filename)!r}")
+    write_csv(silhouette_df, prefix=stem, suffix="silhouette", output_dir=output_path)
+    logger.success(f"Saved Silhouette Scores -> {(output_dir / output_path)!r}")
 
 
 @app.command("cluster")
