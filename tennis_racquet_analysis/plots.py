@@ -296,14 +296,11 @@ def qq(
 @app.command("elbow")
 def elbow_plot(
     input_file: str = typer.Argument(..., help="csv from `inertia` command."),
-    input_dir: Path = typer.Option(
-        PROCESSED_DATA_DIR,
-        "--input_dir",
+    input_dir: str = typer.Option(
+        "processed",
+        "--input-dir",
         "-d",
-        exists=True,
-        dir_okay=True,
-        file_okay=True,
-        help="Directory where feature-engineered files live.",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
     ),
     output_dir: Path = typer.Option(
         FIGURES_DIR,
@@ -311,7 +308,7 @@ def elbow_plot(
         "-o",
         dir_okay=True,
         file_okay=False,
-        help="Where to save the elbow plot png.",
+        help="Save the silhouette plot PNG to the 'figures' directory.",
     ),
     no_save: bool = typer.Option(
         False,
@@ -322,7 +319,7 @@ def elbow_plot(
 ):
     df = load_data(DATA_DIR / input_dir / input_file)
     stem = Path(input_file).stem
-    output_path = output_dir / f"{stem}_elbow.png"
+    output_path = output_dir / f"{stem}.png"
     fig = inertia_plot(
         df,
         output_path,
