@@ -189,14 +189,11 @@ def km_cluster(
 @app.command("batch-cluster")
 def batch_cluster_export(
     input_file: str = typer.Argument(..., help="csv filename under data subfolder."),
-    input_dir: Path = typer.Option(
-        PROCESSED_DATA_DIR,
-        "--input_dir",
+    input_dir: str = typer.Option(
+        "processed",
+        "--input-dir",
         "-d",
-        exists=True,
-        dir_okay=True,
-        file_okay=True,
-        help="Directory where files live.",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
     ),
     start: int = typer.Option(
         1,
@@ -222,17 +219,15 @@ def batch_cluster_export(
     init: str = typer.Option(
         "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'"
     ),
-    output_dir: Path = typer.Option(
-        PROCESSED_DATA_DIR,
+    output_dir: str = typer.Option(
+        "processed",
         "--output-dir",
         "-o",
-        exists=True,
-        dir_okay=True,
-        file_okay=False,
-        help="Where to write the labeled csv.",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the file will be output.",
     ),
 ):
     df = load_data(DATA_DIR / input_dir / input_file)
+    output_path = DATA_DIR / output_dir
     progress_bar = tqdm(range(start, stop + 1), desc="Batch Clustering:", ncols=100)
     df_labeled = batch_kmeans(
         df,
@@ -243,8 +238,8 @@ def batch_cluster_export(
         algorithm=algorithm,
     )
     prefix = Path(input_file).stem
-    suffix = "clusters_" + "_".join(str(k) for k in range(start, stop + 1))
-    output_path = write_csv(df_labeled, prefix=prefix, suffix=suffix, output_dir=output_dir)
+    suffix = "".join(f"{start}-{stop}")
+    write_csv(df_labeled, prefix=prefix, suffix=suffix, output_dir=output_path)
     logger.success(f"Saved Batch Clusters for k={start}-{stop} -> {output_path!r}")
 
 
