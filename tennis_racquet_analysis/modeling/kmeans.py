@@ -127,14 +127,11 @@ def km_silhouette(
 @app.command("cluster")
 def km_cluster(
     input_file: str = typer.Argument(..., help="csv filename under processed data/"),
-    input_dir: Path = typer.Option(
-        PROCESSED_DATA_DIR,
-        "--input_dir",
+    input_dir: str = typer.Option(
+        "processed",
+        "--input-dir",
         "-d",
-        exists=True,
-        dir_okay=True,
-        file_okay=True,
-        help="Directory where files live.",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
     ),
     k: int = typer.Option(
         ...,
@@ -160,18 +157,16 @@ def km_cluster(
         "-f",
         help="Which numeric columns to use; repeat to supply mulitple. Defaults to all numeric.",
     ),
-    output_dir: Path = typer.Option(
-        PROCESSED_DATA_DIR,
+    output_dir: str = typer.Option(
+        "processed",
         "--output-dir",
         "-o",
-        exists=True,
-        dir_okay=True,
-        file_okay=False,
-        help="Directory to write the labeled csv (default: data/processed).",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the file will be output.",
     ),
 ):
     input_path = DATA_DIR / input_dir / input_file
     df = load_data(input_path)
+    output_path = DATA_DIR / output_dir
     steps = tqdm(total=2, desc="Clustering", ncols=100)
     df_labeled = fit_kmeans(
         df,
@@ -185,11 +180,10 @@ def km_cluster(
     )
     steps.update(1)
     stem = Path(input_file).stem
-    output_filename = f"{stem}_clustered_{k}.csv"
-    write_csv(df_labeled, prefix=stem, suffix=f"clustered_{k}", output_dir=output_dir)
+    write_csv(df_labeled, prefix=stem, suffix=f"clustered_{k}", output_dir=output_path)
     steps.update(1)
     steps.close()
-    logger.success(f"Saved Clustered Data -> {(output_dir / output_filename)!r}")
+    logger.success(f"Saved Clustered Data -> {(output_dir / output_path)!r}")
 
 
 @app.command("batch-cluster")
