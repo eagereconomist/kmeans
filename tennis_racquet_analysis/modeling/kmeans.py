@@ -26,9 +26,7 @@ def km_inertia(
         "-d",
         help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
     ),
-    random_state: int = typer.Option(
-        4572, "--seed", "-s", help="Random seed for reproducibility."
-    ),
+    random_state: int = typer.Option(4572, "--seed", help="Random seed for reproducibility."),
     n_init: int = typer.Option(
         50, "--n-init", "-n", help="Number of times kmeans is run with differnet centroid seeds."
     ),
@@ -80,9 +78,7 @@ def km_silhouette(
         "-d",
         help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
     ),
-    random_state: int = typer.Option(
-        4572, "--seed", "-s", help="Random seed for reproducibility."
-    ),
+    random_state: int = typer.Option(4572, "--seed", help="Random seed for reproducibility."),
     n_init: int = typer.Option(
         50, "--n-init", "-n", help="Number of times kmeans is run with differnet centroid seeds."
     ),
@@ -139,9 +135,7 @@ def km_cluster(
         "-k",
         help="Number of clusters to fit",
     ),
-    random_state: int = typer.Option(
-        4572, "--seed", "-s", help="Random seed for reproducibility."
-    ),
+    random_state: int = typer.Option(4572, "--seed", help="Random seed for reproducibility."),
     n_init: int = typer.Option(
         50, "--n-init", "-n", help="Number of times kmeans is run with differnet centroid seeds."
     ),
@@ -207,9 +201,7 @@ def batch_cluster_export(
         "-e",
         help="Maximum k (inclusive).",
     ),
-    random_state: int = typer.Option(
-        4572, "--seed", "-s", help="Random seed for reproducibility."
-    ),
+    random_state: int = typer.Option(4572, "--seed", help="Random seed for reproducibility."),
     n_init: int = typer.Option(
         50, "--n-init", "-n", help="Number of times kmeans is run with differnet centroid seeds."
     ),
