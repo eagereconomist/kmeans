@@ -124,7 +124,7 @@ def km_silhouette(
     logger.success(f"Saved Silhouette Scores -> {(output_dir / output_path)!r}")
 
 
-@app.command("cluster")
+@app.command("fit-kmeans")
 def km_cluster(
     input_file: str = typer.Argument(..., help="csv filename under processed data/"),
     input_dir: str = typer.Option(
