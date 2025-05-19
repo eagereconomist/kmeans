@@ -105,8 +105,7 @@ def km_silhouette(
 ):
     df = load_data(DATA_DIR / input_dir / input_file)
     output_path = DATA_DIR / output_dir
-    n_samples = df.shape[0]
-    progress_bar = tqdm(range(2, n_samples), desc="Silhouette", ncols=100)
+    progress_bar = tqdm(range(2, 21), desc="Silhouette")
     silhouette_df = compute_silhouette_scores(
         df=df,
         feature_columns=feature_columns,
