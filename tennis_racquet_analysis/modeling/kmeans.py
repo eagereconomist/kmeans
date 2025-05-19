@@ -161,7 +161,7 @@ def km_cluster(
     input_path = DATA_DIR / input_dir / input_file
     df = load_data(input_path)
     output_path = DATA_DIR / output_dir
-    steps = tqdm(total=2, desc="Clustering", ncols=100)
+    steps = tqdm(total=2, desc="Clustering")
     df_labeled = fit_kmeans(
         df,
         k=k,
