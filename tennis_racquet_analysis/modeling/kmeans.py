@@ -180,8 +180,8 @@ def km_cluster(
     logger.success(f"Saved Clustered Data -> {(output_dir / output_path)!r}")
 
 
-@app.command("batch-cluster")
-def batch_cluster_export(
+@app.command("batch-kmeans")
+def batch_kmeans_export(
     input_file: str = typer.Argument(..., help="csv filename under data subfolder."),
     input_dir: str = typer.Option(
         "processed",
