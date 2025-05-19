@@ -7,7 +7,7 @@ from typing import Optional, Sequence, Union, Tuple, Iterable
 
 def compute_inertia_scores(
     df: pd.DataFrame,
-    k_range: Union[Tuple[int, int], range] = (1, 10),
+    k_range: Union[Tuple[int, int], range] = (1, 20),
     feature_columns: Optional[Sequence[str]] = None,
     init: str = "k-means++",
     n_init: int = 50,
@@ -26,12 +26,13 @@ def compute_inertia_scores(
         ks = k_range
     inertia_vals = []
     for k in ks:
+        algo_option = algorithm if k > 1 else "lloyd"
         km = KMeans(
             n_clusters=k,
             init=init,
             n_init=n_init,
             random_state=random_state,
-            algorithm=algorithm,
+            algorithm=algo_option,
         ).fit(X)
         inertia_vals.append({"k": k, "inertia": km.inertia_})
     return pd.DataFrame.from_records(inertia_vals)
