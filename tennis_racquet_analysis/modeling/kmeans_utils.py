@@ -7,25 +7,23 @@ from typing import Optional, Sequence, Union, Tuple, Iterable
 
 def compute_inertia_scores(
     df: pd.DataFrame,
+    k_range: Union[Tuple[int, int], range] = (1, 10),
     feature_columns: Optional[Sequence[str]] = None,
     init: str = "k-means++",
     n_init: int = 50,
     random_state: int = 4572,
     algorithm: str = "lloyd",
-    k_values: Optional[Iterable[int]] = None,
 ) -> pd.DataFrame:
     X = (
         df.select_dtypes(include=np.number).values
         if feature_columns is None
         else df[list(feature_columns)].values
     )
-    n_samples = X.shape[0]
-    ks = range(1, n_samples + 1)
-    if k_values is None:
-        n_samples = X.shape[0]
-        ks = range(1, n_samples + 1)
+    if isinstance(k_range, tuple):
+        k_start, k_end = k_range
+        ks = range(k_start, k_end + 1)
     else:
-        ks = k_values
+        ks = k_range
     inertia_vals = []
     for k in ks:
         km = KMeans(
