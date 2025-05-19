@@ -26,6 +26,8 @@ def km_inertia(
         "-d",
         help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
     ),
+    start: int = typer.Option(1, "--start", "-s", help="Minimum k (inclusive)."),
+    stop: int = typer.Option(10, "--stop", "-e", help="Maximum k (inclusive)."),
     random_state: int = typer.Option(4572, "--seed", help="Random seed for reproducibility."),
     n_init: int = typer.Option(
         50, "--n-init", "-n", help="Number of times kmeans is run with differnet centroid seeds."
@@ -53,12 +55,11 @@ def km_inertia(
     input_path = DATA_DIR / input_dir / input_file
     output_path = DATA_DIR / output_dir
     df = load_data(input_path)
-    n_samples = df.shape[0]
-    progress_bar = tqdm(range(1, n_samples + 1), desc="Inertia", ncols=100)
+    progress_bar = tqdm(range(start, stop + 1), desc="Batch Clustering")
     inertia_df = compute_inertia_scores(
         df=df,
         feature_columns=feature_columns,
-        k_values=progress_bar,
+        k_range=progress_bar,
         random_state=random_state,
         n_init=n_init,
         algorithm=algorithm,
