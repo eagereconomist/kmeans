@@ -220,7 +220,7 @@ def batch_kmeans_export(
 ):
     df = load_data(DATA_DIR / input_dir / input_file)
     output_path = DATA_DIR / output_dir
-    progress_bar = tqdm(range(start, stop + 1), desc="Batch Clustering", ncols=100)
+    progress_bar = tqdm(range(start, stop + 1), desc="Batch Clustering")
     df_labeled = batch_kmeans(
         df,
         k_range=progress_bar,
