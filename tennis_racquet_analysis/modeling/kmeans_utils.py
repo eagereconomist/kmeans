@@ -110,8 +110,13 @@ def batch_kmeans(
         ks = k_range
     df_labeled = df.copy()
     for k in ks:
+        algo_option = algorithm if k > 1 else "lloyd"
         km = KMeans(
-            n_clusters=k, init=init, n_init=n_init, random_state=random_state, algorithm=algorithm
+            n_clusters=k,
+            init=init,
+            n_init=n_init,
+            random_state=random_state,
+            algorithm=algo_option,
         ).fit(X)
         df_labeled[f"{label_column}_{k}"] = km.labels_
     return df_labeled
