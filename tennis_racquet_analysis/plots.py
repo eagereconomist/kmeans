@@ -450,7 +450,7 @@ def cluster_3d_plot(
         help="Don't write to disk. Opens html plot in browser.",
     ),
 ):
-    with tqdm(total=3, desc="Cluster-3D", ncols=100) as progress_bar:
+    with tqdm(total=3, desc="Cluster-3D") as progress_bar:
         df = load_data(DATA_DIR / input_dir / input_file)
         progress_bar.update(1)
         num_cols = df.select_dtypes(include="number").columns.tolist()
