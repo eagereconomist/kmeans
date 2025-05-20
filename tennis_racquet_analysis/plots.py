@@ -544,7 +544,7 @@ def batch_cluster_plot(
     if not cluster_columns:
         raise typer.BadParameter(f"No columns found with prefix {label_column!r}")
     output_path = output_dir / f"{Path(input_file).stem}_{x_col}_vs_{y_col}_batch.png"
-    with tqdm(total=1, desc="Generating Batch Subplots", ncols=100) as progress_bar:
+    with tqdm(total=1, desc="Generating Batch Subplots") as progress_bar:
         plot_batch_clusters(
             df,
             x_axis=x_col,
