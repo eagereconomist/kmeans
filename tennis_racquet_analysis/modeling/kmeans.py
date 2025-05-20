@@ -55,7 +55,7 @@ def km_inertia(
     input_path = DATA_DIR / input_dir / input_file
     output_path = DATA_DIR / output_dir
     df = load_data(input_path)
-    progress_bar = tqdm(range(start, stop + 1), desc="Batch Clustering")
+    progress_bar = tqdm(range(start, stop + 1), desc="Inertia")
     inertia_df = compute_inertia_scores(
         df=df,
         feature_columns=feature_columns,
