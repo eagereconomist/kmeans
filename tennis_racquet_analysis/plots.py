@@ -396,7 +396,7 @@ def cluster_plot(
     numeric_columns = df.select_dtypes(include="number").columns.tolist()
     x_col = x_axis or numeric_columns[0]
     y_col = y_axis or (numeric_columns[1] if len(numeric_columns) > 1 else numeric_columns[0])
-    with tqdm(total=1, desc="Generating Cluster Scatter", ncols=100) as pbar:
+    with tqdm(total=1, desc="Generating Cluster Scatter") as pbar:
         output_path = output_dir / f"{Path(input_file).stem}_{x_col}_vs_{y_col}_cluster.png"
         (
             cluster_scatter(
