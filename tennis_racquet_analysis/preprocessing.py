@@ -6,7 +6,6 @@ import typer
 from tennis_racquet_analysis.config import (
     RAW_DATA_DIR,
     INTERIM_DATA_DIR,
-    PROCESSED_DATA_DIR,
     DATA_DIR,
 )
 from tennis_racquet_analysis.preprocessing_utils import (
@@ -143,13 +142,10 @@ def main(
 def pca_summary(
     input_file: str = typer.Argument(..., help="csv filename under data subfolder."),
     input_dir: Path = typer.Option(
-        PROCESSED_DATA_DIR,
+        "processed",
         "--input-dir",
         "-d",
-        exists=True,
-        dir_okay=True,
-        file_okay=True,
-        help="Directory where scaled data files live.",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
     ),
     feature_columns: list[str] = typer.Option(
         None,
@@ -161,16 +157,14 @@ def pca_summary(
         4572, "--seed", "-s", help="Random seed for reproducibility."
     ),
     output_dir: Path = typer.Option(
-        PROCESSED_DATA_DIR,
-        "-o",
+        "processed",
         "--output-dir",
-        exists=True,
-        dir_okay=True,
-        file_okay=False,
-        help="Directory to write the PCA summary csv's.",
+        "-o",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
     ),
 ):
     input_path = DATA_DIR / input_dir / input_file
+    output_path = DATA_DIR / output_dir
     df = load_data(input_path)
     dict_pca = compute_pca_summary(
         df=df,
@@ -181,7 +175,7 @@ def pca_summary(
     df_loadings = dict_pca["loadings"]
     df_loadings = df_loadings.reset_index().rename(columns={"index": "component"})
     loadings_path = write_csv(
-        df_loadings, prefix=stem, suffix="pca_loadings", output_dir=output_dir
+        df_loadings, prefix=stem, suffix="pca_loadings", output_dir=output_path
     )
     logger.success(f"Saved PCA Loadings → {loadings_path!r}")
 
@@ -191,7 +185,7 @@ def pca_summary(
         df_pve,
         prefix=stem,
         suffix="pca_proportion_var",
-        output_dir=output_dir,
+        output_dir=output_path,
     )
     logger.success(f"Saved Explained Variance Ratio → {pve_path!r}")
 
@@ -201,7 +195,7 @@ def pca_summary(
         df_cpve,
         prefix=stem,
         suffix="pca_cumulative_var",
-        output_dir=output_dir,
+        output_dir=output_path,
     )
     logger.success(f"Saved Cumulative Variance Ratio → {cpve_path!r}")
 
