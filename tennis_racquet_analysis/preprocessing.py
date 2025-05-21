@@ -179,6 +179,16 @@ def pca_summary(
     )
     logger.success(f"Saved PCA Loadings → {loadings_path!r}")
 
+    df_scores = dict_pca["scores"]
+    df_scores = df_scores.reset_index(drop=True)
+    scores_path = write_csv(
+        df_scores,
+        prefix=stem,
+        suffix="pca_scores",
+        output_dir=output_path,
+    )
+    logger.success(f"Saved PCA Scores → {scores_path!r}")
+
     df_pve = dict_pca["pve"]
     df_pve = df_pve.reset_index().rename(columns={"index": "component"})
     pve_path = write_csv(
