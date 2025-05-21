@@ -600,13 +600,10 @@ def plot_scree(
 def plot_cumulative_prop_var(
     input_file: str = typer.Argument(..., help="csv file."),
     input_dir: Path = typer.Option(
-        PROCESSED_DATA_DIR,
-        "--input_dir",
+        "processed",
+        "--input-dir",
         "-d",
-        exists=True,
-        dir_okay=True,
-        file_okay=True,
-        help="Directory where feature-engineered files live.",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
     ),
     output_dir: Path = typer.Option(
         FIGURES_DIR,
