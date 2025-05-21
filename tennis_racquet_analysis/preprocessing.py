@@ -1,7 +1,7 @@
 from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
-from typing import List
+from typing import List, Optional
 import typer
 from tennis_racquet_analysis.config import (
     RAW_DATA_DIR,
@@ -153,6 +153,12 @@ def pca_summary(
         "-f",
         help="Name of numeric column to include; repeat flag to add more. Defaults to all numeric.",
     ),
+    n_components: Optional[int] = typer.Option(
+        None,
+        "--n-components",
+        "-n",
+        help="How many principal components to compute/export (defaults to all).",
+    ),
     random_state: int = typer.Option(
         4572, "--seed", "-s", help="Random seed for reproducibility."
     ),
@@ -169,6 +175,7 @@ def pca_summary(
     dict_pca = compute_pca_summary(
         df=df,
         feature_columns=feature_columns,
+        n_components=None,
         random_state=random_state,
     )
     stem = Path(input_file).stem
@@ -179,12 +186,16 @@ def pca_summary(
     )
     logger.success(f"Saved PCA Loadings → {loadings_path!r}")
 
-    df_scores = dict_pca["scores"]
-    df_scores = df_scores.reset_index(drop=True)
+    df_scores_full = dict_pca["scores"]
+    if n_components is not None:
+        df_scores = df_scores_full.iloc[:, :n_components].reset_index(drop=True)
+    else:
+        df_scores = df_scores_full.reset_index(drop=True)
+    suffix = f"pca_scores_{df_scores.shape[1]}pc" if n_components else "pca_scores"
     scores_path = write_csv(
         df_scores,
         prefix=stem,
-        suffix="pca_scores",
+        suffix=suffix,
         output_dir=output_path,
     )
     logger.success(f"Saved PCA Scores → {scores_path!r}")
