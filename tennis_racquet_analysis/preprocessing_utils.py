@@ -35,8 +35,8 @@ def compute_pca_summary(
     random_state: int = 4572,
 ) -> Dict[str, Union[pd.DataFrame, pd.Series]]:
     if feature_columns is None:
-        all_numueric_cols = df.select_dtypes(include="number").columns.tolist()
-        feature_columns = [c for c in all_numueric_cols if c != hue_column]
+        all_numeric_cols = df.select_dtypes(include="number").columns.tolist()
+        feature_columns = [c for c in all_numeric_cols if c != hue_column]
     X = df[feature_columns].values
     pca = PCA(n_components=n_components, random_state=random_state).fit(X)
     scores_array = pca.transform(X)
