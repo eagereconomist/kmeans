@@ -671,7 +671,7 @@ def plot_pca_biplot(
         help="Directory to save the biplot PNG.",
     ),
 ):
-    df = load_data(input_dir / input_file)
+    df = load_data(DATA_DIR / input_dir / input_file)
 
     summary = compute_pca_summary(df=df, feature_columns=feature_columns, hue_column=hue_column)
     loadings = summary["loadings"]
@@ -743,7 +743,7 @@ def plot_3d_pca_biplot(
         help="Show plot, but don't save.",
     ),
 ):
-    df = load_data(input_dir / input_file)
+    df = load_data(DATA_DIR / input_dir / input_file)
 
     summary = compute_pca_summary(
         df=df, feature_columns=feature_columns, hue_column=hue_column, random_state=random_state
