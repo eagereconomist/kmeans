@@ -8,7 +8,7 @@ from math import ceil
 import plotly.express as px
 
 
-from tennis_racquet_analysis.config import DATA_DIR, FIGURES_DIR, PROCESSED_DATA_DIR
+from tennis_racquet_analysis.config import DATA_DIR, FIGURES_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data
 from tennis_racquet_analysis.plots_utils import (
     _save_fig,
