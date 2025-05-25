@@ -317,6 +317,7 @@ def pca_biplot(
     df: pd.DataFrame,
     loadings: pd.DataFrame,
     pve: pd.Series,
+    compute_scores: bool = True,
     pc_x: int = 0,
     pc_y: int = 1,
     scale: float = 1.0,
@@ -326,8 +327,11 @@ def pca_biplot(
     output_path: Optional[Path] = None,
 ) -> plt.Figure:
     feature_cols = loadings.columns.tolist()
-    X = df[feature_cols].values
-    scores = X.dot(loadings.values.T)
+    if compute_scores:
+        X = df[feature_cols].values
+        scores = X.dot(loadings.values.T)
+    else:
+        scores = df.values
     var_x, var_y = pve.iloc[pc_x], pve.iloc[pc_y]
     x_label = f"PC{pc_x + 1} ({var_x:.1%})"
     y_label = f"PC{pc_y + 1} ({var_y:.1%})"
@@ -381,6 +385,7 @@ def pca_biplot_3d(
     df: pd.DataFrame,
     loadings: pd.DataFrame,
     pve: pd.Series,
+    compute_scores: bool = True,
     pc_x: int = 0,
     pc_y: int = 1,
     pc_z: int = 2,
@@ -392,8 +397,11 @@ def pca_biplot_3d(
     feature_cols = loadings.columns.tolist()
     if len(feature_cols) < 3:
         raise ValueError("Need at least 3 features for a 3D plot.")
-    X = df[feature_cols].values
-    scores = X.dot(loadings.values.T)
+    if compute_scores:
+        X = df[feature_cols].values
+        scores = X.dot(loadings.values.T)
+    else:
+        scores = df.values
     x_vals, y_vals, z_vals = scores[:, pc_x], scores[:, pc_y], scores[:, pc_z]
 
     x_label = f"PC{pc_x + 1} ({pve.iloc[pc_x]:.1%})"
