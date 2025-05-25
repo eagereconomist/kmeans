@@ -650,6 +650,12 @@ def plot_pca_biplot(
         "--feature-column",
         help="Numeric column(s) to include; repeat flag to add more. Defaults to all.",
     ),
+    compute_scores: bool = typer.Option(
+        True,
+        "--compute-scores",
+        "-cs",
+        help="If True, compute scores via df.dot(loadings.T); if False, skip projection",
+    ),
     pc_x: int = typer.Option(
         0, "--pc-x", "-x", help="Principal component for x-axis (0-indexed)."
     ),
@@ -687,6 +693,7 @@ def plot_pca_biplot(
         df=df,
         loadings=loadings,
         pve=pve,
+        compute_scores=compute_scores,
         pc_x=pc_x,
         pc_y=pc_y,
         scale=scale,
@@ -717,6 +724,12 @@ def plot_3d_pca_biplot(
         "-f",
         "--feature-column",
         help="Numeric column(s) to include; repeat flag to add more. Defaults to all.",
+    ),
+    compute_scores: bool = typer.Option(
+        True,
+        "--compute-scores",
+        "-cs",
+        help="If True, compute scores via df.dot(loadings.T); if False, skip projection",
     ),
     pc_x: int = typer.Option(
         0, "--pc-x", "-x", help="Principal component for x-axis (0-indexed)."
@@ -762,6 +775,7 @@ def plot_3d_pca_biplot(
         df=df,
         loadings=loadings,
         pve=pve,
+        compute_scores=compute_scores,
         pc_x=pc_x,
         pc_y=pc_y,
         pc_z=pc_z,
