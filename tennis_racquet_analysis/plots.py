@@ -650,8 +650,12 @@ def plot_pca_biplot(
         "--feature-column",
         help="Numeric column(s) to include; repeat flag to add more. Defaults to all.",
     ),
-    pc_x: int = typer.Option(0, "--pc-x", help="Principal component for x-axis (0-indexed)."),
-    pc_y: int = typer.Option(1, "--pc-y", help="Principal component for y-axis (0-indexed)."),
+    pc_x: int = typer.Option(
+        0, "--pc-x", "-x", help="Principal component for x-axis (0-indexed)."
+    ),
+    pc_y: int = typer.Option(
+        1, "--pc-y", "-y", help="Principal component for y-axis (0-indexed)."
+    ),
     scale: float = typer.Option(1.0, "--scale", help="Arrow length multiplier for loadings."),
     figsize: tuple[float, float] = typer.Option(
         (20, 14), "--figsize", help="Figure size (width height)."
@@ -714,9 +718,15 @@ def plot_3d_pca_biplot(
         "--feature-column",
         help="Numeric column(s) to include; repeat flag to add more. Defaults to all.",
     ),
-    pc_x: int = typer.Option(0, "--x", help="Principal component for x-axis (0-indexed)."),
-    pc_y: int = typer.Option(1, "--y", help="Principal component for y-axis (0-indexed)."),
-    pc_z: int = typer.Option(2, "--z", help="Principal component for z-axis (0-indexed)."),
+    pc_x: int = typer.Option(
+        0, "--pc-x", "-x", help="Principal component for x-axis (0-indexed)."
+    ),
+    pc_y: int = typer.Option(
+        1, "--pc-y", "-y", help="Principal component for y-axis (0-indexed)."
+    ),
+    pc_z: int = typer.Option(
+        2, "--pc-z", "-z", help="Principal component for z-axis (0-indexed)."
+    ),
     scale: float = typer.Option(1.0, "--scale", help="Arrow length multiplier for loadings."),
     hue_column: Optional[str] = typer.Option(
         None,
