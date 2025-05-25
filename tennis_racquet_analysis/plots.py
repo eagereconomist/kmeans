@@ -703,13 +703,10 @@ def plot_pca_biplot(
 def plot_3d_pca_biplot(
     input_file: str = typer.Argument(..., help="CSV filename under data subfolder."),
     input_dir: Path = typer.Option(
-        PROCESSED_DATA_DIR,
-        "-d",
+        "processed",
         "--input-dir",
-        exists=True,
-        dir_okay=True,
-        file_okay=True,
-        help="Directory of csv.",
+        "-d",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
     ),
     feature_columns: list[str] = typer.Option(
         None,
@@ -717,7 +714,6 @@ def plot_3d_pca_biplot(
         "--feature-column",
         help="Numeric column(s) to include; repeat flag to add more. Defaults to all.",
     ),
-    random_state: int = typer.Option(4572, "-s", "--seed", help="Random seed for PCA."),
     pc_x: int = typer.Option(0, "--x", help="Principal component for x-axis (0-indexed)."),
     pc_y: int = typer.Option(1, "--y", help="Principal component for y-axis (0-indexed)."),
     pc_z: int = typer.Option(2, "--z", help="Principal component for z-axis (0-indexed)."),
@@ -745,9 +741,7 @@ def plot_3d_pca_biplot(
 ):
     df = load_data(DATA_DIR / input_dir / input_file)
 
-    summary = compute_pca_summary(
-        df=df, feature_columns=feature_columns, hue_column=hue_column, random_state=random_state
-    )
+    summary = compute_pca_summary(df=df, feature_columns=feature_columns, hue_column=hue_column)
     loadings, pve = summary["loadings"], summary["pve"]
     hue = df[hue_column] if hue_column else None
 
