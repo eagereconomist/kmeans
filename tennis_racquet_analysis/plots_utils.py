@@ -354,11 +354,11 @@ def pca_biplot(
             for i in range(len(categories))
         ]
         labels = [str(cat) for cat in categories]
-        ax.legend(handles, labels, title="cluster", loc="best")
+        ax.legend(handles, labels, title="Cluster", loc="best")
 
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
-    ax.set_title("PCA Biplot", pad=40, fontdict={"fontsize": 30})
+    ax.set_title(f"PCA Biplot (k={hue.name.split('_')[-1]})", pad=40, fontdict={"fontsize": 30})
 
     for k, feature in enumerate(feature_cols):
         x_arr = loadings.iat[pc_x, k] * scale
@@ -437,7 +437,7 @@ def pca_biplot_3d(
         category_orders={"cluster": order} if order is not None else None,
         color_discrete_sequence=px.colors.qualitative.T10,
         labels={"x": x_label, "y": y_label, "z": z_label},
-        title="3D PCA Biplot",
+        title=f"3D PCA Biplot (k={hue.name.split('_')[-1]})",
         width=1000,
         height=1000,
     )
