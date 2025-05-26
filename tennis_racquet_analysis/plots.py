@@ -653,8 +653,8 @@ def plot_pca_biplot(
     compute_scores: bool = typer.Option(
         True,
         "--compute-scores",
-        "-cs",
-        help="If True, compute scores via df.dot(loadings.T); if False, skip projection",
+        "--skip-compute-scores",
+        help="By default, compute PC scores from raw features; if --skip-compute-scores is given, assume df already contains PC columns.",
     ),
     pc_x: int = typer.Option(
         0, "--pc-x", "-x", help="Principal component for x-axis (0-indexed)."
@@ -728,8 +728,8 @@ def plot_3d_pca_biplot(
     compute_scores: bool = typer.Option(
         True,
         "--compute-scores",
-        "-cs",
-        help="If True, compute scores via df.dot(loadings.T); if False, skip projection",
+        "--skip-compute-scores",
+        help="By default, compute PC scores from raw features; if --skip-compute-scores is given, assume df already contains PC columns.",
     ),
     pc_x: int = typer.Option(
         0, "--pc-x", "-x", help="Principal component for x-axis (0-indexed)."
