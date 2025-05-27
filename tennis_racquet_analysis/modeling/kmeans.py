@@ -7,117 +7,12 @@ from tqdm import tqdm
 from tennis_racquet_analysis.config import DATA_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data
 from tennis_racquet_analysis.modeling.kmeans_utils import (
-    compute_inertia_scores,
-    compute_silhouette_scores,
     fit_kmeans,
     batch_kmeans,
 )
 from tennis_racquet_analysis.processing_utils import write_csv
 
 app = typer.Typer()
-
-
-@app.command("inertia")
-def km_inertia(
-    input_file: str = typer.Argument(..., help="csv filename under the data subfolder."),
-    input_dir: str = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
-    ),
-    start: int = typer.Option(1, "--start", "-s", help="Minimum k (inclusive)."),
-    stop: int = typer.Option(20, "--stop", "-e", help="Maximum k (inclusive)."),
-    random_state: int = typer.Option(4572, "--seed", help="Random seed for reproducibility."),
-    n_init: int = typer.Option(
-        50, "--n-init", "-n", help="Number of times kmeans is run with differnet centroid seeds."
-    ),
-    algorithm: str = typer.Option(
-        "lloyd", "--algorithm", "-a", help="KMeans algorithm: 'lloyd' or 'elkan'."
-    ),
-    init: str = typer.Option(
-        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'"
-    ),
-    feature_columns: List[str] = typer.Option(
-        None,
-        "--feature-column",
-        "-f",
-        help="Name of numeric column to include; repeat flag to add more."
-        "Defaults to all numeric columns.",
-    ),
-    output_dir: str = typer.Option(
-        "processed",
-        "--output-dir",
-        "-o",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the file will be output.",
-    ),
-):
-    input_path = DATA_DIR / input_dir / input_file
-    output_path = DATA_DIR / output_dir
-    df = load_data(input_path)
-    progress_bar = tqdm(range(start, stop + 1), desc="Inertia")
-    inertia_df = compute_inertia_scores(
-        df=df,
-        feature_columns=feature_columns,
-        k_range=progress_bar,
-        random_state=random_state,
-        n_init=n_init,
-        algorithm=algorithm,
-        init=init,
-    )
-    stem = Path(input_file).stem
-    write_csv(inertia_df, prefix=stem, suffix="inertia", output_dir=output_path)
-    logger.success(f"Saved Inertia Scores -> {(output_dir / output_path)!r}")
-
-
-@app.command("silhouette")
-def km_silhouette(
-    input_file: str = typer.Argument(..., help="csv filename under the data subfolder."),
-    input_dir: str = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
-    ),
-    random_state: int = typer.Option(4572, "--seed", help="Random seed for reproducibility."),
-    n_init: int = typer.Option(
-        50, "--n-init", "-n", help="Number of times kmeans is run with differnet centroid seeds."
-    ),
-    algorithm: str = typer.Option(
-        "lloyd", "--algorithm", "-a", help="KMeans algorithm: 'lloyd' or 'elkan'."
-    ),
-    init: str = typer.Option(
-        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'"
-    ),
-    feature_columns: List[str] = typer.Option(
-        None,
-        "--feature-column",
-        "-f",
-        help="Name of numeric column to include; repeat flag to add more."
-        "Defaults to all numeric columns.",
-    ),
-    output_dir: str = typer.Option(
-        "processed",
-        "--output-dir",
-        "-o",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the file will be output.",
-    ),
-):
-    df = load_data(DATA_DIR / input_dir / input_file)
-    output_path = DATA_DIR / output_dir
-    progress_bar = tqdm(range(2, 21), desc="Silhouette")
-    silhouette_df = compute_silhouette_scores(
-        df=df,
-        feature_columns=feature_columns,
-        k_values=progress_bar,
-        random_state=random_state,
-        n_init=n_init,
-        algorithm=algorithm,
-        init=init,
-    )
-    stem = Path(input_file).stem
-    write_csv(silhouette_df, prefix=stem, suffix="silhouette", output_dir=output_path)
-    logger.success(f"Saved Silhouette Scores -> {(output_dir / output_path)!r}")
 
 
 @app.command("fit-kmeans")
