@@ -6,15 +6,60 @@ from tqdm import tqdm
 
 from tennis_racquet_analysis.config import DATA_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data
+from tennis_racquet_analysis.processing_utils import write_csv
 from tennis_racquet_analysis.evaluation_utils import (
     compute_inertia_scores,
     compute_silhouette_scores,
     compute_calinski_scores,
     compute_davies_scores,
+    load_inertia_results,
+    load_silhouette_results,
+    load_calinski_results,
+    load_davies_results,
+    merge_benchmarks,
 )
-from tennis_racquet_analysis.processing_utils import write_csv
 
 app = typer.Typer()
+
+
+@app.command("benchmark")
+def benchmark(
+    input_dir: Path = typer.Option(
+        "processed",
+        "--input-dir",
+        "-d",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
+    ),
+    output_file: Path = typer.Option(
+        None,
+        "--output-file",
+        "-o",
+        writable=True,
+        dir_okay=False,
+        help="Optional path to write the benchmark table as csv",
+    ),
+    decimals: int = typer.Option(
+        3,
+        "--decimals",
+        "-d",
+        help="Number of decimal places to round metric values to",
+    ),
+):
+    processed_root = DATA_DIR / input_dir
+    inertia_df = load_inertia_results(processed_root)
+    silhouette_df = load_silhouette_results(processed_root)
+    calinski_df = load_calinski_results(processed_root)
+    davies_df = load_davies_results(processed_root)
+
+    df = merge_benchmarks(inertia_df, silhouette_df, calinski_df, davies_df)
+    for col in ("inertia", "silhouette", "calinski", "davies"):
+        df[col] = df[col].round(decimals)
+
+    typer.echo(df.to_string(index=False))
+
+    if output_file:
+        df.to_csv(output_file, index=False)
+        typer.echo(f"Benchmark table saved to {output_file}")
 
 
 @app.command("inertia")
