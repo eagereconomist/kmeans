@@ -3,6 +3,70 @@ import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
 from typing import Optional, Sequence, Union, Tuple, Iterable
+from pathlib import Path
+from functools import reduce
+import re
+
+
+def load_metric_results(processed_root: Path, metric: str) -> pd.DataFrame:
+    records = []
+
+    for algo_dir in processed_root.glob("**/algo_*_init_*"):
+        if not algo_dir.is_dir():
+            continue
+
+        expression = re.match(r"^algo_([^_]+)_init_(.+)$", algo_dir.name)
+        if not expression:
+            continue
+        algorithm, init = expression.groups()
+
+        variant = algo_dir.relative_to(processed_root).parts[0]
+
+        for csv_path in algo_dir.glob(f"*_{metric}.csv"):
+            input_stem = csv_path.stem.rsplit(f"_{metric}", 1)[0]
+            df = pd.read_csv(csv_path)
+            df = df.rename(columns={df.columns[0]: "n_clusters", df.columns[1]: metric})
+            df["variant"] = variant
+            df["algorithm"] = algorithm
+            df["init"] = init
+            df["input_stem"] = input_stem
+            records.append(
+                df[["variant", "algorithm", "init", "input_stem", "n_clusters", metric]]
+            )
+    if not records:
+        return pd.DataFrame(
+            columns=["variant", "algorithm", "init", "input_stem", "n_clusters", metric]
+        )
+    return pd.concat(records, ignore_index=True)
+
+
+def load_inertia_results(processed_root: Path) -> pd.DataFrame:
+    return load_metric_results(processed_root, "inertia")
+
+
+def load_silhouette_results(processed_root: Path) -> pd.DataFrame:
+    return load_metric_results(processed_root, "silhouette")
+
+
+def load_calinski_results(processed_root: Path) -> pd.DataFrame:
+    return load_metric_results(processed_root, "calinski")
+
+
+def load_davies_results(processed_root: Path) -> pd.DataFrame:
+    return load_metric_results(processed_root, "davies")
+
+
+def merge_benchmarks(
+    inertia_df: pd.DataFrame,
+    silhouette_df: pd.DataFrame,
+    calinski_df: pd.DataFrame,
+    davies_df: pd.DataFrame,
+) -> pd.DataFrame:
+    df_keys = ["variant", "input_stem", "algorithm", "init", "n_clusters"]
+    return reduce(
+        lambda left, right: pd.merge(left, right, on=df_keys, how="outer"),
+        [inertia_df, silhouette_df, calinski_df, davies_df],
+    )
 
 
 def compute_inertia_scores(
