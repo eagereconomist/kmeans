@@ -6,9 +6,11 @@ from tqdm import tqdm
 
 from tennis_racquet_analysis.config import DATA_DIR
 from tennis_racquet_analysis.preprocessing_utils import load_data
-from tennis_racquet_analysis.modeling.kmeans_utils import (
+from tennis_racquet_analysis.evaluation_utils import (
     compute_inertia_scores,
     compute_silhouette_scores,
+    compute_calinski_scores,
+    compute_davies_scores,
 )
 from tennis_racquet_analysis.processing_utils import write_csv
 
@@ -116,3 +118,107 @@ def km_silhouette(
     stem = Path(input_file).stem
     write_csv(silhouette_df, prefix=stem, suffix="silhouette", output_dir=output_path)
     logger.success(f"Saved Silhouette Scores -> {(output_dir / output_path)!r}")
+
+
+@app.command("calinski")
+def km_calinski(
+    input_file: str = typer.Argument(..., help="csv filename under the data subfolder."),
+    input_dir: str = typer.Option(
+        "processed",
+        "--input-dir",
+        "-d",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
+    ),
+    random_state: int = typer.Option(4572, "--seed", help="Random seed for reproducibility."),
+    n_init: int = typer.Option(
+        50, "--n-init", "-n", help="Number of times kmeans is run with differnet centroid seeds."
+    ),
+    algorithm: str = typer.Option(
+        "lloyd", "--algorithm", "-a", help="KMeans algorithm: 'lloyd' or 'elkan'."
+    ),
+    init: str = typer.Option(
+        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'"
+    ),
+    feature_columns: List[str] = typer.Option(
+        None,
+        "--feature-column",
+        "-f",
+        help="Name of numeric column to include; repeat flag to add more."
+        "Defaults to all numeric columns.",
+    ),
+    output_dir: str = typer.Option(
+        "processed",
+        "--output-dir",
+        "-o",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the file will be output.",
+    ),
+):
+    df = load_data(DATA_DIR / input_dir / input_file)
+    output_path = DATA_DIR / output_dir
+    progress_bar = tqdm(range(2, 21), desc="Calinski-Harabasz")
+    calinski_df = compute_calinski_scores(
+        df=df,
+        feature_columns=feature_columns,
+        k_values=progress_bar,
+        random_state=random_state,
+        n_init=n_init,
+        algorithm=algorithm,
+        init=init,
+    )
+    stem = Path(input_file).stem
+    write_csv(calinski_df, prefix=stem, suffix="calinski", output_dir=output_path)
+    logger.success(f"Saved Calinski-Harabasz Scores -> {(output_dir / output_path)!r}")
+
+
+@app.command("davies")
+def km_davies(
+    input_file: str = typer.Argument(..., help="csv filename under the data subfolder."),
+    input_dir: str = typer.Option(
+        "processed",
+        "--input-dir",
+        "-d",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
+    ),
+    random_state: int = typer.Option(4572, "--seed", help="Random seed for reproducibility."),
+    n_init: int = typer.Option(
+        50, "--n-init", "-n", help="Number of times kmeans is run with differnet centroid seeds."
+    ),
+    algorithm: str = typer.Option(
+        "lloyd", "--algorithm", "-a", help="KMeans algorithm: 'lloyd' or 'elkan'."
+    ),
+    init: str = typer.Option(
+        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'"
+    ),
+    feature_columns: List[str] = typer.Option(
+        None,
+        "--feature-column",
+        "-f",
+        help="Name of numeric column to include; repeat flag to add more."
+        "Defaults to all numeric columns.",
+    ),
+    output_dir: str = typer.Option(
+        "processed",
+        "--output-dir",
+        "-o",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the file will be output.",
+    ),
+):
+    df = load_data(DATA_DIR / input_dir / input_file)
+    output_path = DATA_DIR / output_dir
+    progress_bar = tqdm(range(2, 21), desc="Davies-Bouldin")
+    davies_df = compute_davies_scores(
+        df=df,
+        feature_columns=feature_columns,
+        k_values=progress_bar,
+        random_state=random_state,
+        n_init=n_init,
+        algorithm=algorithm,
+        init=init,
+    )
+    stem = Path(input_file).stem
+    write_csv(davies_df, prefix=stem, suffix="davies", output_dir=output_path)
+    logger.success(f"Saved Davies-Bouldin Scores -> {(output_dir / output_path)!r}")
+
+
+if __name__ == "__main__":
+    app()
