@@ -51,6 +51,41 @@ def _save_fig(fig: plt.Figure, path: Path):
     plt.close(fig)
 
 
+def bar_plot(
+    df: pd.DataFrame,
+    cat_col: str,
+    val_col: str,
+    output_path: Path,
+    orient: str = "v",
+    save: bool = True,
+    ax: plt.Axes = None,
+) -> pd.DataFrame:
+    for col in (cat_col, val_col):
+        if col not in df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame.")
+    df[val_col] = pd.to_numeric(df[val_col], errors="coerce")
+    if df[val_col].isna().any():
+        raise ValueError(f"Column '{val_col}' must be numeric.")
+    if ax is None:
+        fig, ax = _init_fig()
+    else:
+        fig = ax.figure
+    if orient.lower().startswith("h"):
+        x, y = val_col, cat_col
+    else:
+        x, y = cat_col, val_col
+    sns.barplot(data=df, x=x, y=y, orient=orient, ax=ax)
+    _set_axis_bounds(ax, df[val_col], axis=("x" if orient.lower().startswith("h") else "y"))
+    ax.set(
+        xlabel=x.replace("_", " ").capitalize(),
+        ylabel=y.replace("_", " ").capitalize(),
+        title=f"Bar Plot of {val_col.replace('_', ' ').capitalize()} by {cat_col.replace('_', ' ').capitalize()}",
+    )
+    if save:
+        _save_fig(fig, output_path)
+    return df
+
+
 def histogram(
     df: pd.DataFrame,
     x_axis: str,
