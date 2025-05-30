@@ -49,14 +49,6 @@ def load_metric_results(processed_root: Path, metric: str) -> pd.DataFrame:
         )
 
 
-def load_inertia_results(processed_root: Path) -> pd.DataFrame:
-    return load_metric_results(processed_root, "inertia")
-
-
-def load_silhouette_results(processed_root: Path) -> pd.DataFrame:
-    return load_metric_results(processed_root, "silhouette")
-
-
 def load_calinski_results(processed_root: Path) -> pd.DataFrame:
     return load_metric_results(processed_root, "calinski")
 
@@ -66,20 +58,12 @@ def load_davies_results(processed_root: Path) -> pd.DataFrame:
 
 
 def merge_benchmarks(
-    inertia_df: pd.DataFrame,
-    silhouette_df: pd.DataFrame,
     calinski_df: pd.DataFrame,
     davies_df: pd.DataFrame,
 ) -> pd.DataFrame:
-    inertia = inertia_df.rename(columns={"input_stem": "stem_inertia"})
-    silhouette = silhouette_df.rename(columns={"input_stem": "stem_silhouette"})
     calinski = calinski_df.rename(columns={"input_stem": "stem_calinski"})
     davies = davies_df.rename(columns={"input_stem": "stem_davies"})
 
-    inertia = inertia[["variant", "algorithm", "init", "n_clusters", "inertia", "stem_inertia"]]
-    silhouette = silhouette[
-        ["variant", "algorithm", "init", "n_clusters", "silhouette", "stem_silhouette"]
-    ]
     calinski = calinski[
         ["variant", "algorithm", "init", "n_clusters", "calinski", "stem_calinski"]
     ]
@@ -89,15 +73,10 @@ def merge_benchmarks(
         lambda left, right: pd.merge(
             left, right, on=["variant", "algorithm", "init", "n_clusters"], how="outer"
         ),
-        [inertia, silhouette, calinski, davies],
+        [calinski, davies],
     )
 
-    merged["input_stem"] = (
-        merged["stem_calinski"]
-        .fillna(merged["stem_davies"])
-        .fillna(merged["stem_silhouette"])
-        .fillna(merged["stem_inertia"])
-    )
+    merged["input_stem"] = merged["stem_calinski"].fillna(merged["stem_davies"])
 
     return merged[
         [
@@ -106,8 +85,6 @@ def merge_benchmarks(
             "init",
             "input_stem",
             "n_clusters",
-            "inertia",
-            "silhouette",
             "calinski",
             "davies",
         ]
