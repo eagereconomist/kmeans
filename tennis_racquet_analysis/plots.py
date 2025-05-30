@@ -13,6 +13,7 @@ from tennis_racquet_analysis.preprocessing_utils import load_data
 from tennis_racquet_analysis.plots_utils import (
     _save_fig,
     _apply_cubehelix_style,
+    bar_plot,
     histogram,
     scatter_plot,
     box_plot,
@@ -33,6 +34,53 @@ from tennis_racquet_analysis.plots_utils import (
 from tennis_racquet_analysis.preprocessing_utils import compute_pca_summary
 
 app = typer.Typer()
+
+
+@app.command("barplot")
+def barplt(
+    input_file: str = typer.Argument(..., help="csv filename."),
+    input_dir: Path = typer.Option(
+        "processed",
+        "--input-dir",
+        "-d",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
+    ),
+    cat_col: str = typer.Argument(
+        ..., help="Categorical column (x-axis when vertical orientation)."
+    ),
+    val_col: str = typer.Argument(..., help="Numeric column to plot."),
+    orient: str = typer.Option("v", "--orient", "-a", help="Orientation of the plot: 'v' or 'h'."),
+    output_dir: Path = typer.Option(
+        FIGURES_DIR,
+        "--output-dir:",
+        "-o",
+        dir_okay=True,
+        file_okay=False,
+    ),
+    no_save: bool = typer.Option(
+        False, "--no-save", "-n", help="Generate plot, but don't write to disk."
+    ),
+):
+    input_path = DATA_DIR / input_dir / input_file
+    df = load_data(input_path)
+    stem = Path(input_file).stem
+    file_name = f"{stem}_{cat_col}_by_{val_col}_barplot.png"
+    output_path = output_dir / file_name
+    steps = tqdm(total=1, desc="Barplot")
+    bar_plot(
+        df=df,
+        cat_col=cat_col,
+        val_col=val_col,
+        output_path=output_path,
+        orient=orient,
+        save=not no_save,
+    )
+    steps.update(1)
+    steps.close()
+    if no_save:
+        logger.success("Bar plot generated (not saved to disk).")
+    else:
+        logger.success(f"Bar plot saved to {output_path!r}")
 
 
 @app.command("hist")
