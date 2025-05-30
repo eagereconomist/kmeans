@@ -12,8 +12,6 @@ from tennis_racquet_analysis.evaluation_utils import (
     compute_silhouette_scores,
     compute_calinski_scores,
     compute_davies_scores,
-    load_inertia_results,
-    load_silhouette_results,
     load_calinski_results,
     load_davies_results,
     merge_benchmarks,
@@ -46,16 +44,12 @@ def benchmark(
     ),
 ):
     processed_root = DATA_DIR / input_dir
-    inertia_df = load_inertia_results(processed_root)
-    silhouette_df = load_silhouette_results(processed_root)
     calinski_df = load_calinski_results(processed_root)
     davies_df = load_davies_results(processed_root)
 
-    df = merge_benchmarks(inertia_df, silhouette_df, calinski_df, davies_df)
-    for col in ("inertia", "silhouette", "calinski", "davies"):
+    df = merge_benchmarks(calinski_df, davies_df)
+    for col in ("calinski", "davies"):
         df[col] = df[col].round(decimals)
-
-    typer.echo(df.to_string(index=False))
 
     if output_file:
         df.to_csv(output_file, index=False)
