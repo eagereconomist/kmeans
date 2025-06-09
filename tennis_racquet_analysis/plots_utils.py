@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import Optional, Sequence
 from matplotlib.lines import Line2D
+from matplotlib.colors import Normalize
 import pandas as pd
 import seaborn as sns
 import statsmodels.api as sm
@@ -382,10 +383,12 @@ def pca_biplot(
 
         cmap = plt.get_cmap("tab10")
 
-        ax.scatter(scores[:, pc_x], scores[:, pc_y], c=codes, cmap=cmap, alpha=1)
+        norm = Normalize(vmin=0, vmax=len(categories) - 1)
+
+        ax.scatter(scores[:, pc_x], scores[:, pc_y], c=codes, cmap=cmap, norm=norm, alpha=1)
 
         handles = [
-            Line2D([], [], marker="o", color=cmap(i), linestyle="", markersize=6)
+            Line2D([], [], marker="o", color=cmap(norm(i)), linestyle="", markersize=6)
             for i in range(len(categories))
         ]
         labels = [str(cat) for cat in categories]
