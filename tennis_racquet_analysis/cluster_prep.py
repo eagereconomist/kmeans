@@ -1,5 +1,4 @@
 import typer
-import pandas as pd
 from pathlib import Path
 from loguru import logger
 from tennis_racquet_analysis.config import DATA_DIR, EXTERNAL_DATA_DIR
