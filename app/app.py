@@ -5,6 +5,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from sklearn.cluster import KMeans
 
 from tennis_racquet_analysis.config import PROCESSED_DATA_DIR
 from tennis_racquet_analysis.preprocessing_utils import (
@@ -32,38 +33,70 @@ else:
     dataset_label = st.sidebar.selectbox("Or choose a project CSV", choices)
     df = load_data(processed.parent / dataset_label)
 
+# we'll refer to this for saving/loading PCA‐loadings, if needed
 stem = Path(dataset_label).stem
 
-# ─── 3) Cluster column ─────────────────────────────────────────────────────────
-clusters = [c for c in df.columns if c.lower().startswith("cluster")]
-if not clusters:
-    st.error("Your CSV needs a cluster column (e.g. 'cluster_3').")
-    st.stop()
-cluster_col = st.sidebar.selectbox("Cluster column", clusters)
-df[cluster_col] = (df[cluster_col].astype(int) + 1).astype(str)
-cluster_order = sorted(df[cluster_col].unique(), key=lambda x: int(x))
+# ─── 3) Model Settings ─────────────────────────────────────────────────────────
+st.sidebar.header("Model Settings")
+n_clusters = st.sidebar.slider("Number of clusters", 2, 15, 3, help="k for k-means")
+algo_method = st.sidebar.selectbox("Algorithm Method", ["lloyd", "elkan"])
+init_method = st.sidebar.selectbox("Init method", ["k-means++", "random"])
+use_random_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
+random_seed = None
+if use_random_seed:
+    random_seed = st.sidebar.number_input("Random seed", min_value=0, value=42, step=1)
+run_cluster = st.sidebar.button("Run K-Means")
 
-# ─── 4) PCA scores & loadings ─────────────────────────────────────────────────
+# ─── 4) Determine cluster column ────────────────────────────────────────────────
+if run_cluster:
+    # cluster on all numeric features the user imported (assumed preprocessed!)
+    features = df.select_dtypes(include="number")
+    km = KMeans(
+        n_clusters=n_clusters,
+        init=init_method,
+        random_state=(random_seed if use_random_seed else None),
+    )
+    labels = km.fit_predict(features)
+    # shift 0→1, cast to str for consistent coloring
+    df["cluster"] = (labels + 1).astype(str)
+    cluster_col = "cluster"
+    cluster_order = sorted(df[cluster_col].unique(), key=lambda x: int(x))
+
+else:
+    # if the user hasn't run clustering yet, let them pick any existing cluster_* col
+    existing = [c for c in df.columns if c.lower().startswith("cluster")]
+    if not existing:
+        st.error("No cluster column found in your data. Please run k-means above.")
+        st.stop()
+    cluster_col = st.sidebar.selectbox("Cluster column", existing)
+    cluster_order = sorted(df[cluster_col].unique(), key=lambda x: int(x))
+
+    # ─── Show the newly clustered table ────────────────────────────────────────
+    st.subheader("Clustered Data")
+    st.dataframe(df)  # scrollable table of all columns including `cluster`
+
+# ─── 5) PCA scores & loadings ───────────────────────────────────────────────────
 pcs_in_file = [c for c in df.columns if re.fullmatch(r"(?i)PC[0-9]+", c)]
 has_scores = len(pcs_in_file) >= 2
 
 if not has_scores:
-    # compute from raw features
+    # compute PCA on the raw numeric features
     pca_res = compute_pca_summary(df=df, hue_column=cluster_col)
     scores_df = pca_res["scores"]
     loadings = pca_res["loadings"]
+    # merge the new PC scores back into df
     df = pd.concat([df.reset_index(drop=True), scores_df.reset_index(drop=True)], axis=1)
     pcs_in_file = scores_df.columns.tolist()
 else:
     loadings = None
 
-# ─── 5) Hover setup ────────────────────────────────────────────────────────────
+# ─── 6) Hover setup ────────────────────────────────────────────────────────────
 hover_cols = [cluster_col] + [f"PC{i}" for i in (1, 2, 3) if f"PC{i}" in df.columns]
 hover_template = "Cluster = %{customdata[0]}"
 for idx, pc in enumerate(hover_cols[1:], start=1):
     hover_template += f"<br>{pc} = %{{customdata[{idx}]:.3f}}"
 
-# ─── 6) Controls: 2D/3D & axes ─────────────────────────────────────────────────
+# ─── 7) Controls: 2D/3D & axes ─────────────────────────────────────────────────
 dim_options = ["2D"] + (["3D"] if len(pcs_in_file) >= 3 else [])
 plot_dim = st.sidebar.selectbox("Plot dimension", dim_options)
 
@@ -71,12 +104,14 @@ pc_x = st.sidebar.selectbox("X-Axis Principal Component", pcs_in_file, index=0)
 pc_y = st.sidebar.selectbox(
     "Y-Axis Principal Component", [p for p in pcs_in_file if p != pc_x], index=0
 )
+
 pc_z = None
 if plot_dim == "3D":
     pc_z = st.sidebar.selectbox(
         "Z-Axis Principal Component", [p for p in pcs_in_file if p not in (pc_x, pc_y)], index=0
     )
 
+# ─── 8) Loading-vector scale ───────────────────────────────────────────────────
 scale = st.sidebar.slider(
     "Loading Vector Scale",
     min_value=0.1,
@@ -86,23 +121,23 @@ scale = st.sidebar.slider(
     help="Proportion of PC-axis span for vector length",
 )
 
-# ─── 7) Header ────────────────────────────────────────────────────────────────
+# ─── 9) Header ────────────────────────────────────────────────────────────────
 st.title("K-Means Clustering Dashboard")
 st.markdown(f"**Dataset:** `{dataset_label}` — {df.shape[0]:,} rows, {df.shape[1]} cols")
 
-# ─── 8) Plot ──────────────────────────────────────────────────────────────────
+# ─── 10) Plot ─────────────────────────────────────────────────────────────────
 common = dict(
     color=cluster_col, category_orders={cluster_col: cluster_order}, custom_data=hover_cols
 )
 
-k = cluster_col.split("_")[-1]
+k = cluster_col.split("_")[-1]  # for titles
 
 if plot_dim == "2D":
     fig = px.scatter(
         df,
         x=pc_x,
         y=pc_y,
-        title=f"PCA Biplot Using {k} Clusters",
+        title=f"PCA Biplot Using {k} Clusters" if cluster_col in df else "PCA Biplot",
         hover_data=None,
         **common,
         width=900,
@@ -140,8 +175,10 @@ if plot_dim == "2D":
                 axref="x",
                 ayref="y",
                 showarrow=True,
-                arrowhead=2,
-                arrowsize=1,
+                arrowhead=3,
+                arrowcolor="grey",
+                arrowwidth=2,
+                arrowsize=2,
                 text="",
             )
             # label
@@ -170,13 +207,9 @@ else:  # 3D
     fig3d.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
 
     if loadings is not None:
-        spans = [
-            df[pc_x].max() - df[pc_x].min(),
-            df[pc_y].max() - df[pc_y].min(),
-            df[pc_z].max() - df[pc_z].min(),
-        ]
+        spans = [df[c].max() - df[c].min() for c in (pc_x, pc_y, pc_z)]
         vec_scale = min(spans) * scale
-        frac = 0.05
+        frac = 0.1
         for feat in loadings.columns:
             x_e = loadings.at[pc_x, feat] * vec_scale
             y_e = loadings.at[pc_y, feat] * vec_scale
