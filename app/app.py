@@ -9,9 +9,6 @@ from tennis_racquet_analysis.modeling.kmeans_utils import fit_kmeans
 from tennis_racquet_analysis.preprocessing_utils import (
     compute_pca_summary,
 )
-from tennis_racquet_analysis.preprocessing_utils import (
-    load_data,
-)  # still used if you want to read from disk, but not for sidebar
 
 # ─── 1) Page config ───────────────────────────────────────────────────────────
 st.set_page_config(
