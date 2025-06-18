@@ -197,8 +197,8 @@ else:  # 3D
         title=f"3D PCA Biplot Using {k_label} Clusters",
         hover_data=None,
         **common,
-        width=900,
-        height=900,
+        width=1000,
+        height=1000,
     )
     fig3d.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
 
