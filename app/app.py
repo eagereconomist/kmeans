@@ -20,6 +20,10 @@ st.set_page_config(
 )
 st.sidebar.title("Dashboard Settings")
 
+# remember if we've run k-means
+if "did_cluster" not in st.session_state:
+    st.session_state.did_cluster = False
+
 # ─── 2) Load data ───────────────────────────────────────────────────────────────
 uploaded = st.sidebar.file_uploader("Upload your own CSV", type="csv")
 if uploaded:
@@ -32,51 +36,74 @@ else:
     dataset_label = st.sidebar.selectbox("Or choose a project CSV", choices)
     df = load_data(processed.parent / dataset_label)
 
-# ─── 3) Model Settings ─────────────────────────────────────────────────────────
-st.sidebar.header("Model Settings")
-n_clusters = st.sidebar.slider("Number of clusters", 2, 15, 3, help="k for k-means")
-n_init = st.sidebar.number_input("n_init (k-means)", min_value=1, value=50, step=1)
-algo_method = st.sidebar.selectbox("Algorithm Method", ["lloyd", "elkan"])
-init_method = st.sidebar.selectbox("Init Method", ["k-means++", "random"])
-use_random_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
-random_seed = None
-if use_random_seed:
-    random_seed = st.sidebar.number_input("Random seed", min_value=0, value=42, step=1)
-run_cluster = st.sidebar.button("Run K-Means")
+# ─── 2b) Detect any pre-existing cluster column ─────────────────────────────────
+initial_clusters = [c for c in df.columns if re.search(r"cluster", c, re.I)]
+if initial_clusters:
+    # reset any previous run‐state so we never reference n_clusters
+    st.session_state.did_cluster = False
 
-# ─── 4) Run or pick clusters ────────────────────────────────────────────────────
-if run_cluster:
-    df = fit_kmeans(
-        df,
-        k=n_clusters,
-        feature_columns=None,
-        init=init_method,
-        n_init=n_init,
-        random_state=(random_seed if use_random_seed else None),
-        algorithm=algo_method,
-        label_column="cluster",
+    st.error(
+        "Cannot run k-means: data file already contains cluster column(s): "
+        f"{', '.join(initial_clusters)}"
     )
-    st.session_state.did_cluster = True
 
-    cluster_col = f"cluster_{n_clusters}"
-    cluster_order = sorted(df[cluster_col].unique(), key=lambda x: int(x))
+    # pick which existing cluster column to drive everything
+    cluster_col = st.sidebar.selectbox("Cluster column", initial_clusters)
+    cluster_order = sorted(
+        df[cluster_col].unique(), key=lambda x: int(x) if str(x).isdigit() else x
+    )
 
-    st.subheader("Clustered Data")
-    st.dataframe(df)
+    st.subheader("Imported Data (with existing clusters)")
+    st.dataframe(df, use_container_width=True)
 
 else:
-    existing = [c for c in df.columns if re.fullmatch(r"cluster(_\d+)?", c)]
-    if not existing:
-        st.error("No cluster column found. Please run k-means above.")
-        st.stop()
-    cluster_col = st.sidebar.selectbox("Cluster column", existing)
-    cluster_order = sorted(df[cluster_col].unique(), key=lambda x: int(x))
+    # ─── 3) Model Settings ───────────────────────────────────────────────────────
+    st.sidebar.header("Model Settings")
+    n_clusters = st.sidebar.slider("Number of clusters", 2, 15, 3, help="k for k-means")
+    n_init = st.sidebar.number_input("n_init (k-means)", min_value=1, value=50, step=1)
+    algo_method = st.sidebar.selectbox("Algorithm Method", ["lloyd", "elkan"])
+    init_method = st.sidebar.selectbox("Init Method", ["k-means++", "random"])
+    use_random_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
+    random_seed = None
+    if use_random_seed:
+        random_seed = st.sidebar.number_input("Random seed", min_value=0, value=42, step=1)
+    run_cluster = st.sidebar.button("Run K-Means")
 
-# ─── 4b) Derive k_label for titles ─────────────────────────────────────────────
-if st.session_state.did_cluster:
+    # ─── 4) Run or pick clusters ─────────────────────────────────────────────────
+    if run_cluster:
+        df = fit_kmeans(
+            df,
+            k=n_clusters,
+            feature_columns=None,
+            init=init_method,
+            n_init=n_init,
+            random_state=(random_seed if use_random_seed else None),
+            algorithm=algo_method,
+            label_column="cluster",
+        )
+        st.session_state.did_cluster = True
+
+        cluster_col = f"cluster_{n_clusters}"
+        cluster_order = sorted(df[cluster_col].unique(), key=lambda x: int(x))
+
+        st.subheader("Clustered Data")
+        st.dataframe(df, use_container_width=True)
+
+    else:
+        existing = [c for c in df.columns if re.fullmatch(r"cluster(_\d+)?", c)]
+        if not existing:
+            st.error("No cluster column found. Please run k-means above.")
+            st.stop()
+        cluster_col = st.sidebar.selectbox("Cluster column", existing)
+        cluster_order = sorted(df[cluster_col].unique(), key=lambda x: int(x))
+
+# ─── 4b) Derive k_label for titles ───────────────────────────────────────────────
+# Only use n_clusters if we actually ran k-means *and* n_clusters is defined
+if st.session_state.did_cluster and "n_clusters" in locals():
     k_label = n_clusters
-elif cluster_col is not None:
-    k_label = int(cluster_col.split("_")[-1])
+elif "cluster_col" in locals():
+    parts = str(cluster_col).split("_")
+    k_label = parts[-1] if parts[-1].isdigit() else ""
 else:
     k_label = ""
 
@@ -153,7 +180,6 @@ if plot_dim == "2D":
             x_end = loadings.at[pc_x, feat] * vec_scale
             y_end = loadings.at[pc_y, feat] * vec_scale
 
-            # shaft
             fig.add_shape(
                 type="line",
                 x0=0,
@@ -164,7 +190,6 @@ if plot_dim == "2D":
                 yref="y",
                 line=dict(color="grey", width=2),
             )
-            # arrowhead
             fig.add_annotation(
                 x=x_end,
                 y=y_end,
@@ -181,7 +206,6 @@ if plot_dim == "2D":
                 arrowsize=2,
                 text="",
             )
-            # label
             fig.add_annotation(
                 x=x_end * 1.05,
                 y=y_end * 1.05,
@@ -216,7 +240,6 @@ else:  # 3D
             z_e = loadings.at[pc_z, feat] * vec_scale
             x_s, y_s, z_s = x_e * (1 - frac), y_e * (1 - frac), z_e * (1 - frac)
 
-            # shaft
             fig3d.add_trace(
                 go.Scatter3d(
                     x=[0, x_s],
@@ -228,7 +251,6 @@ else:  # 3D
                     hoverinfo="skip",
                 )
             )
-            # arrowhead cone
             fig3d.add_trace(
                 go.Cone(
                     x=[x_s],
@@ -244,7 +266,6 @@ else:  # 3D
                     sizeref=vec_scale * frac,
                 )
             )
-            # label
             fig3d.add_trace(
                 go.Scatter3d(
                     x=[x_e],
