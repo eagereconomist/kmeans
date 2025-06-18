@@ -6,13 +6,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from tennis_racquet_analysis.modeling.kmeans_utils import fit_kmeans
-from tennis_racquet_analysis.config import PROCESSED_DATA_DIR
 from tennis_racquet_analysis.preprocessing_utils import (
-    load_data,  # loads a CSV given a Path
-    compute_pca_summary,  # returns {'scores': DataFrame, 'loadings': DataFrame}
+    compute_pca_summary,
 )
+from tennis_racquet_analysis.preprocessing_utils import (
+    load_data,
+)  # still used if you want to read from disk, but not for sidebar
 
-# ─── 1) Page config ────────────────────────────────────────────────────────────
+# ─── 1) Page config ───────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="K-Means Clustering Dashboard",
     layout="wide",
@@ -24,24 +25,22 @@ st.sidebar.title("Dashboard Settings")
 if "did_cluster" not in st.session_state:
     st.session_state.did_cluster = False
 
-# ─── 2) Load data ───────────────────────────────────────────────────────────────
-uploaded = st.sidebar.file_uploader("Upload your own CSV", type="csv")
-if uploaded:
-    df = pd.read_csv(uploaded)
-    dataset_label = uploaded.name
-else:
-    processed = PROCESSED_DATA_DIR
-    all_csvs = sorted(processed.rglob("*.csv"))
-    choices = [str(p.relative_to(processed.parent)) for p in all_csvs]
-    dataset_label = st.sidebar.selectbox("Or choose a project CSV", choices)
-    df = load_data(processed.parent / dataset_label)
+# ─── 2) Require upload ─────────────────────────────────────────────────────────
+uploaded = st.sidebar.file_uploader(
+    "Upload your own CSV", type="csv", help="Choose any local CSV to visualize"
+)
+if not uploaded:
+    st.error("Please upload a CSV file to visualize.")
+    st.stop()
+
+# at this point we know `uploaded` is not None
+df = pd.read_csv(uploaded)
+dataset_label = uploaded.name
 
 # ─── 2b) Detect any pre-existing cluster column ─────────────────────────────────
 initial_clusters = [c for c in df.columns if re.search(r"cluster", c, re.I)]
 if initial_clusters:
-    # reset any previous run‐state so we never reference n_clusters
     st.session_state.did_cluster = False
-
     st.error(
         "Cannot run k-means: data file already contains cluster column(s): "
         f"{', '.join(initial_clusters)}"
@@ -70,7 +69,7 @@ else:
         random_seed = st.sidebar.number_input("Random seed", min_value=0, value=42, step=1)
     run_cluster = st.sidebar.button("Run K-Means")
 
-    # ─── 4) Run or pick clusters ─────────────────────────────────────────────────
+    # ─── 4) Run or pick clusters ────────────────────────────────────────────────
     if run_cluster:
         df = fit_kmeans(
             df,
@@ -97,10 +96,10 @@ else:
             st.error("No cluster column found. Please run k-means above.")
             st.stop()
         cluster_col = st.sidebar.selectbox("Cluster column", existing)
+        df[cluster_col] = df[cluster_col].astype(str)
         cluster_order = sorted(df[cluster_col].unique(), key=lambda x: int(x))
 
 # ─── 4b) Derive k_label for titles ───────────────────────────────────────────────
-# Only use n_clusters if we actually ran k-means *and* n_clusters is defined
 if st.session_state.did_cluster and "n_clusters" in locals():
     k_label = n_clusters
 elif "cluster_col" in locals():
