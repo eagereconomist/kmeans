@@ -4,8 +4,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from sklearn.cluster import KMeans
 
+from tennis_racquet_analysis.modeling.kmeans_utils import fit_kmeans
 from tennis_racquet_analysis.config import PROCESSED_DATA_DIR
 from tennis_racquet_analysis.preprocessing_utils import (
     load_data,  # loads a CSV given a Path
@@ -35,6 +35,7 @@ else:
 # ─── 3) Model Settings ─────────────────────────────────────────────────────────
 st.sidebar.header("Model Settings")
 n_clusters = st.sidebar.slider("Number of clusters", 2, 15, 3, help="k for k-means")
+n_init = st.sidebar.number_input("n_init (k-means)", min_value=1, value=50, step=1)
 algo_method = st.sidebar.selectbox("Algorithm Method", ["lloyd", "elkan"])
 init_method = st.sidebar.selectbox("Init Method", ["k-means++", "random"])
 use_random_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
@@ -43,38 +44,41 @@ if use_random_seed:
     random_seed = st.sidebar.number_input("Random seed", min_value=0, value=42, step=1)
 run_cluster = st.sidebar.button("Run K-Means")
 
-# ─── 4) Determine cluster column ────────────────────────────────────────────────
+# ─── 4) Run or pick clusters ────────────────────────────────────────────────────
 if run_cluster:
-    features = df.select_dtypes(include="number")
-    km = KMeans(
-        n_clusters=n_clusters,
-        algorithm=algo_method,
+    df = fit_kmeans(
+        df,
+        k=n_clusters,
+        feature_columns=None,
         init=init_method,
+        n_init=n_init,
         random_state=(random_seed if use_random_seed else None),
+        algorithm=algo_method,
+        label_column="cluster",
     )
-    labels = km.fit_predict(features)
-    df["cluster"] = (labels + 1).astype(str)
-    cluster_col = "cluster"
+    st.session_state.did_cluster = True
+
+    cluster_col = f"cluster_{n_clusters}"
     cluster_order = sorted(df[cluster_col].unique(), key=lambda x: int(x))
 
-    # Show the newly clustered table
     st.subheader("Clustered Data")
     st.dataframe(df)
 
 else:
-    existing = [c for c in df.columns if c.lower().startswith("cluster")]
+    existing = [c for c in df.columns if re.fullmatch(r"cluster(_\d+)?", c)]
     if not existing:
-        st.error("No cluster column found in your data. Please run k-means above.")
+        st.error("No cluster column found. Please run k-means above.")
         st.stop()
     cluster_col = st.sidebar.selectbox("Cluster column", existing)
     cluster_order = sorted(df[cluster_col].unique(), key=lambda x: int(x))
 
-# ─── 4b) Determine k_label for titles ──────────────────────────────────────────
-# If we ran k-means just now, use n_clusters; otherwise parse from the column name
-if cluster_col == "cluster":
+# ─── 4b) Derive k_label for titles ─────────────────────────────────────────────
+if st.session_state.did_cluster:
     k_label = n_clusters
+elif cluster_col is not None:
+    k_label = int(cluster_col.split("_")[-1])
 else:
-    k_label = cluster_col.split("_")[-1]
+    k_label = ""
 
 # ─── 5) PCA scores & loadings ───────────────────────────────────────────────────
 pcs_in_file = [c for c in df.columns if re.fullmatch(r"(?i)PC[0-9]+", c)]
