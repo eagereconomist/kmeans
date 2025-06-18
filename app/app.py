@@ -1,5 +1,4 @@
 import re
-from pathlib import Path
 
 import streamlit as st
 import pandas as pd
@@ -33,14 +32,11 @@ else:
     dataset_label = st.sidebar.selectbox("Or choose a project CSV", choices)
     df = load_data(processed.parent / dataset_label)
 
-# we'll refer to this for saving/loading PCA‐loadings, if needed
-stem = Path(dataset_label).stem
-
 # ─── 3) Model Settings ─────────────────────────────────────────────────────────
 st.sidebar.header("Model Settings")
 n_clusters = st.sidebar.slider("Number of clusters", 2, 15, 3, help="k for k-means")
 algo_method = st.sidebar.selectbox("Algorithm Method", ["lloyd", "elkan"])
-init_method = st.sidebar.selectbox("Init method", ["k-means++", "random"])
+init_method = st.sidebar.selectbox("Init Method", ["k-means++", "random"])
 use_random_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
 random_seed = None
 if use_random_seed:
@@ -49,21 +45,23 @@ run_cluster = st.sidebar.button("Run K-Means")
 
 # ─── 4) Determine cluster column ────────────────────────────────────────────────
 if run_cluster:
-    # cluster on all numeric features the user imported (assumed preprocessed!)
     features = df.select_dtypes(include="number")
     km = KMeans(
         n_clusters=n_clusters,
+        algorithm=algo_method,
         init=init_method,
         random_state=(random_seed if use_random_seed else None),
     )
     labels = km.fit_predict(features)
-    # shift 0→1, cast to str for consistent coloring
     df["cluster"] = (labels + 1).astype(str)
     cluster_col = "cluster"
     cluster_order = sorted(df[cluster_col].unique(), key=lambda x: int(x))
 
+    # Show the newly clustered table
+    st.subheader("Clustered Data")
+    st.dataframe(df)
+
 else:
-    # if the user hasn't run clustering yet, let them pick any existing cluster_* col
     existing = [c for c in df.columns if c.lower().startswith("cluster")]
     if not existing:
         st.error("No cluster column found in your data. Please run k-means above.")
@@ -71,20 +69,21 @@ else:
     cluster_col = st.sidebar.selectbox("Cluster column", existing)
     cluster_order = sorted(df[cluster_col].unique(), key=lambda x: int(x))
 
-    # ─── Show the newly clustered table ────────────────────────────────────────
-    st.subheader("Clustered Data")
-    st.dataframe(df)  # scrollable table of all columns including `cluster`
+# ─── 4b) Determine k_label for titles ──────────────────────────────────────────
+# If we ran k-means just now, use n_clusters; otherwise parse from the column name
+if cluster_col == "cluster":
+    k_label = n_clusters
+else:
+    k_label = cluster_col.split("_")[-1]
 
 # ─── 5) PCA scores & loadings ───────────────────────────────────────────────────
 pcs_in_file = [c for c in df.columns if re.fullmatch(r"(?i)PC[0-9]+", c)]
 has_scores = len(pcs_in_file) >= 2
 
 if not has_scores:
-    # compute PCA on the raw numeric features
     pca_res = compute_pca_summary(df=df, hue_column=cluster_col)
     scores_df = pca_res["scores"]
     loadings = pca_res["loadings"]
-    # merge the new PC scores back into df
     df = pd.concat([df.reset_index(drop=True), scores_df.reset_index(drop=True)], axis=1)
     pcs_in_file = scores_df.columns.tolist()
 else:
@@ -104,7 +103,6 @@ pc_x = st.sidebar.selectbox("X-Axis Principal Component", pcs_in_file, index=0)
 pc_y = st.sidebar.selectbox(
     "Y-Axis Principal Component", [p for p in pcs_in_file if p != pc_x], index=0
 )
-
 pc_z = None
 if plot_dim == "3D":
     pc_z = st.sidebar.selectbox(
@@ -130,14 +128,12 @@ common = dict(
     color=cluster_col, category_orders={cluster_col: cluster_order}, custom_data=hover_cols
 )
 
-k = cluster_col.split("_")[-1]  # for titles
-
 if plot_dim == "2D":
     fig = px.scatter(
         df,
         x=pc_x,
         y=pc_y,
-        title=f"PCA Biplot Using {k} Clusters" if cluster_col in df else "PCA Biplot",
+        title=f"PCA Biplot Using {k_label} Clusters",
         hover_data=None,
         **common,
         width=900,
@@ -198,7 +194,7 @@ else:  # 3D
         x=pc_x,
         y=pc_y,
         z=pc_z,
-        title=f"3D PCA Biplot Using {k} Clusters",
+        title=f"3D PCA Biplot Using {k_label} Clusters",
         hover_data=None,
         **common,
         width=900,
