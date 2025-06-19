@@ -198,10 +198,10 @@ if plot_dim == "2D":
                 axref="x",
                 ayref="y",
                 showarrow=True,
-                arrowhead=3,
+                arrowhead=4,
                 arrowcolor="grey",
                 arrowwidth=2,
-                arrowsize=2,
+                arrowsize=1,
                 text="",
             )
             fig.add_annotation(
