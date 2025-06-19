@@ -45,7 +45,7 @@ if initial_clusters:
 
     # pick which existing cluster column to drive everything
     cluster_col = st.sidebar.selectbox("Cluster column", initial_clusters)
-    df[cluster_col] = df[cluster_col].astype(str)
+    df[cluster_col] = (df[cluster_col].astype(int) + 1).astype(str)
     cluster_order = sorted(
         df[cluster_col].unique(), key=lambda x: int(x) if str(x).isdigit() else x
     )
@@ -81,7 +81,7 @@ else:
         st.session_state.did_cluster = True
 
         cluster_col = f"cluster_{n_clusters}"
-        df[cluster_col] = df[cluster_col].astype(str)
+        df[cluster_col] = (df[cluster_col].astype(int) + 1).astype(str)
         cluster_order = sorted(df[cluster_col].unique(), key=lambda x: int(x))
 
         st.subheader("Clustered Data")
