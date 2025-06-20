@@ -145,7 +145,7 @@ if plot_dim == "2D":
             y_end = loadings.at[pc_y, feat] * vec_scale
 
             fig.add_shape(
-                "line",
+                type="line",
                 x0=0,
                 y0=0,
                 x1=x_end,
