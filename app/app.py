@@ -44,10 +44,9 @@ if (
 df = st.session_state.df
 dataset_label = st.session_state.df_source_label
 
-# ─── 2b) Detect any pre-existing cluster column ────────────────────────────────
+# ─── 2b) Detect any pre-existing cluster column ─────────────────────────────────
 initial_clusters = [c for c in df.columns if re.search(r"cluster", c, re.I)]
 if initial_clusters:
-    # we never run k-means if the file already had clusters
     st.session_state.did_cluster = False
 
     st.error(
@@ -55,11 +54,17 @@ if initial_clusters:
         f"{', '.join(initial_clusters)}"
     )
 
+    # pick which existing cluster column to drive everything
     cluster_col = st.sidebar.selectbox("Cluster column", initial_clusters)
-    # shift 0→1 and cast to str
-    df[cluster_col] = (df[cluster_col].astype(int) + 1).astype(str)
+
+    # only shift if they were zero-based
+    vals = df[cluster_col].astype(int)
+    if vals.min() == 0:
+        vals = vals + 1
+    df[cluster_col] = vals.astype(str)
+
     cluster_order = sorted(
-        df[cluster_col].unique(), key=lambda x: int(x) if str(x).isdigit() else x
+        df[cluster_col].unique(), key=lambda x: int(x) if x.isdigit() else x
     )
 
     st.subheader("Imported Data (with existing clusters)")
