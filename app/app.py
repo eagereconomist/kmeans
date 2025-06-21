@@ -17,7 +17,7 @@ st.set_page_config(
 )
 st.sidebar.title("Dashboard Settings")
 
-# ─── 2) Upload & show the raw CSV ───────────────────────────────────────────────
+# ─── 2) Upload ─────────────────────────────────────────────────────────────────
 uploaded = st.sidebar.file_uploader(
     "Upload your own CSV", type="csv", help="Choose any local CSV to visualize"
 )
@@ -26,28 +26,33 @@ if not uploaded:
     st.stop()
 
 raw_df = pd.read_csv(uploaded)
-st.subheader("Imported Data")
-st.dataframe(raw_df, use_container_width=True)
-
-# ─── 3) Detect existing clusters or run k-means ─────────────────────────────────
 initial = [c for c in raw_df.columns if re.search(r"cluster", c, re.I)]
+
 if initial:
-    # user uploaded a pre-clustered file → just shift 0→1 & stringify
+    # ─── Pre-clustered branch ─────────────────────────────────────────────────
     df = raw_df.copy()
     cluster_col = initial[0]
-    df[cluster_col] = (df[cluster_col].astype(int) + 1).astype(str)
 
-    # **FIX #1**: set color_col & cluster_order for plotting
-    color_col = cluster_col
-    st.session_state.color_col = color_col
-    st.session_state.cluster_order = sorted(df[cluster_col].unique(), key=int)
+    # keep the original 0-based ints in the table
+    df[cluster_col] = df[cluster_col].astype(int)
+    # but build a separate 1-based string column for our legend
+    df["cluster_label"] = (df[cluster_col] + 1).astype(str)
 
-    st.subheader("Imported Data (with existing clusters)")
-    st.dataframe(df, use_container_width=True)
-    st.session_state.did_cluster = False
+    # legend uses the 1-based string, table uses the original ints
+    color_col = "cluster_label"
+    st.session_state.color_col    = color_col
+    st.session_state.cluster_order = sorted(df[color_col].unique(), key=int)
+    st.session_state.did_cluster   = False
+
+    # show only the original ints in the data table
+    st.subheader("Pre-clustered Data")
+    st.dataframe(df.drop(columns=["cluster_label"]), use_container_width=True)
 
 else:
-    # fresh features → let them run k-means once
+    # ─── fresh-features branch ────────────────────────────────────────────────
+    st.subheader("Imported Data")
+    st.dataframe(raw_df, use_container_width=True)
+
     if "did_cluster" not in st.session_state:
         st.session_state.did_cluster = False
 
@@ -58,10 +63,13 @@ else:
         algo = st.sidebar.selectbox("Algorithm Method", ["lloyd", "elkan"])
         init = st.sidebar.selectbox("Init Method", ["k-means++", "random"])
         use_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
-        seed = st.sidebar.number_input("Random seed", min_value=0, value=42) if use_seed else None
+        seed = (
+            st.sidebar.number_input("Random seed", min_value=0, value=42)
+            if use_seed
+            else None
+        )
 
         if st.sidebar.button("Run K-Means"):
-            # 1) fit and get 0-based integer labels in 'cluster_{k}'
             df = fit_kmeans(
                 raw_df.copy(),
                 k=n_clusters,
@@ -72,41 +80,34 @@ else:
                 algorithm=algo,
                 label_column="cluster",
             )
-
-            # 2) keep 0-based ints for CLI comparison, but make a 1-based string label for the legend
             col = f"cluster_{n_clusters}"
             df[col] = df[col].astype(int)
             df["cluster_label"] = (df[col] + 1).astype(str)
 
-            # **FIX #2**: assign local cluster_col & color_col
             cluster_col = col
             color_col = "cluster_label"
 
-            # stash everything
-            st.session_state.did_cluster   = True
-            st.session_state.df            = df
-            st.session_state.cluster_col   = cluster_col
-            st.session_state.color_col     = color_col
+            st.session_state.did_cluster = True
+            st.session_state.df = df
+            st.session_state.cluster_col = cluster_col
+            st.session_state.color_col = color_col
             st.session_state.cluster_order = sorted(df[color_col].unique(), key=int)
 
-            # 3) only show the int-based column in the table
-            display_df = df.drop(columns=["cluster_label"])
             st.subheader("Clustered Data")
-            st.dataframe(display_df, use_container_width=True)
-
+            st.dataframe(df.drop(columns=["cluster_label"]), use_container_width=True)
         else:
             st.info("Click **Run K-Means** on the left sidebar to continue.")
             st.stop()
 
     else:
-        # grab from session_state once we've already run
-        df          = st.session_state.df
+        df = st.session_state.df
         cluster_col = st.session_state.cluster_col
-        color_col   = st.session_state.color_col
+        color_col = st.session_state.color_col
+
         st.subheader("Clustered Data")
         st.dataframe(df.drop(columns=["cluster_label"]), use_container_width=True)
 
-# ─── 4) Derive k_label for titles ─────────────────────────────────────────────────
+# ─── 4) Derive k_label for titles ───────────────────────────────────────────────
 if "cluster_col" in locals():
     parts = str(cluster_col).split("_")
     k_label = parts[-1] if parts[-1].isdigit() else ""
@@ -114,24 +115,23 @@ else:
     k_label = ""
 
 # ─── 5) PCA scores & loadings ───────────────────────────────────────────────────
-# ensure cluster_col is defined (e.g. after initial branch)
-if 'cluster_col' not in locals() or cluster_col is None:
+if "cluster_col" not in locals() or cluster_col is None:
     cluster_col = st.session_state.get("cluster_col", None)
 
 pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC\d+", c)]
 has_scores = len(pcs) >= 2
 
 if not has_scores:
-    pca      = compute_pca_summary(df=df, hue_column=cluster_col)
-    scores   = pca["scores"]
+    pca = compute_pca_summary(df=df, hue_column=cluster_col)
+    scores = pca["scores"]
     loadings = pca["loadings"]
-    df       = pd.concat([df.reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
-    pcs      = scores.columns.tolist()
+    df = pd.concat([df.reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
+    pcs = scores.columns.tolist()
 else:
     loadings = None
 
 # ─── 6) Hover formatting ───────────────────────────────────────────────────────
-hover_cols     = [st.session_state.color_col] + pcs[:3]
+hover_cols = [st.session_state.color_col] + pcs[:3]
 hover_template = "Cluster = %{customdata[0]}"
 for i, pc in enumerate(hover_cols[1:], 1):
     hover_template += f"<br>{pc} = %{{customdata[{i}]:.3f}}"
@@ -139,7 +139,9 @@ for i, pc in enumerate(hover_cols[1:], 1):
 # ─── 7) Plot controls ──────────────────────────────────────────────────────────
 dim = st.sidebar.selectbox("Plot dimension", ["2D"] + (["3D"] if len(pcs) >= 3 else []))
 pc_x = st.sidebar.selectbox("X-Axis Principal Component", pcs, index=0)
-pc_y = st.sidebar.selectbox("Y-Axis Principal Component", [p for p in pcs if p != pc_x], index=0)
+pc_y = st.sidebar.selectbox(
+    "Y-Axis Principal Component", [p for p in pcs if p != pc_x], index=0
+)
 pc_z = None
 if dim == "3D":
     pc_z = st.sidebar.selectbox(
@@ -176,10 +178,12 @@ if dim == "2D":
     if loadings is not None:
         span_x = df[pc_x].max() - df[pc_x].min()
         span_y = df[pc_y].max() - df[pc_y].min()
-        vec    = min(span_x, span_y) * scale
+        vec = min(span_x, span_y) * scale
         for feat in loadings.columns:
             x_end = loadings.at[pc_x, feat] * vec
             y_end = loadings.at[pc_y, feat] * vec
+
+            # shaft
             fig.add_shape(
                 dict(
                     type="line",
@@ -192,6 +196,7 @@ if dim == "2D":
                     line=dict(color="grey", width=2),
                 )
             )
+            # arrowhead
             fig.add_annotation(
                 x=x_end,
                 y=y_end,
@@ -208,9 +213,12 @@ if dim == "2D":
                 arrowsize=1,
                 text="",
             )
+            # label
             fig.add_annotation(
                 x=x_end * 1.05,
                 y=y_end * 1.05,
+                xref="x",
+                yref="y",
                 showarrow=False,
                 text=feat,
                 font=dict(size=12, color="grey"),
@@ -234,13 +242,14 @@ else:  # 3D
 
     if loadings is not None:
         spans = [df[c].max() - df[c].min() for c in (pc_x, pc_y, pc_z)]
-        vec   = min(spans) * scale
-        frac  = 0.1
+        vec = min(spans) * scale
+        frac = 0.1
         for feat in loadings.columns:
             x_e = loadings.at[pc_x, feat] * vec
             y_e = loadings.at[pc_y, feat] * vec
             z_e = loadings.at[pc_z, feat] * vec
             x_s, y_s, z_s = x_e * (1 - frac), y_e * (1 - frac), z_e * (1 - frac)
+
             fig3d.add_trace(
                 go.Scatter3d(
                     x=[0, x_s],
