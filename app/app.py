@@ -35,6 +35,15 @@ if (
         st.session_state.pop(key, None)
 
 raw_df = pd.read_csv(uploaded)
+
+# ─── NEW: Reset clustering state whenever the upload changes ────────────────
+if (
+    "last_uploaded_name" not in st.session_state
+    or st.session_state.last_uploaded_name != uploaded.name
+):
+    st.session_state.did_cluster = False
+    st.session_state.last_uploaded_name = uploaded.name
+    
 initial = [c for c in raw_df.columns if re.search(r"cluster", c, re.I)]
 
 # ─── placeholder for the single table ─────────────────────────────────────────
