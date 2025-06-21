@@ -95,7 +95,7 @@ else:
             st.dataframe(display_df, use_container_width=True)
 
         else:
-            st.info("Configure k-means above and click ▶️ to run.")
+            st.info("Click **Run K-Means** on the left sidebar to continue.")
             st.stop()
 
     else:
@@ -197,6 +197,10 @@ if dim == "2D":
                 y=y_end,
                 ax=0,
                 ay=0,
+                xref="x",
+                yref="y",
+                axref="x",
+                ayref="y",
                 showarrow=True,
                 arrowhead=4,
                 arrowcolor="grey",
