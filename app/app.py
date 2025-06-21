@@ -25,11 +25,25 @@ if not uploaded:
     st.error("Please upload a CSV file to visualize.")
     st.stop()
 
+# ─── Reset clustering state on new upload ──────────────────────────────────────
+if (
+    "last_upload" not in st.session_state
+    or st.session_state.last_upload != uploaded.name
+):
+    st.session_state.last_upload = uploaded.name
+    for key in ("did_cluster", "df", "cluster_col", "color_col", "cluster_order"):
+        st.session_state.pop(key, None)
+
 raw_df = pd.read_csv(uploaded)
 initial = [c for c in raw_df.columns if re.search(r"cluster", c, re.I)]
 
+# ─── placeholder for the single table ─────────────────────────────────────────
+table = st.empty()
+table.subheader("Imported Data")
+table.dataframe(raw_df, use_container_width=True)
+
 if initial:
-    # ─── Pre-clustered branch ─────────────────────────────────────────────────
+    # ─── Pre-clustered branch ───────────────────────────────────────────────────
     df = raw_df.copy()
     cluster_col = initial[0]
 
@@ -44,19 +58,20 @@ if initial:
     st.session_state.cluster_order = sorted(df[color_col].unique(), key=int)
     st.session_state.did_cluster   = False
 
-    # show only the original ints in the data table
-    st.subheader("Pre-clustered Data")
-    st.dataframe(df.drop(columns=["cluster_label"]), use_container_width=True)
+    # replace placeholder with pre-clustered data
+    table.subheader("Pre-clustered Data")
+    table.dataframe(df.drop(columns=["cluster_label"]), use_container_width=True)
 
 else:
-    # ─── fresh-features branch ────────────────────────────────────────────────
-    st.subheader("Imported Data")
-    st.dataframe(raw_df, use_container_width=True)
-
+    # ─── fresh-features branch ─────────────────────────────────────────────────
     if "did_cluster" not in st.session_state:
         st.session_state.did_cluster = False
 
     if not st.session_state.did_cluster:
+        # show raw import only once
+        table.subheader("Imported Data")
+        table.dataframe(raw_df, use_container_width=True)
+
         st.sidebar.header("Model Settings")
         n_clusters = st.sidebar.slider("Number of clusters", 2, 15, 3)
         n_init = st.sidebar.number_input("n_init (k-means)", min_value=1, value=50, step=1)
@@ -85,27 +100,29 @@ else:
             df["cluster_label"] = (df[col] + 1).astype(str)
 
             cluster_col = col
-            color_col = "cluster_label"
+            color_col   = "cluster_label"
 
-            st.session_state.did_cluster = True
-            st.session_state.df = df
-            st.session_state.cluster_col = cluster_col
-            st.session_state.color_col = color_col
+            st.session_state.did_cluster   = True
+            st.session_state.df            = df
+            st.session_state.cluster_col   = cluster_col
+            st.session_state.color_col     = color_col
             st.session_state.cluster_order = sorted(df[color_col].unique(), key=int)
 
-            st.subheader("Clustered Data")
-            st.dataframe(df.drop(columns=["cluster_label"]), use_container_width=True)
+            # replace placeholder with clustered data
+            table.subheader("Clustered Data")
+            table.dataframe(df.drop(columns=["cluster_label"]), use_container_width=True)
         else:
             st.info("Click **Run K-Means** on the left sidebar to continue.")
             st.stop()
 
     else:
-        df = st.session_state.df
+        df          = st.session_state.df
         cluster_col = st.session_state.cluster_col
-        color_col = st.session_state.color_col
+        color_col   = st.session_state.color_col
 
-        st.subheader("Clustered Data")
-        st.dataframe(df.drop(columns=["cluster_label"]), use_container_width=True)
+        # replace placeholder with clustered data
+        table.subheader("Clustered Data")
+        table.dataframe(df.drop(columns=["cluster_label"]), use_container_width=True)
 
 # ─── 4) Derive k_label for titles ───────────────────────────────────────────────
 if "cluster_col" in locals():
@@ -122,16 +139,16 @@ pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC\d+", c)]
 has_scores = len(pcs) >= 2
 
 if not has_scores:
-    pca = compute_pca_summary(df=df, hue_column=cluster_col)
-    scores = pca["scores"]
+    pca      = compute_pca_summary(df=df, hue_column=cluster_col)
+    scores   = pca["scores"]
     loadings = pca["loadings"]
-    df = pd.concat([df.reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
-    pcs = scores.columns.tolist()
+    df       = pd.concat([df.reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
+    pcs      = scores.columns.tolist()
 else:
     loadings = None
 
 # ─── 6) Hover formatting ───────────────────────────────────────────────────────
-hover_cols = [st.session_state.color_col] + pcs[:3]
+hover_cols     = [st.session_state.color_col] + pcs[:3]
 hover_template = "Cluster = %{customdata[0]}"
 for i, pc in enumerate(hover_cols[1:], 1):
     hover_template += f"<br>{pc} = %{{customdata[{i}]:.3f}}"
@@ -139,9 +156,7 @@ for i, pc in enumerate(hover_cols[1:], 1):
 # ─── 7) Plot controls ──────────────────────────────────────────────────────────
 dim = st.sidebar.selectbox("Plot dimension", ["2D"] + (["3D"] if len(pcs) >= 3 else []))
 pc_x = st.sidebar.selectbox("X-Axis Principal Component", pcs, index=0)
-pc_y = st.sidebar.selectbox(
-    "Y-Axis Principal Component", [p for p in pcs if p != pc_x], index=0
-)
+pc_y = st.sidebar.selectbox("Y-Axis Principal Component", [p for p in pcs if p != pc_x], index=0)
 pc_z = None
 if dim == "3D":
     pc_z = st.sidebar.selectbox(
@@ -178,11 +193,10 @@ if dim == "2D":
     if loadings is not None:
         span_x = df[pc_x].max() - df[pc_x].min()
         span_y = df[pc_y].max() - df[pc_y].min()
-        vec = min(span_x, span_y) * scale
+        vec    = min(span_x, span_y) * scale
         for feat in loadings.columns:
             x_end = loadings.at[pc_x, feat] * vec
             y_end = loadings.at[pc_y, feat] * vec
-
             # shaft
             fig.add_shape(
                 dict(
@@ -249,7 +263,6 @@ else:  # 3D
             y_e = loadings.at[pc_y, feat] * vec
             z_e = loadings.at[pc_z, feat] * vec
             x_s, y_s, z_s = x_e * (1 - frac), y_e * (1 - frac), z_e * (1 - frac)
-
             fig3d.add_trace(
                 go.Scatter3d(
                     x=[0, x_s],
