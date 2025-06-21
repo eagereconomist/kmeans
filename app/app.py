@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 
 import streamlit as st
 import pandas as pd
@@ -16,10 +17,7 @@ st.set_page_config(
 )
 st.sidebar.title("Dashboard Settings")
 
-if "did_cluster" not in st.session_state:
-    st.session_state.did_cluster = False
-
-# ─── 2) Require upload ─────────────────────────────────────────────────────────
+# ─── 2) Upload & show the raw CSV ───────────────────────────────────────────────
 uploaded = st.sidebar.file_uploader(
     "Upload your own CSV", type="csv", help="Choose any local CSV to visualize"
 )
@@ -27,140 +25,180 @@ if not uploaded:
     st.error("Please upload a CSV file to visualize.")
     st.stop()
 
-df = pd.read_csv(uploaded)
-dataset_label = uploaded.name
+raw_df = pd.read_csv(uploaded)
+st.subheader("Imported Data")
+st.dataframe(raw_df, use_container_width=True)
 
-# ─── Always show the raw imported data ────────────────────────────────────────
-table = st.empty()
-table.dataframe(df, use_container_width=True)
-
-# ─── 2b) Pre-existing clusters? ───────────────────────────────────────────────
-initial = [c for c in df.columns if re.search(r"cluster", c, re.I)]
+# ─── 3) Detect existing clusters or run k-means ─────────────────────────────────
+initial = [c for c in raw_df.columns if re.search(r"cluster", c, re.I)]
 if initial:
-    st.session_state.did_cluster = False
-    st.warning(f"File already has cluster column(s): {', '.join(initial)} (using first)…")
+    # user uploaded a pre-clustered file → just shift 0→1 & stringify
+    df = raw_df.copy()
     cluster_col = initial[0]
-    df[cluster_col] = df[cluster_col].astype(int)  # keep 0-based internally
+    df[cluster_col] = (df[cluster_col].astype(int) + 1).astype(str)
+
+    # **FIX #1**: set color_col & cluster_order for plotting
+    color_col = cluster_col
+    st.session_state.color_col = color_col
+    st.session_state.cluster_order = sorted(df[cluster_col].unique(), key=int)
+
+    st.subheader("Imported Data (with existing clusters)")
+    st.dataframe(df, use_container_width=True)
+    st.session_state.did_cluster = False
 
 else:
-    # ─── 3) Model Settings ───────────────────────────────────────────────────
-    st.sidebar.header("Model Settings")
-    n_clusters = st.sidebar.slider("Number of clusters", 2, 15, 3)
-    n_init = st.sidebar.number_input("n_init (k-means)", 1, 100, 50)
-    algo = st.sidebar.selectbox("Algorithm", ["lloyd", "elkan"])
-    init = st.sidebar.selectbox("Init method", ["k-means++", "random"])
-    use_seed = st.sidebar.checkbox("Specify random seed")
-    seed = st.sidebar.number_input("Random seed", 0, 9999, 42) if use_seed else None
-    run = st.sidebar.button("Run K-Means")
+    # fresh features → let them run k-means once
+    if "did_cluster" not in st.session_state:
+        st.session_state.did_cluster = False
 
-    if run:
-        df = fit_kmeans(
-            df,
-            k=n_clusters,
-            feature_columns=None,
-            init=init,
-            n_init=n_init,
-            random_state=seed,
-            algorithm=algo,
-            label_column="cluster",
-        )
-        st.session_state.did_cluster = True
-        cluster_col = f"cluster_{n_clusters}"
-        df[cluster_col] = df[cluster_col].astype(int)  # keep 0-based internally
-    else:
-        existing = [c for c in df.columns if re.fullmatch(r"cluster(_\d+)?", c, re.I)]
-        if not existing:
-            st.error("No cluster column found. Please run k-means above.")
+    if not st.session_state.did_cluster:
+        st.sidebar.header("Model Settings")
+        n_clusters = st.sidebar.slider("Number of clusters", 2, 15, 3)
+        n_init = st.sidebar.number_input("n_init (k-means)", min_value=1, value=50, step=1)
+        algo = st.sidebar.selectbox("Algorithm Method", ["lloyd", "elkan"])
+        init = st.sidebar.selectbox("Init Method", ["k-means++", "random"])
+        use_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
+        seed = st.sidebar.number_input("Random seed", min_value=0, value=42) if use_seed else None
+
+        if st.sidebar.button("Run K-Means"):
+            # 1) fit and get 0-based integer labels in 'cluster_{k}'
+            df = fit_kmeans(
+                raw_df.copy(),
+                k=n_clusters,
+                feature_columns=None,
+                init=init,
+                n_init=n_init,
+                random_state=seed,
+                algorithm=algo,
+                label_column="cluster",
+            )
+
+            # 2) keep 0-based ints for CLI comparison, but make a 1-based string label for the legend
+            col = f"cluster_{n_clusters}"
+            df[col] = df[col].astype(int)
+            df["cluster_label"] = (df[col] + 1).astype(str)
+
+            # **FIX #2**: assign local cluster_col & color_col
+            cluster_col = col
+            color_col = "cluster_label"
+
+            # stash everything
+            st.session_state.did_cluster   = True
+            st.session_state.df            = df
+            st.session_state.cluster_col   = cluster_col
+            st.session_state.color_col     = color_col
+            st.session_state.cluster_order = sorted(df[color_col].unique(), key=int)
+
+            # 3) only show the int-based column in the table
+            display_df = df.drop(columns=["cluster_label"])
+            st.subheader("Clustered Data")
+            st.dataframe(display_df, use_container_width=True)
+
+        else:
+            st.info("Configure k-means above and click ▶️ to run.")
             st.stop()
-        cluster_col = existing[0]
-        df[cluster_col] = df[cluster_col].astype(int)
 
-# ─── 4) Create 1-based “plot” column for legend ────────────────────────────────
-plot_col = f"{cluster_col}_plot"
-df[plot_col] = (df[cluster_col] + 1).astype(str)
-cluster_order = sorted(df[plot_col].unique(), key=lambda x: int(x))
+    else:
+        # grab from session_state once we've already run
+        df          = st.session_state.df
+        cluster_col = st.session_state.cluster_col
+        color_col   = st.session_state.color_col
+        st.subheader("Clustered Data")
+        st.dataframe(df.drop(columns=["cluster_label"]), use_container_width=True)
 
-# Update the single table in-place to include the cluster column
-table.dataframe(df, use_container_width=True)
+# ─── 4) Derive k_label for titles ─────────────────────────────────────────────────
+if "cluster_col" in locals():
+    parts = str(cluster_col).split("_")
+    k_label = parts[-1] if parts[-1].isdigit() else ""
+else:
+    k_label = ""
 
-# ─── 5) PCA & loadings ─────────────────────────────────────────────────────────
-pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC[0-9]+", c)]
-if len(pcs) < 2:
-    pca = compute_pca_summary(df=df, hue_column=plot_col)
-    scores, loadings = pca["scores"], pca["loadings"]
-    df = pd.concat([df.reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
-    pcs = scores.columns.tolist()
+# ─── 5) PCA scores & loadings ───────────────────────────────────────────────────
+# ensure cluster_col is defined (e.g. after initial branch)
+if 'cluster_col' not in locals() or cluster_col is None:
+    cluster_col = st.session_state.get("cluster_col", None)
+
+pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC\d+", c)]
+has_scores = len(pcs) >= 2
+
+if not has_scores:
+    pca      = compute_pca_summary(df=df, hue_column=cluster_col)
+    scores   = pca["scores"]
+    loadings = pca["loadings"]
+    df       = pd.concat([df.reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
+    pcs      = scores.columns.tolist()
 else:
     loadings = None
 
-# ─── 6) Hover setup ───────────────────────────────────────────────────────────
-hover_cols = [plot_col] + pcs[:3]
-template = "Cluster = %{customdata[0]}"
-for i, pc in enumerate(hover_cols[1:], start=1):
-    template += f"<br>{pc} = %{{customdata[{i}]:.3f}}"
+# ─── 6) Hover formatting ───────────────────────────────────────────────────────
+hover_cols     = [st.session_state.color_col] + pcs[:3]
+hover_template = "Cluster = %{customdata[0]}"
+for i, pc in enumerate(hover_cols[1:], 1):
+    hover_template += f"<br>{pc} = %{{customdata[{i}]:.3f}}"
 
-# ─── 7) 2D/3D selector ──────────────────────────────────────────────────────────
-dim_opts = ["2D"] + (["3D"] if len(pcs) >= 3 else [])
-plot_dim = st.sidebar.selectbox("Plot dimension", dim_opts)
+# ─── 7) Plot controls ──────────────────────────────────────────────────────────
+dim = st.sidebar.selectbox("Plot dimension", ["2D"] + (["3D"] if len(pcs) >= 3 else []))
 pc_x = st.sidebar.selectbox("X-Axis Principal Component", pcs, index=0)
 pc_y = st.sidebar.selectbox("Y-Axis Principal Component", [p for p in pcs if p != pc_x], index=0)
 pc_z = None
-if plot_dim == "3D":
+if dim == "3D":
     pc_z = st.sidebar.selectbox(
-        "Z-Axis Principal Component", [p for p in pcs if p not in (pc_x, pc_y)], index=0
+        "Z-Axis Principal Component",
+        [p for p in pcs if p not in (pc_x, pc_y)],
+        index=0,
     )
-
 scale = st.sidebar.slider("Loading Vector Scale", 0.1, 5.0, 0.7, step=0.05)
 
+# ─── 8) Header ────────────────────────────────────────────────────────────────
 st.title("K-Means Clustering Dashboard")
-st.markdown(f"**Dataset:** `{dataset_label}` — {df.shape[0]:,} rows, {df.shape[1]} cols")
+st.markdown(f"**Dataset:** `{uploaded.name}` — {df.shape[0]} rows, {df.shape[1]} cols")
 
+# ─── 9) Plot ──────────────────────────────────────────────────────────────────
 common = dict(
-    color=plot_col,
-    category_orders={plot_col: cluster_order},
+    color=st.session_state.color_col,
+    category_orders={st.session_state.color_col: st.session_state.cluster_order},
     custom_data=hover_cols,
 )
 
-# ─── 8) 2D plot ────────────────────────────────────────────────────────────────
-if plot_dim == "2D":
+if dim == "2D":
     fig = px.scatter(
         df,
         x=pc_x,
         y=pc_y,
-        title=f"PCA Biplot Using {cluster_col.split('_')[-1]} Clusters",
+        title=f"PCA Biplot Using {k_label} Clusters",
         hover_data=None,
         **common,
         width=900,
         height=900,
     )
-    fig.update_traces(hovertemplate=template, selector=dict(mode="markers"))
+    fig.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
 
     if loadings is not None:
         span_x = df[pc_x].max() - df[pc_x].min()
         span_y = df[pc_y].max() - df[pc_y].min()
-        vec_scale = min(span_x, span_y) * scale
-
+        vec    = min(span_x, span_y) * scale
         for feat in loadings.columns:
-            x_end = loadings.at[pc_x, feat] * vec_scale
-            y_end = loadings.at[pc_y, feat] * vec_scale
-
+            x_end = loadings.at[pc_x, feat] * vec
+            y_end = loadings.at[pc_y, feat] * vec
             fig.add_shape(
-                type="line",
-                x0=0,
-                y0=0,
-                x1=x_end,
-                y1=y_end,
-                xref="x",
-                yref="y",
-                line=dict(color="grey", width=2),
+                dict(
+                    type="line",
+                    x0=0,
+                    y0=0,
+                    x1=x_end,
+                    y1=y_end,
+                    xref="x",
+                    yref="y",
+                    line=dict(color="grey", width=2),
+                )
             )
             fig.add_annotation(
                 x=x_end,
                 y=y_end,
-                ax=x_end * 0.85,
-                ay=y_end * 0.85,
+                ax=0,
+                ay=0,
                 showarrow=True,
-                arrowhead=3,
+                arrowhead=4,
                 arrowcolor="grey",
                 arrowwidth=2,
                 arrowsize=1,
@@ -176,34 +214,29 @@ if plot_dim == "2D":
 
     st.plotly_chart(fig, use_container_width=True)
 
-# ─── 9) 3D plot ────────────────────────────────────────────────────────────────
-else:
+else:  # 3D
     fig3d = px.scatter_3d(
         df,
         x=pc_x,
         y=pc_y,
         z=pc_z,
-        title=f"3D PCA Biplot Using {cluster_col.split('_')[-1]} Clusters",
+        title=f"3D PCA Biplot Using {k_label} Clusters",
         hover_data=None,
         **common,
         width=1000,
         height=1000,
     )
-    fig3d.update_traces(hovertemplate=template, selector=dict(mode="markers"))
+    fig3d.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
 
     if loadings is not None:
-        spans = [
-            df[c].max() - df[c].min() for c in (pc_x, pc_y, pc_z)
-        ]
-        vec_scale = min(spans) * scale
-        frac = 0.1
-
+        spans = [df[c].max() - df[c].min() for c in (pc_x, pc_y, pc_z)]
+        vec   = min(spans) * scale
+        frac  = 0.1
         for feat in loadings.columns:
-            x_e = loadings.at[pc_x, feat] * vec_scale
-            y_e = loadings.at[pc_y, feat] * vec_scale
-            z_e = loadings.at[pc_z, feat] * vec_scale
+            x_e = loadings.at[pc_x, feat] * vec
+            y_e = loadings.at[pc_y, feat] * vec
+            z_e = loadings.at[pc_z, feat] * vec
             x_s, y_s, z_s = x_e * (1 - frac), y_e * (1 - frac), z_e * (1 - frac)
-
             fig3d.add_trace(
                 go.Scatter3d(
                     x=[0, x_s],
@@ -227,7 +260,7 @@ else:
                     showscale=False,
                     colorscale=[[0, "grey"], [1, "grey"]],
                     sizemode="absolute",
-                    sizeref=vec_scale * frac,
+                    sizeref=vec * frac,
                 )
             )
             fig3d.add_trace(
