@@ -36,20 +36,21 @@ if (
 
 raw_df = pd.read_csv(uploaded)
 
-# ─── NEW: Reset clustering state whenever the upload changes ────────────────
+# ─── also reset when filename changes ──────────────────────────────────────────
 if (
     "last_uploaded_name" not in st.session_state
     or st.session_state.last_uploaded_name != uploaded.name
 ):
     st.session_state.did_cluster = False
     st.session_state.last_uploaded_name = uploaded.name
-    
+
 initial = [c for c in raw_df.columns if re.search(r"cluster", c, re.I)]
 
 # ─── placeholder for the single table ─────────────────────────────────────────
+display_df = raw_df.copy()
 table = st.empty()
-table.subheader("Imported Data")
-table.dataframe(raw_df, use_container_width=True)
+table.subheader(f"Imported Data — {display_df.shape[0]} rows, {display_df.shape[1]} cols")
+table.dataframe(display_df, use_container_width=True)
 
 if initial:
     # ─── Pre-clustered branch ───────────────────────────────────────────────────
@@ -68,8 +69,9 @@ if initial:
     st.session_state.did_cluster   = False
 
     # replace placeholder with pre-clustered data
-    table.subheader("Pre-clustered Data")
-    table.dataframe(df.drop(columns=["cluster_label"]), use_container_width=True)
+    display_df = df.drop(columns=["cluster_label"])
+    table.subheader(f"Pre-clustered Data — {display_df.shape[0]} rows, {display_df.shape[1]} cols")
+    table.dataframe(display_df, use_container_width=True)
 
 else:
     # ─── fresh-features branch ─────────────────────────────────────────────────
@@ -78,8 +80,9 @@ else:
 
     if not st.session_state.did_cluster:
         # show raw import only once
-        table.subheader("Imported Data")
-        table.dataframe(raw_df, use_container_width=True)
+        display_df = raw_df.copy()
+        table.subheader(f"Imported Data — {display_df.shape[0]} rows, {display_df.shape[1]} cols")
+        table.dataframe(display_df, use_container_width=True)
 
         st.sidebar.header("Model Settings")
         n_clusters = st.sidebar.slider("Number of clusters", 2, 15, 3)
@@ -118,8 +121,9 @@ else:
             st.session_state.cluster_order = sorted(df[color_col].unique(), key=int)
 
             # replace placeholder with clustered data
-            table.subheader("Clustered Data")
-            table.dataframe(df.drop(columns=["cluster_label"]), use_container_width=True)
+            display_df = df.drop(columns=["cluster_label"])
+            table.subheader(f"Clustered Data — {display_df.shape[0]} rows, {display_df.shape[1]} cols")
+            table.dataframe(display_df, use_container_width=True)
         else:
             st.info("Click **Run K-Means** on the left sidebar to continue.")
             st.stop()
@@ -130,8 +134,9 @@ else:
         color_col   = st.session_state.color_col
 
         # replace placeholder with clustered data
-        table.subheader("Clustered Data")
-        table.dataframe(df.drop(columns=["cluster_label"]), use_container_width=True)
+        display_df = df.drop(columns=["cluster_label"])
+        table.subheader(f"Clustered Data — {display_df.shape[0]} rows, {display_df.shape[1]} cols")
+        table.dataframe(display_df, use_container_width=True)
 
 # ─── 4) Derive k_label for titles ───────────────────────────────────────────────
 if "cluster_col" in locals():
@@ -157,7 +162,7 @@ else:
     loadings = None
 
 # ─── 6) Hover formatting ───────────────────────────────────────────────────────
-hover_cols     = [st.session_state.color_col] + pcs[:3]
+hover_cols = [st.session_state.color_col] + pcs[:3]
 hover_template = "Cluster = %{customdata[0]}"
 for i, pc in enumerate(hover_cols[1:], 1):
     hover_template += f"<br>{pc} = %{{customdata[{i}]:.3f}}"
@@ -165,9 +170,7 @@ for i, pc in enumerate(hover_cols[1:], 1):
 # ─── 7) Plot controls ──────────────────────────────────────────────────────────
 dim = st.sidebar.selectbox("Plot dimension", ["2D"] + (["3D"] if len(pcs) >= 3 else []))
 pc_x = st.sidebar.selectbox("X-Axis Principal Component", pcs, index=0)
-pc_y = st.sidebar.selectbox(
-    "Y-Axis Principal Component", [p for p in pcs if p != pc_x], index=0
-)
+pc_y = st.sidebar.selectbox("Y-Axis Principal Component", [p for p in pcs if p != pc_x], index=0)
 pc_z = None
 if dim == "3D":
     pc_z = st.sidebar.selectbox(
@@ -176,7 +179,7 @@ if dim == "3D":
         index=0,
     )
 
-# only show loading‐vector scale slider if we actually have loadings
+# only show loading-vector scale slider if we actually have loadings
 if loadings is not None:
     scale = st.sidebar.slider("Loading Vector Scale", 0.1, 5.0, 0.7, step=0.05)
 else:
@@ -184,7 +187,7 @@ else:
 
 # ─── 8) Header ────────────────────────────────────────────────────────────────
 st.title("K-Means Clustering Dashboard")
-st.markdown(f"**Dataset:** `{uploaded.name}` — {df.shape[0]} rows, {df.shape[1]} cols")
+st.markdown(f"**Dataset:** `{uploaded.name}` — {display_df.shape[0]} rows, {display_df.shape[1]} cols")
 
 # ─── 9) Plot ──────────────────────────────────────────────────────────────────
 common = dict(
@@ -272,8 +275,8 @@ else:  # 3D
 
     if loadings is not None:
         spans = [df[c].max() - df[c].min() for c in (pc_x, pc_y, pc_z)]
-        vec = min(spans) * scale
-        frac = 0.1
+        vec   = min(spans) * scale
+        frac  = 0.1
         for feat in loadings.columns:
             x_e = loadings.at[pc_x, feat] * vec
             y_e = loadings.at[pc_y, feat] * vec
