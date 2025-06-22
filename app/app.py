@@ -165,7 +165,9 @@ for i, pc in enumerate(hover_cols[1:], 1):
 # ─── 7) Plot controls ──────────────────────────────────────────────────────────
 dim = st.sidebar.selectbox("Plot dimension", ["2D"] + (["3D"] if len(pcs) >= 3 else []))
 pc_x = st.sidebar.selectbox("X-Axis Principal Component", pcs, index=0)
-pc_y = st.sidebar.selectbox("Y-Axis Principal Component", [p for p in pcs if p != pc_x], index=0)
+pc_y = st.sidebar.selectbox(
+    "Y-Axis Principal Component", [p for p in pcs if p != pc_x], index=0
+)
 pc_z = None
 if dim == "3D":
     pc_z = st.sidebar.selectbox(
@@ -173,7 +175,12 @@ if dim == "3D":
         [p for p in pcs if p not in (pc_x, pc_y)],
         index=0,
     )
-scale = st.sidebar.slider("Loading Vector Scale", 0.1, 5.0, 0.7, step=0.05)
+
+# only show loading‐vector scale slider if we actually have loadings
+if loadings is not None:
+    scale = st.sidebar.slider("Loading Vector Scale", 0.1, 5.0, 0.7, step=0.05)
+else:
+    scale = None
 
 # ─── 8) Header ────────────────────────────────────────────────────────────────
 st.title("K-Means Clustering Dashboard")
