@@ -15,6 +15,17 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ─── RESTART BUTTON ───────────────────────────────────────────────────────────
+# Clear everything and rerun to show only the uploader again
+if st.sidebar.button("Restart"):
+    # delete all keys in session_state
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    # re-run the script from top
+    st.rerun()
+
+
 st.sidebar.title("Dashboard Settings")
 
 # ─── 2) Upload ─────────────────────────────────────────────────────────────────
