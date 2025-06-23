@@ -1,5 +1,4 @@
 import re
-from pathlib import Path
 
 import streamlit as st
 import pandas as pd
@@ -37,10 +36,7 @@ if not uploaded:
     st.stop()
 
 # ─── Reset clustering state on new upload ──────────────────────────────────────
-if (
-    "last_upload" not in st.session_state
-    or st.session_state.last_upload != uploaded.name
-):
+if "last_upload" not in st.session_state or st.session_state.last_upload != uploaded.name:
     st.session_state.last_upload = uploaded.name
     for key in ("did_cluster", "df", "cluster_col", "color_col", "cluster_order"):
         st.session_state.pop(key, None)
@@ -75,9 +71,9 @@ if initial:
 
     # legend uses the 1-based string, table uses the original ints
     color_col = "cluster_label"
-    st.session_state.color_col    = color_col
+    st.session_state.color_col = color_col
     st.session_state.cluster_order = sorted(df[color_col].unique(), key=int)
-    st.session_state.did_cluster   = False
+    st.session_state.did_cluster = False
 
     # replace placeholder with pre-clustered data
     display_df = df.drop(columns=["cluster_label"])
@@ -101,11 +97,7 @@ else:
         algo = st.sidebar.selectbox("Algorithm Method", ["lloyd", "elkan"])
         init = st.sidebar.selectbox("Init Method", ["k-means++", "random"])
         use_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
-        seed = (
-            st.sidebar.number_input("Random seed", min_value=0, value=42)
-            if use_seed
-            else None
-        )
+        seed = st.sidebar.number_input("Random seed", min_value=0, value=42) if use_seed else None
 
         if st.sidebar.button("Run K-Means"):
             df = fit_kmeans(
@@ -123,26 +115,28 @@ else:
             df["cluster_label"] = (df[col] + 1).astype(str)
 
             cluster_col = col
-            color_col   = "cluster_label"
+            color_col = "cluster_label"
 
-            st.session_state.did_cluster   = True
-            st.session_state.df            = df
-            st.session_state.cluster_col   = cluster_col
-            st.session_state.color_col     = color_col
+            st.session_state.did_cluster = True
+            st.session_state.df = df
+            st.session_state.cluster_col = cluster_col
+            st.session_state.color_col = color_col
             st.session_state.cluster_order = sorted(df[color_col].unique(), key=int)
 
             # replace placeholder with clustered data
             display_df = df.drop(columns=["cluster_label"])
-            table.subheader(f"Clustered Data — {display_df.shape[0]} rows, {display_df.shape[1]} cols")
+            table.subheader(
+                f"Clustered Data — {display_df.shape[0]} rows, {display_df.shape[1]} cols"
+            )
             table.dataframe(display_df, use_container_width=True)
         else:
             st.info("Click **Run K-Means** on the left sidebar to continue.")
             st.stop()
 
     else:
-        df          = st.session_state.df
+        df = st.session_state.df
         cluster_col = st.session_state.cluster_col
-        color_col   = st.session_state.color_col
+        color_col = st.session_state.color_col
 
         # replace placeholder with clustered data
         display_df = df.drop(columns=["cluster_label"])
@@ -164,11 +158,11 @@ pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC\d+", c)]
 has_scores = len(pcs) >= 2
 
 if not has_scores:
-    pca      = compute_pca_summary(df=df, hue_column=cluster_col)
-    scores   = pca["scores"]
+    pca = compute_pca_summary(df=df, hue_column=cluster_col)
+    scores = pca["scores"]
     loadings = pca["loadings"]
-    df       = pd.concat([df.reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
-    pcs      = scores.columns.tolist()
+    df = pd.concat([df.reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
+    pcs = scores.columns.tolist()
 else:
     loadings = None
 
@@ -198,7 +192,9 @@ else:
 
 # ─── 8) Header ────────────────────────────────────────────────────────────────
 st.title("K-Means Clustering Dashboard")
-st.markdown(f"**Dataset:** `{uploaded.name}` — {display_df.shape[0]} rows, {display_df.shape[1]} cols")
+st.markdown(
+    f"**Dataset:** `{uploaded.name}` — {display_df.shape[0]} rows, {display_df.shape[1]} cols"
+)
 
 # ─── 9) Plot ──────────────────────────────────────────────────────────────────
 common = dict(
@@ -223,7 +219,7 @@ if dim == "2D":
     if loadings is not None:
         span_x = df[pc_x].max() - df[pc_x].min()
         span_y = df[pc_y].max() - df[pc_y].min()
-        vec    = min(span_x, span_y) * scale
+        vec = min(span_x, span_y) * scale
         for feat in loadings.columns:
             x_end = loadings.at[pc_x, feat] * vec
             y_end = loadings.at[pc_y, feat] * vec
@@ -286,8 +282,8 @@ else:  # 3D
 
     if loadings is not None:
         spans = [df[c].max() - df[c].min() for c in (pc_x, pc_y, pc_z)]
-        vec   = min(spans) * scale
-        frac  = 0.1
+        vec = min(spans) * scale
+        frac = 0.1
         for feat in loadings.columns:
             x_e = loadings.at[pc_x, feat] * vec
             y_e = loadings.at[pc_y, feat] * vec
