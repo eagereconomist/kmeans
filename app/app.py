@@ -30,6 +30,7 @@ if st.sidebar.button("Restart"):
         "color_col",
         "cluster_order",
         "pve",
+        "cpve",
         "loadings",
         "last_upload",
         "last_uploaded_name",
@@ -40,7 +41,6 @@ if st.sidebar.button("Restart"):
 st.sidebar.title("Dashboard Settings")
 
 # ─── 2) Upload ─────────────────────────────────────────────────────────────────
-# cycle key on restart so uploader clears
 uploader_key = f"uploader_{st.session_state.get('uploader_count', 0)}"
 uploaded = st.sidebar.file_uploader(
     "Upload your own CSV",
@@ -62,6 +62,7 @@ if "last_upload" not in st.session_state or st.session_state.last_upload != uplo
         "color_col",
         "cluster_order",
         "pve",
+        "cpve",
         "loadings",
     ):
         st.session_state.pop(key, None)
@@ -97,15 +98,13 @@ has_cluster = any(re.search(r"cluster", c, re.I) for c in raw_df.columns)
 
 if not has_cluster and len(numeric_cols) < 2:
     st.error(
-        "Error: This dataset isn’t ready for k-means: it needs at least two numeric feature columns. "
+        "Error: This dataset isn't ready for k-means: it needs at least two numeric feature columns. "
         "Please upload a dataset with two or more numeric features."
     )
     st.stop()
 
 # 2) Numeric feature checks
-numeric_cols = raw_df.select_dtypes(include="number").columns.tolist()
 initial = [c for c in raw_df.columns if re.search(r"cluster", c, re.I)]
-
 if initial:
     feature_cols = [c for c in numeric_cols if c not in initial]
     if len(feature_cols) < 2:
@@ -122,8 +121,6 @@ else:
         )
         st.stop()
 
-initial = [c for c in raw_df.columns if re.search(r"cluster", c, re.I)]
-
 # ─── Main app logic with general catch-all ─────────────────────────────────────
 try:
     # ─── placeholder for the single table ─────────────────────────────────────
@@ -136,7 +133,6 @@ try:
         # ─── Pre-clustered branch ───────────────────────────────────────────────
         df = raw_df.copy()
         cluster_col = initial[0]
-
         df[cluster_col] = df[cluster_col].astype(int)
         df["cluster_label"] = (df[cluster_col] + 1).astype(str)
 
@@ -201,7 +197,6 @@ try:
             else:
                 st.info("Click **Run K-Means** on the left sidebar to continue.")
                 st.stop()
-
         else:
             df = st.session_state.df
             cluster_col = st.session_state.cluster_col
@@ -214,27 +209,20 @@ try:
             table.dataframe(display_df, use_container_width=True)
 
     # ─── 4) Derive k_label for titles ─────────────────────────────────────────
-    if "cluster_col" in locals():
-        parts = str(cluster_col).split("_")
-        k_label = parts[-1] if parts[-1].isdigit() else ""
-    else:
-        k_label = ""
+    parts = str(cluster_col).split("_")
+    k_label = parts[-1] if parts[-1].isdigit() else ""
 
-    # ─── 5) PCA scores, loadings & PVE ────────────────────────────────────────
-    if "cluster_col" not in locals() or cluster_col is None:
-        cluster_col = st.session_state.get("cluster_col", None)
-
-    # always recompute PCA summary
+    # ─── 5) PCA scores, loadings & variance ──────────────────────────────────
     pca = compute_pca_summary(df=df, hue_column=cluster_col)
     scores = pca["scores"]
+    loadings = pca["loadings"]
     pve = pca["pve"]
+    cpve = pca["cpve"]
 
-    # detect if user imported PC scores directly
+    # skip loading vectors if user imported PCs directly
     imported_pcs = [c for c in raw_df.columns if re.fullmatch(r"(?i)PC\d+", c)]
     if imported_pcs:
-        loadings = None  # skip loading vectors when clustering on imported PCs
-    else:
-        loadings = pca["loadings"]
+        loadings = None
 
     # drop old PC columns and append fresh scores
     old_pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC\d+", c)]
@@ -250,6 +238,11 @@ try:
         hover_template += f"<br>{pc} = %{{customdata[{i}]:.3f}}"
 
     # ─── 7) Plot controls ─────────────────────────────────────────────────
+    st.sidebar.header("PCA Output Options")
+    show_loadings = st.sidebar.checkbox("Show loadings", value=False)
+    show_pve = st.sidebar.checkbox("Show % variance explained", value=False)
+    show_cpve = st.sidebar.checkbox("Show cumulative variance", value=False)
+
     dim = st.sidebar.selectbox("Plot dimension", ["2D"] + (["3D"] if len(pcs) >= 3 else []))
     pc_x = st.sidebar.selectbox("X-Axis Principal Component", pcs, index=0)
     pc_y = st.sidebar.selectbox(
@@ -258,7 +251,9 @@ try:
     pc_z = None
     if dim == "3D":
         pc_z = st.sidebar.selectbox(
-            "Z-Axis Principal Component", [p for p in pcs if p not in (pc_x, pc_y)], index=0
+            "Z-Axis Principal Component",
+            [p for p in pcs if p not in (pc_x, pc_y)],
+            index=0,
         )
 
     # ─── Guards: require enough PCs ────────────────────────────────────────
@@ -281,10 +276,11 @@ try:
     )
 
     # ─── slider only if loadings are present ─────────────────────────────────
-    if loadings is not None:
-        scale = st.sidebar.slider("Loading Vector Scale", 0.1, 5.0, 0.7, step=0.05)
-    else:
-        scale = None
+    scale = (
+        st.sidebar.slider("Loading Vector Scale", 0.1, 5.0, 0.7, step=0.05)
+        if loadings is not None
+        else None
+    )
 
     # ─── 9) Plot ─────────────────────────────────────────────────────────
     common = dict(
@@ -416,11 +412,18 @@ try:
                 )
         st.plotly_chart(fig3d, use_container_width=True)
 
-except Exception:
-    st.error(
-        "We ran into an unexpected issue with your dataset. "
-        "Please ensure it’s a clean CSV (no missing values), "
-        "has at least two numeric features (and a cluster column if pre-clustered), "
-        "then try again."
-    )
-    st.stop()
+    # ─── 10) Optional PCA tables & charts ───────────────────────────────────────
+    st.markdown("### PCA Scores")
+    st.dataframe(scores)
+
+    if show_loadings and loadings is not None:
+        st.markdown("### PCA Loadings")
+        st.dataframe(loadings)
+
+    if show_pve:
+        st.markdown("### % Variance Explained")
+        st.bar_chart(pve)
+
+    if show_cpve:
+        st.markdown("### Cumulative Variance Explained")
+        st.line_chart(cpve)
