@@ -239,6 +239,7 @@ try:
 
     # ─── 7) Plot controls ─────────────────────────────────────────────────
     st.sidebar.header("PCA Output Options")
+    show_scores = st.sidebar.checkbox("Show Principal Component Scores", value=False)
     show_loadings = st.sidebar.checkbox("Show Principal Component Loadings", value=False)
     show_pve = st.sidebar.checkbox("Show Proportional Variance Explained", value=False)
     show_cpve = st.sidebar.checkbox("Show Cumulative Variance", value=False)
@@ -413,8 +414,9 @@ try:
         st.plotly_chart(fig3d, use_container_width=True)
 
     # ─── 10) Optional PCA tables & charts ───────────────────────────────────────
-    st.markdown("### PCA Scores")
-    st.dataframe(scores)
+    if show_scores and scores is not None:
+        st.markdown("### PCA Scores")
+        st.dataframe(scores)
 
     if show_loadings and loadings is not None:
         st.markdown("### PCA Loadings")
