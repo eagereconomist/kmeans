@@ -239,9 +239,9 @@ try:
 
     # ─── 7) Plot controls ─────────────────────────────────────────────────
     st.sidebar.header("PCA Output Options")
-    show_loadings = st.sidebar.checkbox("Show loadings", value=False)
-    show_pve = st.sidebar.checkbox("Show % variance explained", value=False)
-    show_cpve = st.sidebar.checkbox("Show cumulative variance", value=False)
+    show_loadings = st.sidebar.checkbox("Show Principal Component Loadings", value=False)
+    show_pve = st.sidebar.checkbox("Show Proportional Variance Explained", value=False)
+    show_cpve = st.sidebar.checkbox("Show Cumulative Variance", value=False)
 
     dim = st.sidebar.selectbox("Plot dimension", ["2D"] + (["3D"] if len(pcs) >= 3 else []))
     pc_x = st.sidebar.selectbox("X-Axis Principal Component", pcs, index=0)
@@ -421,7 +421,7 @@ try:
         st.dataframe(loadings)
 
     if show_pve:
-        st.markdown("### % Variance Explained")
+        st.markdown("### Percentage of Variance Explained")
         st.line_chart(pve)
 
     if show_cpve:
