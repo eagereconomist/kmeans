@@ -422,8 +422,11 @@ try:
 
     if show_pve:
         st.markdown("### % Variance Explained")
-        st.bar_chart(pve)
+        st.line_chart(pve)
 
     if show_cpve:
         st.markdown("### Cumulative Variance Explained")
         st.line_chart(cpve)
+
+finally:
+    pass
