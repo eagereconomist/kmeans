@@ -54,6 +54,37 @@ if (
     st.session_state.did_cluster = False
     st.session_state.last_uploaded_name = uploaded.name
 
+# ─── Input validation ───────────────────────────────────────────────────────────
+# 1) No missing values
+if raw_df.isnull().any().any():
+    st.error(
+        "Uploaded dataset contains missing values. "
+        "Please upload a cleaned dataset with no missing values."
+    )
+    st.stop()
+
+# 2) Numeric feature checks
+numeric_cols = raw_df.select_dtypes(include="number").columns.tolist()
+initial = [c for c in raw_df.columns if re.search(r"cluster", c, re.I)]
+
+if initial:
+    # pre-clustered: need at least two numeric feature columns besides the cluster
+    feature_cols = [c for c in numeric_cols if c not in initial]
+    if len(feature_cols) < 2:
+        st.error(
+            "Your pre-clustered file must include at least two numeric feature columns "
+            "in addition to the cluster column for PCA & visualization."
+        )
+        st.stop()
+else:
+    # fresh features: need at least two numeric columns for k-means
+    if len(numeric_cols) < 2:
+        st.error(
+            "We need at least two numeric feature columns for k-means. "
+            "Please upload a processed dataset (e.g., standardized)."
+        )
+        st.stop()
+
 initial = [c for c in raw_df.columns if re.search(r"cluster", c, re.I)]
 
 # ─── placeholder for the single table ─────────────────────────────────────────
@@ -187,6 +218,11 @@ if dim == "2D" and len(pcs) < 2:
 x_label = f"{pc_x} ({pve[pc_x]:.1%})"
 y_label = f"{pc_y} ({pve[pc_y]:.1%})"
 if dim == "3D":
+    if len(pcs) < 3:
+        st.error(
+            "Error: At least 3 principal components (PC1, PC2, and PC3) are required for a 3D biplot."
+        )
+        st.stop()
     z_label = f"{pc_z} ({pve[pc_z]:.1%})"
 
 # ─── Slider for loading-vector scale ────────────────────────────────────────────
