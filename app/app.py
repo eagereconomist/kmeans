@@ -493,26 +493,13 @@ try:
 
     if show_loadings and loadings is not None:
         st.markdown("### PCA Loadings")
-        st.dataframe(loadings)
+        loadings_t = loadings.T
+        st.dataframe(loadings_t)
 
     if show_pve:
         st.markdown("### % Variance Explained")
         st.line_chart(pve)
 
-    if show_cpve:
-        st.markdown("### Cumulative Variance Explained")
-        st.line_chart(cpve)
-
-    # ─── 12) Optional PCA tables & charts ───────────────────────────────────────
-    if show_scores:
-        st.markdown("### PCA Scores")
-        st.dataframe(scores)
-    if show_loadings and loadings is not None:
-        st.markdown("### PCA Loadings")
-        st.dataframe(loadings)
-    if show_pve:
-        st.markdown("### % Variance Explained")
-        st.line_chart(pve)
     if show_cpve:
         st.markdown("### Cumulative Variance Explained")
         st.line_chart(cpve)
