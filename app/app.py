@@ -420,7 +420,8 @@ try:
 
     if show_loadings and loadings is not None:
         st.markdown("### PCA Loadings")
-        st.dataframe(loadings)
+        loadings_t = loadings.T
+        st.dataframe(loadings_t)
 
     if show_pve:
         st.markdown("### Percentage of Variance Explained")
