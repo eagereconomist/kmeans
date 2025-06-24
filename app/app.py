@@ -16,14 +16,10 @@ st.set_page_config(
 )
 
 # ─── RESTART BUTTON ───────────────────────────────────────────────────────────
-# Clear everything and rerun to show only the uploader again
 if st.sidebar.button("Restart"):
-    # delete all keys in session_state
     for key in list(st.session_state.keys()):
         del st.session_state[key]
-    # re-run the script from top
     st.rerun()
-
 
 st.sidebar.title("Dashboard Settings")
 
@@ -38,12 +34,19 @@ if not uploaded:
 # ─── Reset clustering state on new upload ──────────────────────────────────────
 if "last_upload" not in st.session_state or st.session_state.last_upload != uploaded.name:
     st.session_state.last_upload = uploaded.name
-    for key in ("did_cluster", "df", "cluster_col", "color_col", "cluster_order"):
+    for key in (
+        "did_cluster",
+        "df",
+        "cluster_col",
+        "color_col",
+        "cluster_order",
+        "pve",  # ← reset any old PCA state
+        "loadings",
+    ):
         st.session_state.pop(key, None)
 
 raw_df = pd.read_csv(uploaded)
 
-# ─── also reset when filename changes ──────────────────────────────────────────
 if (
     "last_uploaded_name" not in st.session_state
     or st.session_state.last_uploaded_name != uploaded.name
@@ -60,33 +63,25 @@ table.subheader(f"Imported Data — {display_df.shape[0]} rows, {display_df.shap
 table.dataframe(display_df, use_container_width=True)
 
 if initial:
-    # ─── Pre-clustered branch ───────────────────────────────────────────────────
+    # ─── Pre-clustered branch ──────────────────────────────────────────────────
     df = raw_df.copy()
     cluster_col = initial[0]
 
-    # keep the original 0-based ints in the table
     df[cluster_col] = df[cluster_col].astype(int)
-    # but build a separate 1-based string column for our legend
     df["cluster_label"] = (df[cluster_col] + 1).astype(str)
 
-    # legend uses the 1-based string, table uses the original ints
     color_col = "cluster_label"
     st.session_state.color_col = color_col
     st.session_state.cluster_order = sorted(df[color_col].unique(), key=int)
     st.session_state.did_cluster = False
 
-    # replace placeholder with pre-clustered data
     display_df = df.drop(columns=["cluster_label"])
     table.subheader(f"Pre-clustered Data — {display_df.shape[0]} rows, {display_df.shape[1]} cols")
     table.dataframe(display_df, use_container_width=True)
 
 else:
-    # ─── fresh-features branch ─────────────────────────────────────────────────
-    if "did_cluster" not in st.session_state:
-        st.session_state.did_cluster = False
-
-    if not st.session_state.did_cluster:
-        # show raw import only once
+    # ─── fresh-features branch ────────────────────────────────────────────────
+    if not st.session_state.get("did_cluster", False):
         display_df = raw_df.copy()
         table.subheader(f"Imported Data — {display_df.shape[0]} rows, {display_df.shape[1]} cols")
         table.dataframe(display_df, use_container_width=True)
@@ -123,7 +118,6 @@ else:
             st.session_state.color_col = color_col
             st.session_state.cluster_order = sorted(df[color_col].unique(), key=int)
 
-            # replace placeholder with clustered data
             display_df = df.drop(columns=["cluster_label"])
             table.subheader(
                 f"Clustered Data — {display_df.shape[0]} rows, {display_df.shape[1]} cols"
@@ -138,7 +132,6 @@ else:
         cluster_col = st.session_state.cluster_col
         color_col = st.session_state.color_col
 
-        # replace placeholder with clustered data
         display_df = df.drop(columns=["cluster_label"])
         table.subheader(f"Clustered Data — {display_df.shape[0]} rows, {display_df.shape[1]} cols")
         table.dataframe(display_df, use_container_width=True)
@@ -150,21 +143,22 @@ if "cluster_col" in locals():
 else:
     k_label = ""
 
-# ─── 5) PCA scores & loadings ───────────────────────────────────────────────────
+# ─── 5) PCA scores, loadings & PVE ─────────────────────────────────────────────
 if "cluster_col" not in locals() or cluster_col is None:
     cluster_col = st.session_state.get("cluster_col", None)
 
-pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC\d+", c)]
-has_scores = len(pcs) >= 2
+# always recompute PCA summary on the current df
+pca = compute_pca_summary(df=df, hue_column=cluster_col)
+scores = pca["scores"]
+loadings = pca["loadings"]
+pve = pca["pve"]
 
-if not has_scores:
-    pca = compute_pca_summary(df=df, hue_column=cluster_col)
-    scores = pca["scores"]
-    loadings = pca["loadings"]
-    df = pd.concat([df.reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
-    pcs = scores.columns.tolist()
-else:
-    loadings = None
+# drop any old PC columns (to avoid duplicates) and merge fresh scores
+old_pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC\d+", c)]
+if old_pcs:
+    df = df.drop(columns=old_pcs)
+df = pd.concat([df.reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
+pcs = scores.columns.tolist()
 
 # ─── 6) Hover formatting ───────────────────────────────────────────────────────
 hover_cols = [st.session_state.color_col] + pcs[:3]
@@ -184,7 +178,13 @@ if dim == "3D":
         index=0,
     )
 
-# only show loading-vector scale slider if we actually have loadings
+# build axis labels with PVE
+x_label = f"{pc_x} ({pve[pc_x]:.1%})"
+y_label = f"{pc_y} ({pve[pc_y]:.1%})"
+if dim == "3D":
+    z_label = f"{pc_z} ({pve[pc_z]:.1%})"
+
+# ─── Slider for loading-vector scale ────────────────────────────────────────────
 if loadings is not None:
     scale = st.sidebar.slider("Loading Vector Scale", 0.1, 5.0, 0.7, step=0.05)
 else:
@@ -215,6 +215,7 @@ if dim == "2D":
         height=900,
     )
     fig.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
+    fig.update_layout(xaxis_title=x_label, yaxis_title=y_label)
 
     if loadings is not None:
         span_x = df[pc_x].max() - df[pc_x].min()
@@ -257,8 +258,6 @@ if dim == "2D":
             fig.add_annotation(
                 x=x_end * 1.05,
                 y=y_end * 1.05,
-                xref="x",
-                yref="y",
                 showarrow=False,
                 text=feat,
                 font=dict(size=12, color="grey"),
@@ -279,6 +278,13 @@ else:  # 3D
         height=1000,
     )
     fig3d.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
+    fig3d.update_layout(
+        scene=dict(
+            xaxis_title=x_label,
+            yaxis_title=y_label,
+            zaxis_title=z_label,
+        )
+    )
 
     if loadings is not None:
         spans = [df[c].max() - df[c].min() for c in (pc_x, pc_y, pc_z)]
