@@ -58,8 +58,19 @@ if (
 # 1) No missing values
 if raw_df.isnull().any().any():
     st.error(
-        "Uploaded dataset contains missing values. "
+        "Error: Uploaded dataset contains missing values. "
         "Please upload a cleaned dataset with no missing values."
+    )
+    st.stop()
+
+# ─── Edge-case: bare feature-only imports not ready for modeling ───────────────
+numeric_cols = raw_df.select_dtypes(include="number").columns.tolist()
+has_cluster = any(re.search(r"cluster", c, re.I) for c in raw_df.columns)
+
+if not has_cluster and len(numeric_cols) < 2:
+    st.error(
+        "Error: This dataset isn’t ready for k-means: it needs at least two numeric feature columns. "
+        "Please upload a dataset with 2 or more numeric features."
     )
     st.stop()
 
