@@ -178,6 +178,11 @@ if dim == "3D":
         index=0,
     )
 
+# ─── Guards: require enough PCs for the chosen biplot dimension ───────────────
+if dim == "2D" and len(pcs) < 2:
+    st.error("Error: At least 2 principal components (PC1 and PC2) are required for a 2D biplot.")
+    st.stop()
+
 # build axis labels with PVE
 x_label = f"{pc_x} ({pve[pc_x]:.1%})"
 y_label = f"{pc_y} ({pve[pc_y]:.1%})"
