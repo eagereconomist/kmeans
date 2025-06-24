@@ -15,14 +15,13 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ─── Initialize dynamic uploader key ──────────────────────────────────────────
-if "uploader_count" not in st.session_state:
-    st.session_state.uploader_count = 0
-
 # ─── RESTART BUTTON ───────────────────────────────────────────────────────────
 if st.sidebar.button("Restart"):
     # bump uploader key so widget resets
-    st.session_state.uploader_count += 1
+    if "uploader_count" in st.session_state:
+        st.session_state.uploader_count += 1
+    else:
+        st.session_state.uploader_count = 0
     # clear clustering & PCA state
     for key in (
         "did_cluster",
@@ -41,7 +40,8 @@ if st.sidebar.button("Restart"):
 st.sidebar.title("Dashboard Settings")
 
 # ─── 2) Upload ─────────────────────────────────────────────────────────────────
-uploader_key = f"uploader_{st.session_state.uploader_count}"
+# cycle key on restart so uploader clears
+uploader_key = f"uploader_{st.session_state.get('uploader_count', 0)}"
 uploaded = st.sidebar.file_uploader(
     "Upload your own CSV",
     type="csv",
@@ -83,6 +83,7 @@ if (
     st.session_state.last_uploaded_name = uploaded.name
 
 # ─── Input validation ───────────────────────────────────────────────────────────
+# 1) No missing values
 if raw_df.isnull().any().any():
     st.error(
         "Error: Uploaded dataset contains missing values. "
@@ -90,6 +91,7 @@ if raw_df.isnull().any().any():
     )
     st.stop()
 
+# ─── Edge-case: bare feature-only imports not ready for modeling ───────────────
 numeric_cols = raw_df.select_dtypes(include="number").columns.tolist()
 has_cluster = any(re.search(r"cluster", c, re.I) for c in raw_df.columns)
 
@@ -100,7 +102,10 @@ if not has_cluster and len(numeric_cols) < 2:
     )
     st.stop()
 
+# 2) Numeric feature checks
+numeric_cols = raw_df.select_dtypes(include="number").columns.tolist()
 initial = [c for c in raw_df.columns if re.search(r"cluster", c, re.I)]
+
 if initial:
     feature_cols = [c for c in numeric_cols if c not in initial]
     if len(feature_cols) < 2:
@@ -117,19 +122,24 @@ else:
         )
         st.stop()
 
-# ─── Main app logic with general catchall ─────────────────────────────────────
+initial = [c for c in raw_df.columns if re.search(r"cluster", c, re.I)]
+
+# ─── Main app logic with general catch-all ─────────────────────────────────────
 try:
+    # ─── placeholder for the single table ─────────────────────────────────────
     display_df = raw_df.copy()
     table = st.empty()
     table.subheader(f"Imported Data — {display_df.shape[0]} rows, {display_df.shape[1]} cols")
     table.dataframe(display_df, use_container_width=True)
 
     if initial:
-        # Pre-clustered branch
+        # ─── Pre-clustered branch ───────────────────────────────────────────────
         df = raw_df.copy()
         cluster_col = initial[0]
+
         df[cluster_col] = df[cluster_col].astype(int)
         df["cluster_label"] = (df[cluster_col] + 1).astype(str)
+
         color_col = "cluster_label"
         st.session_state.color_col = color_col
         st.session_state.cluster_order = sorted(df[color_col].unique(), key=int)
@@ -140,8 +150,9 @@ try:
             f"Pre-clustered Data — {display_df.shape[0]} rows, {display_df.shape[1]} cols"
         )
         table.dataframe(display_df, use_container_width=True)
+
     else:
-        # Fresh-features branch
+        # ─── fresh-features branch ──────────────────────────────────────────
         if not st.session_state.get("did_cluster", False):
             display_df = raw_df.copy()
             table.subheader(
@@ -190,6 +201,7 @@ try:
             else:
                 st.info("Click **Run K-Means** on the left sidebar to continue.")
                 st.stop()
+
         else:
             df = st.session_state.df
             cluster_col = st.session_state.cluster_col
@@ -201,26 +213,43 @@ try:
             )
             table.dataframe(display_df, use_container_width=True)
 
-    # Derive k_label
-    parts = str(cluster_col).split("_")
-    k_label = parts[-1] if parts[-1].isdigit() else ""
+    # ─── 4) Derive k_label for titles ─────────────────────────────────────────
+    if "cluster_col" in locals():
+        parts = str(cluster_col).split("_")
+        k_label = parts[-1] if parts[-1].isdigit() else ""
+    else:
+        k_label = ""
 
-    # PCA & PVE
+    # ─── 5) PCA scores, loadings & PVE ────────────────────────────────────────
+    if "cluster_col" not in locals() or cluster_col is None:
+        cluster_col = st.session_state.get("cluster_col", None)
+
+    # always recompute PCA summary
     pca = compute_pca_summary(df=df, hue_column=cluster_col)
-    scores, loadings, pve = pca["scores"], pca["loadings"], pca["pve"]
+    scores = pca["scores"]
+    pve = pca["pve"]
+
+    # detect if user imported PC scores directly
+    imported_pcs = [c for c in raw_df.columns if re.fullmatch(r"(?i)PC\d+", c)]
+    if imported_pcs:
+        loadings = None  # skip loading vectors when clustering on imported PCs
+    else:
+        loadings = pca["loadings"]
+
+    # drop old PC columns and append fresh scores
     old_pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC\d+", c)]
     if old_pcs:
         df = df.drop(columns=old_pcs)
     df = pd.concat([df.reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
     pcs = scores.columns.tolist()
 
-    # Hover formatting
+    # ─── 6) Hover formatting ──────────────────────────────────────────────
     hover_cols = [st.session_state.color_col] + pcs[:3]
     hover_template = "Cluster = %{customdata[0]}"
     for i, pc in enumerate(hover_cols[1:], 1):
         hover_template += f"<br>{pc} = %{{customdata[{i}]:.3f}}"
 
-    # Plot controls
+    # ─── 7) Plot controls ─────────────────────────────────────────────────
     dim = st.sidebar.selectbox("Plot dimension", ["2D"] + (["3D"] if len(pcs) >= 3 else []))
     pc_x = st.sidebar.selectbox("X-Axis Principal Component", pcs, index=0)
     pc_y = st.sidebar.selectbox(
@@ -232,34 +261,32 @@ try:
             "Z-Axis Principal Component", [p for p in pcs if p not in (pc_x, pc_y)], index=0
         )
 
-    # Guards
+    # ─── Guards: require enough PCs ────────────────────────────────────────
     if dim == "2D" and len(pcs) < 2:
-        st.error("Error: At least 2 PCs required for 2D biplot.")
+        st.error("At least 2 PCs required for a 2D biplot.")
         st.stop()
     if dim == "3D" and len(pcs) < 3:
-        st.error("Error: At least 3 PCs required for 3D biplot.")
+        st.error("At least 3 PCs required for a 3D biplot.")
         st.stop()
 
-    # Axis labels
+    # ─── 8) Header & axis-labels ───────────────────────────────────────────
     x_label = f"{pc_x} ({pve[pc_x]:.1%})"
     y_label = f"{pc_y} ({pve[pc_y]:.1%})"
     if dim == "3D":
         z_label = f"{pc_z} ({pve[pc_z]:.1%})"
 
-    # Scale slider
-    scale = (
-        st.sidebar.slider("Loading Vector Scale", 0.1, 5.0, 0.7, step=0.05)
-        if loadings is not None
-        else None
-    )
-
-    # Header
     st.title("K-Means Clustering Dashboard")
     st.markdown(
         f"**Dataset:** `{uploaded.name}` — {display_df.shape[0]} rows, {display_df.shape[1]} cols"
     )
 
-    # Plot
+    # ─── slider only if loadings are present ─────────────────────────────────
+    if loadings is not None:
+        scale = st.sidebar.slider("Loading Vector Scale", 0.1, 5.0, 0.7, step=0.05)
+    else:
+        scale = None
+
+    # ─── 9) Plot ─────────────────────────────────────────────────────────
     common = dict(
         color=st.session_state.color_col,
         category_orders={st.session_state.color_col: st.session_state.cluster_order},
@@ -279,11 +306,14 @@ try:
         )
         fig.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
         fig.update_layout(xaxis_title=x_label, yaxis_title=y_label)
+
         if loadings is not None:
-            span_x, span_y = df[pc_x].max() - df[pc_x].min(), df[pc_y].max() - df[pc_y].min()
+            span_x = df[pc_x].max() - df[pc_x].min()
+            span_y = df[pc_y].max() - df[pc_y].min()
             vec = min(span_x, span_y) * scale
             for feat in loadings.columns:
-                x_end, y_end = loadings.at[pc_x, feat] * vec, loadings.at[pc_y, feat] * vec
+                x_end = loadings.at[pc_x, feat] * vec
+                y_end = loadings.at[pc_y, feat] * vec
                 fig.add_shape(
                     dict(
                         type="line",
@@ -336,15 +366,15 @@ try:
         fig3d.update_layout(
             scene=dict(xaxis_title=x_label, yaxis_title=y_label, zaxis_title=z_label)
         )
+
         if loadings is not None:
             spans = [df[c].max() - df[c].min() for c in (pc_x, pc_y, pc_z)]
-            vec, frac = min(spans) * scale, 0.1
+            vec = min(spans) * scale
+            frac = 0.1
             for feat in loadings.columns:
-                x_e, y_e, z_e = (
-                    loadings.at[pc_x, feat] * vec,
-                    loadings.at[pc_y, feat] * vec,
-                    loadings.at[pc_z, feat] * vec,
-                )
+                x_e = loadings.at[pc_x, feat] * vec
+                y_e = loadings.at[pc_y, feat] * vec
+                z_e = loadings.at[pc_z, feat] * vec
                 x_s, y_s, z_s = x_e * (1 - frac), y_e * (1 - frac), z_e * (1 - frac)
                 fig3d.add_trace(
                     go.Scatter3d(
