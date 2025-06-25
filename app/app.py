@@ -111,6 +111,12 @@ def show_dataset(df: pd.DataFrame):
 
 # first display
 show_dataset(raw_df)
+# ─── Cluster Diagnostics ──────────────────────────────────────
+st.sidebar.header("Cluster Diagnostics")
+max_k = st.sidebar.slider("Max Clusters (Diagnostics)", 3, 15, 10)
+show_inertia = st.sidebar.checkbox("Show Scree Plot", value=False)
+show_silhouette = st.sidebar.checkbox("Show Silhouette Plot", value=False)
+show_diag_data = st.sidebar.checkbox("Show Diagnostics Table", value=False)
 
 # ─── Model Settings ────────────────────────────────────────────────────────────
 st.sidebar.header("Model Settings")
@@ -121,12 +127,6 @@ init = st.sidebar.selectbox("Init Method", ["k-means++", "random"])
 use_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
 seed = st.sidebar.number_input("Random seed", min_value=0, value=42) if use_seed else None
 
-# ─── Cluster Diagnostics (always visible) ──────────────────────────────────────
-st.sidebar.header("Cluster Diagnostics")
-max_k = st.sidebar.slider("Max Clusters (Diagnostics)", 3, 15, 10)
-show_inertia = st.sidebar.checkbox("Show Scree Plot", value=False)
-show_silhouette = st.sidebar.checkbox("Show Silhouette Plot", value=False)
-show_diag_data = st.sidebar.checkbox("Show Diagnostics Table", value=False)
 
 # Compute diagnostics any time (before or after clustering)
 ks = list(range(1, max_k + 1))
