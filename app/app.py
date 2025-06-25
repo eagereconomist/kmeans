@@ -113,14 +113,14 @@ def show_dataset(df: pd.DataFrame):
 show_dataset(raw_df)
 # ─── Cluster Diagnostics ──────────────────────────────────────
 st.sidebar.header("Cluster Diagnostics")
-max_k = st.sidebar.slider("Max Clusters (Diagnostics)", 3, 15, 10)
+max_k = st.sidebar.slider("Max Clusters (Diagnostics)", 3, 20, 10)
 show_inertia = st.sidebar.checkbox("Show Scree Plot", value=False)
 show_silhouette = st.sidebar.checkbox("Show Silhouette Plot", value=False)
 show_diag_data = st.sidebar.checkbox("Show Diagnostics Table", value=False)
 
 # ─── Model Settings ────────────────────────────────────────────────────────────
 st.sidebar.header("Model Settings")
-n_clusters = st.sidebar.slider("Number of clusters", 2, 15, 3)
+n_clusters = st.sidebar.slider("Number of clusters", 2, 20, 3)
 n_init = st.sidebar.number_input("n_init (k-means)", min_value=1, value=50)
 algo = st.sidebar.selectbox("Algorithm Method", ["lloyd", "elkan"])
 init = st.sidebar.selectbox("Init Method", ["k-means++", "random"])
