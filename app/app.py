@@ -227,7 +227,19 @@ try:
                 # silhouette plot
                 if show_silhouette:
                     st.markdown("### Silhouette Score vs. k")
-                    st.line_chart(sil_ser.rename("silhouette_score"))
+                    sil_plot_df = sil_ser.reset_index().rename(
+                        columns={"index": "k", "silhouette_score": "silhouette_score"}
+                    )
+                    sil_plot_df = sil_plot_df[sil_plot_df["k"] >= 2]
+                    fig_sil = px.line(
+                        sil_plot_df,
+                        x="k",
+                        y="silhouette_score",
+                        markers=True,
+                        title="",
+                    )
+                    fig_sil.update_xaxes(tick0=2, dtick=1, tickformat="d")
+                    st.plotly_chart(fig_sil, use_container_width=True)
 
             if st.sidebar.button("Run K-Means"):
                 df = fit_kmeans(
