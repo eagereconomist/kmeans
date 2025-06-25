@@ -220,7 +220,9 @@ try:
                 # inertia plot
                 if show_inertia:
                     st.markdown("### Inertia vs. k")
-                    st.line_chart(pd.Series(inert_df.set_index("k")["inertia"], name="inertia"))
+                    fig_inertia = px.line(inert_df, x="k", y="inertia", markers=True, title="")
+                    fig_inertia.update_xaxes(dtick=1, tickformat="d")
+                    st.plotly_chart(fig_inertia, use_container_width=True)
 
                 # silhouette plot
                 if show_silhouette:
