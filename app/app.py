@@ -321,7 +321,7 @@ else:
             height=900,
         )
         fig.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
-        fig.update_layout(xaxis_title=x_label, yaxis_title=y_label)
+        fig.update_layout(title_font_size=24, xaxis_title=x_label, yaxis_title=y_label)
 
         if scale is not None:
             span_x = df[pc_x].max() - df[pc_x].min()
@@ -381,6 +381,7 @@ else:
         fig3d.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
         fig3d.update_layout(
             scene=dict(
+                title_font_size=24,
                 xaxis_title=x_label,
                 yaxis_title=y_label,
                 zaxis_title=z_label,
