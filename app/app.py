@@ -124,6 +124,13 @@ def show_dataset(df: pd.DataFrame):
 
 show_dataset(raw_df)
 
+# ─── Cluster Diagnostics ──────────────────────────────────────────────────────
+st.sidebar.header("Cluster Diagnostics")
+max_k = st.sidebar.slider("Max Clusters (Diagnostics)", 3, 20, 10)
+show_diag_data = st.sidebar.checkbox("Show Diagnostics Table", value=False)
+show_inertia = st.sidebar.checkbox("Show Scree Plot", value=False)
+show_silhouette = st.sidebar.checkbox("Show Silhouette Plot", value=False)
+
 # ─── Model Settings ────────────────────────────────────────────────────────────
 st.sidebar.header("Model Settings")
 n_clusters = st.sidebar.slider("Number of clusters", 2, 20, 3)
@@ -133,12 +140,6 @@ init = st.sidebar.selectbox("Init Method", ["k-means++", "random"])
 use_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
 seed = st.sidebar.number_input("Random seed", min_value=0, value=42) if use_seed else None
 
-# ─── Cluster Diagnostics ──────────────────────────────────────────────────────
-st.sidebar.header("Cluster Diagnostics")
-max_k = st.sidebar.slider("Max Clusters (Diagnostics)", 3, 20, 10)
-show_diag_data = st.sidebar.checkbox("Show Diagnostics Table", value=False)
-show_inertia = st.sidebar.checkbox("Show Scree Plot", value=False)
-show_silhouette = st.sidebar.checkbox("Show Silhouette Plot", value=False)
 
 # ─── Compute diagnostics ───────────────────────────────────────────────────────
 ks = list(range(1, max_k + 1))
@@ -380,12 +381,12 @@ else:
         )
         fig3d.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
         fig3d.update_layout(
+            title_font_size=24,
             scene=dict(
-                title_font_size=24,
                 xaxis_title=x_label,
                 yaxis_title=y_label,
                 zaxis_title=z_label,
-            )
+            ),
         )
 
         if scale is not None:
