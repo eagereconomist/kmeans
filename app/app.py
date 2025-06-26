@@ -18,7 +18,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
 st.title("K-Means Clustering Dashboard")
 
 # ─── RESTART BUTTON ───────────────────────────────────────────────────────────
@@ -89,15 +88,17 @@ if not has_cluster and len(numeric_cols) < 2:
 
 initial = [c for c in raw_df.columns if re.search(r"cluster", c, re.I)]
 if initial:
-    # pre-clustered: ensure at least two other numeric cols
     feature_cols = [c for c in numeric_cols if c not in initial]
     if len(feature_cols) < 2:
         st.error("Pre-clustered file must include ≥2 numeric feature columns aside from cluster.")
         st.stop()
 
-# ─── Main app logic ────────────────────────────────────────────────────────────
-st.markdown("## Imported Data")
+# ─── Detect pure PCA-scores file ────────────────────────────────────────────────
+imported_pcs = [c for c in raw_df.columns if re.fullmatch(r"(?i)PC\d+", c)]
+is_pca_scores_file = bool(imported_pcs) and set(imported_pcs) == set(raw_df.columns)
 
+# ─── Display imported data ─────────────────────────────────────────────────────
+st.markdown("## Imported Data")
 dataset_placeholder = st.empty()
 table_placeholder = st.empty()
 
@@ -109,9 +110,9 @@ def show_dataset(df: pd.DataFrame):
     table_placeholder.dataframe(df, use_container_width=True)
 
 
-# first display
 show_dataset(raw_df)
-# ─── Cluster Diagnostics ──────────────────────────────────────
+
+# ─── Cluster Diagnostics ──────────────────────────────────────────────────────
 st.sidebar.header("Cluster Diagnostics")
 max_k = st.sidebar.slider("Max Clusters (Diagnostics)", 3, 20, 10)
 show_inertia = st.sidebar.checkbox("Show Scree Plot", value=False)
@@ -127,8 +128,7 @@ init = st.sidebar.selectbox("Init Method", ["k-means++", "random"])
 use_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
 seed = st.sidebar.number_input("Random seed", min_value=0, value=42) if use_seed else None
 
-
-# Compute diagnostics any time (before or after clustering)
+# ─── Compute diagnostics any time ───────────────────────────────────────────────
 ks = list(range(1, max_k + 1))
 inert_df = compute_inertia_scores(
     df=raw_df,
@@ -159,10 +159,8 @@ if ks_sil:
     )
 else:
     sil_df = pd.DataFrame(columns=["silhouette_score"])
-
 sil_ser = sil_df["silhouette_score"].reindex(ks)
 
-# Diagnostics table
 if show_diag_data:
     diag_df = pd.DataFrame(
         {
@@ -174,14 +172,12 @@ if show_diag_data:
     st.markdown("#### Cluster Diagnostics Data")
     st.dataframe(diag_df.style.hide(axis="index"))
 
-# Scree plot
 if show_inertia:
     st.markdown("### Inertia vs. k")
     fig_i = px.line(inert_df, x="k", y="inertia", markers=True)
     fig_i.update_xaxes(dtick=1, tickformat="d")
     st.plotly_chart(fig_i, use_container_width=True)
 
-# Silhouette plot
 if show_silhouette:
     st.markdown("### Silhouette Score vs. k")
     sil_plot_df = sil_ser.reset_index().rename(
@@ -194,7 +190,7 @@ if show_silhouette:
 
 # ─── Run or Re-run K-Means ──────────────────────────────────────────────────────
 if st.sidebar.button("Run K-Means"):
-    df = fit_kmeans(
+    df_clustered = fit_kmeans(
         raw_df.copy(),
         k=n_clusters,
         feature_columns=None,
@@ -205,18 +201,18 @@ if st.sidebar.button("Run K-Means"):
         label_column="cluster",
     )
     col = f"cluster_{n_clusters}"
-    df[col] = df[col].astype(int)
-    df["cluster_label"] = (df[col] + 1).astype(str)
+    df_clustered[col] = df_clustered[col].astype(int)
+    df_clustered["cluster_label"] = (df_clustered[col] + 1).astype(str)
 
-    st.session_state.df = df
+    st.session_state.df = df_clustered
     st.session_state.cluster_col = col
     st.session_state.color_col = "cluster_label"
-    st.session_state.cluster_order = sorted(df["cluster_label"].unique(), key=int)
+    st.session_state.cluster_order = sorted(df_clustered["cluster_label"].unique(), key=int)
     st.session_state.did_cluster = True
 
-    display_df = df.drop(columns=["cluster_label"])
-    show_dataset(display_df)
+    show_dataset(df_clustered.drop(columns=["cluster_label"]))
 
+# ─── Determine df & cluster_col ────────────────────────────────────────────────
 if st.session_state.get("did_cluster", False):
     df = st.session_state.df.copy()
     cluster_col = st.session_state.cluster_col
@@ -224,212 +220,215 @@ else:
     df = raw_df.copy()
     cluster_col = None
 
-# ─── PCA & Biplot ────────────────────────────────────────────────────────────
-cluster_col = st.session_state.get("cluster_col", None)
-k_label = str(cluster_col).split("_")[-1] if cluster_col else ""
+# ─── PCA & Biplot (only after clustering) ─────────────────────────────────────
+if not st.session_state.get("did_cluster", False):
+    st.warning("Please run K-Means to view the PCA Biplot.")
+else:
+    # If user-uploaded pure PC-scores, compute PVE/CPVE from the scores
+    if is_pca_scores_file:
+        scores = raw_df.copy()
+        loadings = None
+        variances = scores.var(ddof=0)
+        pve = variances / variances.sum()
+        cpve = pve.cumsum()
+    else:
+        pca = compute_pca_summary(df=df, hue_column=cluster_col)
+        scores, loadings, pve, cpve = pca["scores"], pca["loadings"], pca["pve"], pca["cpve"]
 
-pca = compute_pca_summary(df=df, hue_column=cluster_col)
-scores, loadings, pve, cpve = pca["scores"], pca["loadings"], pca["pve"], pca["cpve"]
+    # Attach scores
+    old_pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC\d+", c)]
+    if old_pcs:
+        df = df.drop(columns=old_pcs)
+    df = pd.concat([df.reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
+    pcs = scores.columns.tolist()
 
-imported_pcs = [c for c in raw_df.columns if re.fullmatch(r"(?i)PC\\d+", c)]
-if imported_pcs:
-    loadings = None
+    # Hover template
+    hover_cols = [st.session_state.get("color_col")] + pcs[:3]
+    hover_template = "Cluster = %{customdata[0]}"
+    for i, pc in enumerate(pcs[:3], 1):
+        hover_template += f"<br>{pc} = %{{customdata[{i}]:.3f}}"
 
-old_pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC\\d+", c)]
-if old_pcs:
-    df = df.drop(columns=old_pcs)
-df = pd.concat([df.reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
-pcs = scores.columns.tolist()
-
-hover_cols = [st.session_state.get("color_col")] + pcs[:3]
-hover_template = "Cluster = %{customdata[0]}"
-for i, pc in enumerate(hover_cols[1:], 1):
-    hover_template += f"<br>{pc} = %{{customdata[{i}]:.3f}}"
-
-st.sidebar.header("PCA Output Options")
-show_scores = st.sidebar.checkbox("Show Principal Component Scores", value=False)
-show_loadings = st.sidebar.checkbox("Show Principal Component Loadings", value=False)
-show_pve = st.sidebar.checkbox("Show Proportional Variance Explained", value=False)
-show_cpve = st.sidebar.checkbox("Show Cumulative Variance Explained", value=False)
-
-dim = st.sidebar.selectbox("Plot dimension", ["2D"] + (["3D"] if len(pcs) >= 3 else []))
-pc_x = st.sidebar.selectbox("X-Axis Principal Component", pcs, index=0)
-pc_y = st.sidebar.selectbox("Y-Axis Principal Component", [p for p in pcs if p != pc_x], index=0)
-pc_z = None
-if dim == "3D":
-    pc_z = st.sidebar.selectbox(
-        "Z-Axis Principal Component", [p for p in pcs if p not in (pc_x, pc_y)], index=0
+    # ─── PCA Output Options ───────────────────────────────────────────────────
+    st.sidebar.header("PCA Output Options")
+    show_scores = st.sidebar.checkbox(
+        "Show Principal Component Scores", value=False, disabled=is_pca_scores_file
     )
+    show_loadings = st.sidebar.checkbox("Show Principal Component Loadings", value=False)
+    show_pve = st.sidebar.checkbox("Show Proportional Variance Explained", value=False)
+    show_cpve = st.sidebar.checkbox("Show Cumulative Variance Explained", value=False)
 
-if dim == "2D" and len(pcs) < 2:
-    st.error("At least 2 PCs required for a 2D biplot.")
-    st.stop()
-if dim == "3D" and len(pcs) < 3:
-    st.error("At least 3 PCs required for a 3D biplot.")
-    st.stop()
-
-x_label = f"{pc_x} ({pve[pc_x]:.1%})"
-y_label = f"{pc_y} ({pve[pc_y]:.1%})"
-if dim == "3D":
-    z_label = f"{pc_z} ({pve[pc_z]:.1%})"
-
-scale = (
-    st.sidebar.slider("Loading Vector Scale", 0.1, 5.0, 0.7, step=0.05)
-    if loadings is not None
-    else None
-)
-
-# only include when we've actually clustered
-common: dict = {}
-if st.session_state.get("did_cluster", False):
-    col = st.session_state["color_col"]
-    common = {
-        "color": col,
-        "category_orders": {col: st.session_state["cluster_order"]},
-        "custom_data": hover_cols,
-    }
-
-if dim == "2D":
-    fig = px.scatter(
-        df,
-        x=pc_x,
-        y=pc_y,
-        title=f"PCA Biplot Using {k_label} Clusters",
-        hover_data=None,
-        **common,
-        width=900,
-        height=900,
+    # Axes selection
+    dim = st.sidebar.selectbox("Plot dimension", ["2D"] + (["3D"] if len(pcs) >= 3 else []))
+    pc_x = st.sidebar.selectbox("X-Axis Principal Component", pcs, index=0)
+    pc_y = st.sidebar.selectbox(
+        "Y-Axis Principal Component", [p for p in pcs if p != pc_x], index=0
     )
-    fig.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
-    fig.update_layout(xaxis_title=x_label, yaxis_title=y_label)
+    pc_z = None
+    if dim == "3D":
+        pc_z = st.sidebar.selectbox(
+            "Z-Axis Principal Component", [p for p in pcs if p not in (pc_x, pc_y)], index=0
+        )
 
-    if loadings is not None:
-        span_x = df[pc_x].max() - df[pc_x].min()
-        span_y = df[pc_y].max() - df[pc_y].min()
-        vec = min(span_x, span_y) * scale
-        for feat in loadings.columns:
-            x_end = loadings.at[pc_x, feat] * vec
-            y_end = loadings.at[pc_y, feat] * vec
-            fig.add_shape(
-                dict(
-                    type="line",
-                    x0=0,
-                    y0=0,
-                    x1=x_end,
-                    y1=y_end,
+    # Axis labels
+    x_label = pc_x if pve.get(pc_x) is None else f"{pc_x} ({pve[pc_x]:.1%})"
+    y_label = pc_y if pve.get(pc_y) is None else f"{pc_y} ({pve[pc_y]:.1%})"
+    if dim == "3D":
+        z_label = pc_z if pve.get(pc_z) is None else f"{pc_z} ({pve[pc_z]:.1%})"
+
+    # Validate PC count
+    if dim == "2D" and len(pcs) < 2:
+        st.error("At least 2 PCs required for a 2D biplot.")
+        st.stop()
+    if dim == "3D" and len(pcs) < 3:
+        st.error("At least 3 PCs required for a 3D biplot.")
+        st.stop()
+
+    # Scale for loadings
+    scale = st.sidebar.slider("Loading Vector Scale", 0.1, 5.0, 0.7, step=0.05)
+
+    common = {}
+    if cluster_col:
+        common = {
+            "color": st.session_state["color_col"],
+            "category_orders": {st.session_state["color_col"]: st.session_state["cluster_order"]},
+            "custom_data": hover_cols,
+        }
+
+    # 2D biplot
+    if dim == "2D":
+        fig = px.scatter(
+            df,
+            x=pc_x,
+            y=pc_y,
+            title=f"PCA Biplot Using {cluster_col.split('_')[-1]} Clusters",
+            hover_data=None,
+            **common,
+            width=900,
+            height=900,
+        )
+        fig.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
+        fig.update_layout(xaxis_title=x_label, yaxis_title=y_label)
+
+        # draw loading vectors only when importing feature data
+        if not is_pca_scores_file:
+            span_x = df[pc_x].max() - df[pc_x].min()
+            span_y = df[pc_y].max() - df[pc_y].min()
+            vec = min(span_x, span_y) * scale
+            for feat in loadings.columns:
+                x_end = loadings.at[pc_x, feat] * vec
+                y_end = loadings.at[pc_y, feat] * vec
+                fig.add_shape(
+                    dict(
+                        type="line",
+                        x0=0,
+                        y0=0,
+                        x1=x_end,
+                        y1=y_end,
+                        xref="x",
+                        yref="y",
+                        line=dict(color="grey", width=2),
+                    )
+                )
+                fig.add_annotation(
+                    x=x_end,
+                    y=y_end,
+                    ax=0,
+                    ay=0,
                     xref="x",
                     yref="y",
-                    line=dict(color="grey", width=2),
+                    axref="x",
+                    ayref="y",
+                    showarrow=True,
+                    arrowhead=4,
+                    arrowcolor="grey",
+                    arrowwidth=2,
+                    arrowsize=1,
                 )
-            )
-            fig.add_annotation(
-                x=x_end,
-                y=y_end,
-                ax=0,
-                ay=0,
-                xref="x",
-                yref="y",
-                axref="x",
-                ayref="y",
-                showarrow=True,
-                arrowhead=4,
-                arrowcolor="grey",
-                arrowwidth=2,
-                arrowsize=1,
-            )
-            fig.add_annotation(
-                x=x_end * 1.05,
-                y=y_end * 1.05,
-                showarrow=False,
-                text=feat,
-                font=dict(size=12, color="grey"),
-            )
+                fig.add_annotation(
+                    x=x_end * 1.05,
+                    y=y_end * 1.05,
+                    showarrow=False,
+                    text=feat,
+                    font=dict(size=12, color="grey"),
+                )
+        st.plotly_chart(fig, use_container_width=True)
 
-    st.plotly_chart(fig, use_container_width=True)
-
-else:
-    fig3d = px.scatter_3d(
-        df,
-        x=pc_x,
-        y=pc_y,
-        z=pc_z,
-        title=f"3D PCA Biplot Using {k_label} Clusters",
-        hover_data=None,
-        **common,
-        width=1000,
-        height=1000,
-    )
-    fig3d.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
-    fig3d.update_layout(
-        scene=dict(
-            xaxis_title=x_label,
-            yaxis_title=y_label,
-            zaxis_title=z_label,
+    # 3D biplot
+    else:
+        fig3d = px.scatter_3d(
+            df,
+            x=pc_x,
+            y=pc_y,
+            z=pc_z,
+            title=f"3D PCA Biplot Using {cluster_col.split('_')[-1]} Clusters",
+            hover_data=None,
+            **common,
+            width=1000,
+            height=1000,
         )
-    )
-
-    if loadings is not None:
-        spans = [df[c].max() - df[c].min() for c in (pc_x, pc_y, pc_z)]
-        vec = min(spans) * scale
-        frac = 0.1
-
-        for feat in loadings.columns:
-            x_e = loadings.at[pc_x, feat] * vec
-            y_e = loadings.at[pc_y, feat] * vec
-            z_e = loadings.at[pc_z, feat] * vec
-            x_s, y_s, z_s = x_e * (1 - frac), y_e * (1 - frac), z_e * (1 - frac)
-
-            fig3d.add_trace(
-                go.Scatter3d(
-                    x=[0, x_s],
-                    y=[0, y_s],
-                    z=[0, z_s],
-                    mode="lines",
-                    line=dict(color="grey", width=2),
-                    showlegend=False,
-                    hoverinfo="skip",
+        fig3d.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
+        fig3d.update_layout(
+            scene=dict(xaxis_title=x_label, yaxis_title=y_label, zaxis_title=z_label)
+        )
+        if not is_pca_scores_file:
+            spans = [df[c].max() - df[c].min() for c in (pc_x, pc_y, pc_z)]
+            vec = min(spans) * scale
+            frac = 0.1
+            for feat in loadings.columns:
+                x_e = loadings.at[pc_x, feat] * vec
+                y_e = loadings.at[pc_y, feat] * vec
+                z_e = loadings.at[pc_z, feat] * vec
+                x_s, y_s, z_s = x_e * (1 - frac), y_e * (1 - frac), z_e * (1 - frac)
+                fig3d.add_trace(
+                    go.Scatter3d(
+                        x=[0, x_s],
+                        y=[0, y_s],
+                        z=[0, z_s],
+                        mode="lines",
+                        line=dict(color="grey", width=2),
+                        showlegend=False,
+                        hoverinfo="skip",
+                    )
                 )
-            )
-            fig3d.add_trace(
-                go.Cone(
-                    x=[x_s],
-                    y=[y_s],
-                    z=[z_s],
-                    u=[x_e - x_s],
-                    v=[y_e - y_s],
-                    w=[z_e - z_s],
-                    anchor="tail",
-                    showscale=False,
-                    colorscale=[[0, "grey"], [1, "grey"]],
-                    sizemode="absolute",
-                    sizeref=vec * frac,
+                fig3d.add_trace(
+                    go.Cone(
+                        x=[x_s],
+                        y=[y_s],
+                        z=[z_s],
+                        u=[x_e - x_s],
+                        v=[y_e - y_s],
+                        w=[z_e - z_s],
+                        anchor="tail",
+                        showscale=False,
+                        colorscale=[[0, "grey"], [1, "grey"]],
+                        sizemode="absolute",
+                        sizeref=vec * frac,
+                    )
                 )
-            )
-            fig3d.add_trace(
-                go.Scatter3d(
-                    x=[x_e],
-                    y=[y_e],
-                    z=[z_e],
-                    mode="text",
-                    text=[feat],
-                    textfont=dict(size=12, color="grey"),
-                    showlegend=False,
-                    hoverinfo="skip",
+                fig3d.add_trace(
+                    go.Scatter3d(
+                        x=[x_e],
+                        y=[y_e],
+                        z=[z_e],
+                        mode="text",
+                        text=[feat],
+                        textfont=dict(size=12, color="grey"),
+                        showlegend=False,
+                        hoverinfo="skip",
+                    )
                 )
-            )
+        st.plotly_chart(fig3d, use_container_width=True)
 
-    st.plotly_chart(fig3d, use_container_width=True)
-
-# ─── Optional PCA tables & charts ─────────────────────────────────────────
-if show_scores:
-    st.markdown("### PCA Scores")
-    st.dataframe(scores)
-if show_loadings and loadings is not None:
-    st.markdown("### PCA Loadings")
-    st.dataframe(loadings.T)
-if show_pve:
-    st.markdown("### Percentage of Variance Explained")
-    st.line_chart(pve)
-if show_cpve:
-    st.markdown("### Cumulative Variance Explained")
-    st.line_chart(cpve)
+    # ─── Optional PCA tables & charts ─────────────────────────────────────────
+    if show_scores:
+        st.markdown("### PCA Scores")
+        st.dataframe(scores, use_container_width=True)
+    if show_loadings:
+        st.markdown("### PCA Loadings")
+        st.dataframe(loadings.T, use_container_width=True)
+    if show_pve:
+        st.markdown("### Percentage of Variance Explained")
+        st.line_chart(pve)
+    if show_cpve:
+        st.markdown("### Cumulative Variance Explained")
+        st.line_chart(cpve)
