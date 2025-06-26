@@ -124,13 +124,6 @@ def show_dataset(df: pd.DataFrame):
 
 show_dataset(raw_df)
 
-# ─── Cluster Diagnostics ──────────────────────────────────────────────────────
-st.sidebar.header("Cluster Diagnostics")
-max_k = st.sidebar.slider("Max Clusters (Diagnostics)", 3, 20, 10)
-show_diag_data = st.sidebar.checkbox("Show Diagnostics Data Table", value=False)
-show_inertia = st.sidebar.checkbox("Show Scree Plot", value=False)
-show_silhouette = st.sidebar.checkbox("Show Silhouette Plot", value=False)
-
 # ─── Model Settings ────────────────────────────────────────────────────────────
 st.sidebar.header("Model Settings")
 n_clusters = st.sidebar.slider("Number of clusters", 2, 20, 3)
@@ -140,6 +133,12 @@ init = st.sidebar.selectbox("Init Method", ["k-means++", "random"])
 use_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
 seed = st.sidebar.number_input("Random seed", min_value=0, value=42) if use_seed else None
 
+# ─── Cluster Diagnostics ──────────────────────────────────────────────────────
+st.sidebar.header("Cluster Diagnostics")
+max_k = st.sidebar.slider("Max Clusters (Diagnostics)", 3, 20, 10)
+show_diag_data = st.sidebar.checkbox("Show Diagnostics Table", value=False)
+show_inertia = st.sidebar.checkbox("Show Scree Plot", value=False)
+show_silhouette = st.sidebar.checkbox("Show Silhouette Plot", value=False)
 
 # ─── Compute diagnostics ───────────────────────────────────────────────────────
 ks = list(range(1, max_k + 1))
@@ -202,7 +201,6 @@ if show_silhouette:
     st.plotly_chart(fig_s, use_container_width=True)
 
 # ─── Run or Re-run K-Means ──────────────────────────────────────────────────────
-# ⇢ now shows anytime the file wasn't pre-clustered, even if it's pure PC scores
 if not initial:
     if st.sidebar.button("Run K-Means"):
         df_clustered = fit_kmeans(
@@ -285,6 +283,12 @@ else:
             "Z-Axis Principal Component", [p for p in pcs if p not in (pc_x, pc_y)], index=0
         )
 
+    # only show the scale slider when the import is NOT pure PC--
+    if not is_pca_scores_file:
+        scale = st.sidebar.slider("Loading Vector Scale", 0.1, 5.0, 0.7, step=0.05)
+    else:
+        scale = None
+
     x_label = pc_x if pve.get(pc_x) is None else f"{pc_x} ({pve[pc_x]:.1%})"
     y_label = pc_y if pve.get(pc_y) is None else f"{pc_y} ({pve[pc_y]:.1%})"
     if dim == "3D":
@@ -296,8 +300,6 @@ else:
     if dim == "3D" and len(pcs) < 3:
         st.error("At least 3 PCs required for a 3D biplot.")
         st.stop()
-
-    scale = st.sidebar.slider("Loading Vector Scale", 0.1, 5.0, 0.7, step=0.05)
 
     common = {}
     if cluster_col:
@@ -321,7 +323,7 @@ else:
         fig.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
         fig.update_layout(xaxis_title=x_label, yaxis_title=y_label)
 
-        if not is_pca_scores_file:
+        if scale is not None:
             span_x = df[pc_x].max() - df[pc_x].min()
             span_y = df[pc_y].max() - df[pc_y].min()
             vec = min(span_x, span_y) * scale
@@ -385,7 +387,7 @@ else:
             )
         )
 
-        if not is_pca_scores_file:
+        if scale is not None:
             spans = [df[c].max() - df[c].min() for c in (pc_x, pc_y, pc_z)]
             vec = min(spans) * scale
             frac = 0.1
