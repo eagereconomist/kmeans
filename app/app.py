@@ -11,12 +11,6 @@ from tennis_racquet_analysis.evaluation_utils import (
     compute_inertia_scores,
     compute_silhouette_scores,
 )
-from tennis_racquet_analysis.cluster_prep_utils import (
-    merge_cluster_labels,
-    clusters_to_labels,
-    count_labels,
-    get_cluster_profiles,
-)
 
 # ─── 1) Page config ───────────────────────────────────────────────────────────
 st.set_page_config(
@@ -469,34 +463,72 @@ else:
 st.sidebar.header("Cluster Profiling")
 raw_prof = st.sidebar.file_uploader("Raw data (pre-standardized)", type="csv", key="prof_raw")
 clust_prof = st.sidebar.file_uploader("Cluster results CSV", type="csv", key="prof_clust")
+
 if raw_prof and clust_prof:
-    # load
-    raw_profile_df = pd.read_csv(raw_prof)
-    clust_profile_df = pd.read_csv(clust_prof)
-    # add unique_id
-    raw_profile_df["unique_id"] = raw_profile_df.index
-    clust_profile_df["unique_id"] = clust_profile_df.index
-    # choose cluster column
-    prof_col = st.sidebar.text_input(
-        "Cluster column name in results CSV", value=st.session_state.get("cluster_col", "")
+    raw_df = pd.read_csv(raw_prof)
+    clust_df = pd.read_csv(clust_prof)
+
+    # assign unique_id
+    raw_df["unique_id"] = raw_df.index
+    clust_df["unique_id"] = clust_df.index
+
+    # only columns matching "cluster" are valid here
+    cluster_opts = [c for c in clust_df.columns if re.search(r"cluster", c, re.I)]
+    if not cluster_opts:
+        st.error("No column matching 'cluster' found in your results CSV.")
+        st.stop()
+
+    # default to the one we used in-session if available
+    default = st.session_state.get("cluster_col")
+    prof_col = st.sidebar.selectbox(
+        "Which column is your cluster ID?",
+        cluster_opts,
+        index=cluster_opts.index(default) if default in cluster_opts else 0,
     )
-    # merge on unique_id
-    merged = merge_cluster_labels(raw_profile_df, clust_profile_df, prof_col)
-    # get labels mapping
-    mapping = {}
-    for cid in sorted(merged[prof_col].unique()):
-        mapping[cid] = st.sidebar.text_input(
-            f"Label for cluster {cid}", value=str(cid), key=f"lbl_{cid}"
-        )
-    merged["cluster_label"] = clusters_to_labels(merged[prof_col], mapping)
-    # show counts
-    counts_df = count_labels(merged["cluster_label"])
-    st.markdown("## Cluster Counts")
-    st.bar_chart(counts_df.set_index("cluster_label")["count"])
-    # show profiles
-    profiles = get_cluster_profiles(merged, prof_col)
-    st.markdown("## Cluster Profiles")
-    st.dataframe(profiles)
-    # download button
-    csv = profiles.to_csv(index=False).encode("utf-8")
-    st.download_button("Download cluster profiles", csv, "cluster_profiles.csv", "text/csv")
+
+    # merge on unique_id, bring in only that one cluster column
+    merged = (
+        raw_df.merge(clust_df[["unique_id", prof_col]], on="unique_id")
+        .rename(columns={prof_col: "cluster_label"})
+        .drop(columns=["unique_id"])
+    )
+
+    # coerce to int and then to str for nice grouping
+    merged["cluster_label"] = merged["cluster_label"].astype(int).astype(str)
+
+    # 1) Cluster counts
+    counts = (
+        merged["cluster_label"]
+        .value_counts()
+        .sort_index(key=lambda idx: idx.astype(int))  # sort by numeric cluster ID
+        .rename_axis("cluster_label")
+        .reset_index(name="count")
+    )
+    st.markdown("### Cluster Counts")
+    st.bar_chart(counts.set_index("cluster_label")["count"])
+
+    # 2) Summary‐stat selector (mean always on)
+    extra = st.sidebar.multiselect(
+        "Additional stats to include", ["median", "min", "max"], default=[]
+    )
+    stats = ["mean"] + extra
+
+    # inline helper, excludes PC* columns and the cluster_label itself
+    from pandas.api import types as pd_types
+
+    def _get_profiles(df, cluster_col, stats):
+        feats = [
+            c
+            for c in df.columns
+            if c != cluster_col
+            and pd_types.is_numeric_dtype(df[c])
+            and not re.fullmatch(r"PC\d+", c, flags=re.I)
+        ]
+        agg = df.groupby(cluster_col)[feats].agg(stats)
+        agg.columns = [f"{feat}_{stat}" for feat, stat in agg.columns]
+        return agg.reset_index()
+
+    profiles = _get_profiles(merged, "cluster_label", stats)
+
+    st.markdown("### Cluster Profiles")
+    st.dataframe(profiles, use_container_width=True)
