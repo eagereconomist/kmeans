@@ -11,6 +11,11 @@ from tennis_racquet_analysis.evaluation_utils import (
     compute_inertia_scores,
     compute_silhouette_scores,
 )
+from tennis_racquet_analysis.cluster_prep_utils import (
+    merge_cluster_labels,
+    clusters_to_labels,
+    count_labels,
+)
 
 # ─── 1) Page config ───────────────────────────────────────────────────────────
 st.set_page_config(
@@ -93,7 +98,6 @@ if initial:
     if len(feature_cols) < 2:
         st.error("Pre-clustered file must include ≥2 numeric feature columns aside from cluster.")
         st.stop()
-    # Treat pre-clustered file as already clustered and enforce 1-based labels
     df_pc = raw_df.copy()
     orig = df_pc[initial[0]].astype(int)
     labels = orig - orig.min() + 1
@@ -139,7 +143,6 @@ algo = st.sidebar.selectbox("Algorithm Method", ["lloyd", "elkan"])
 init = st.sidebar.selectbox("Init Method", ["k-means++", "random"])
 use_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
 seed = st.sidebar.number_input("Random seed", min_value=0, value=42) if use_seed else None
-
 
 # ─── Compute diagnostics ───────────────────────────────────────────────────────
 ks = list(range(1, max_k + 1))
@@ -248,8 +251,14 @@ else:
         cpve = pve.cumsum()
     else:
         pca = compute_pca_summary(df=df, hue_column=cluster_col)
-        scores, loadings, pve, cpve = pca["scores"], pca["loadings"], pca["pve"], pca["cpve"]
+        scores, loadings, pve, cpve = (
+            pca["scores"],
+            pca["loadings"],
+            pca["pve"],
+            pca["cpve"],
+        )
 
+    # combine scores
     old_pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC\d+", c)]
     if old_pcs:
         df = df.drop(columns=old_pcs)
@@ -284,7 +293,6 @@ else:
             "Z-Axis Principal Component", [p for p in pcs if p not in (pc_x, pc_y)], index=0
         )
 
-    # only show the scale slider when the import is NOT pure PC--
     if not is_pca_scores_file:
         scale = st.sidebar.slider("Loading Vector Scale", 0.1, 5.0, 0.7, step=0.05)
     else:
@@ -302,14 +310,13 @@ else:
         st.error("At least 3 PCs required for a 3D biplot.")
         st.stop()
 
-    common = {}
-    if cluster_col:
-        common = {
-            "color": st.session_state["color_col"],
-            "category_orders": {st.session_state["color_col"]: st.session_state["cluster_order"]},
-            "custom_data": hover_cols,
-        }
+    common = {
+        "color": st.session_state["color_col"],
+        "category_orders": {st.session_state["color_col"]: st.session_state["cluster_order"]},
+        "custom_data": hover_cols,
+    }
 
+    # ─── 2D biplot ───────────────────────────────────────────────────────────────
     if dim == "2D":
         fig = px.scatter(
             df,
@@ -323,8 +330,8 @@ else:
         )
         fig.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
         fig.update_layout(title_font_size=24, xaxis_title=x_label, yaxis_title=y_label)
-        fig.update_xaxes(title_font_size=17)
-        fig.update_yaxes(title_font_size=17)
+        fig.update_xaxes(title_font_size=17, tickfont_size=14)
+        fig.update_yaxes(title_font_size=17, tickfont_size=14)
 
         if scale is not None:
             span_x = df[pc_x].max() - df[pc_x].min()
@@ -334,16 +341,16 @@ else:
                 x_end = loadings.at[pc_x, feat] * vec
                 y_end = loadings.at[pc_y, feat] * vec
                 fig.add_shape(
-                    dict(
-                        type="line",
-                        x0=0,
-                        y0=0,
-                        x1=x_end,
-                        y1=y_end,
-                        xref="x",
-                        yref="y",
-                        line=dict(color="grey", width=2),
-                    )
+                    {
+                        "type": "line",
+                        "x0": 0,
+                        "y0": 0,
+                        "x1": x_end,
+                        "y1": y_end,
+                        "xref": "x",
+                        "yref": "y",
+                        "line": {"color": "grey", "width": 2},
+                    }
                 )
                 fig.add_annotation(
                     x=x_end,
@@ -369,6 +376,7 @@ else:
                 )
         st.plotly_chart(fig, use_container_width=True)
 
+    # ─── 3D biplot ───────────────────────────────────────────────────────────────
     else:
         fig3d = px.scatter_3d(
             df,
@@ -388,9 +396,9 @@ else:
                 xaxis_title=x_label,
                 yaxis_title=y_label,
                 zaxis_title=z_label,
-                xaxis=dict(title_font_size=17),
-                yaxis=dict(title_font_size=17),
-                zaxis=dict(title_font_size=17),
+                xaxis=dict(title_font_size=17, tickfont=dict(size=14)),
+                yaxis=dict(title_font_size=17, tickfont=dict(size=14)),
+                zaxis=dict(title_font_size=17, tickfont=dict(size=14)),
             ),
         )
 
@@ -455,3 +463,32 @@ else:
     if show_cpve:
         st.markdown("### Cumulative Variance Explained")
         st.line_chart(cpve)
+
+# ─── Cluster Profiling ─────────────────────────────────────────────────────────
+st.sidebar.header("Cluster Profiling")
+raw_prof = st.sidebar.file_uploader("Raw data (pre-standardized)", type="csv", key="prof_raw")
+clust_prof = st.sidebar.file_uploader("Cluster results CSV", type="csv", key="prof_clust")
+if raw_prof and clust_prof:
+    # load
+    raw_profile_df = pd.read_csv(raw_prof)
+    clust_profile_df = pd.read_csv(clust_prof)
+    # add unique_id
+    raw_profile_df["unique_id"] = raw_profile_df.index
+    clust_profile_df["unique_id"] = clust_profile_df.index
+    # merge on unique_id
+    merged = merge_cluster_labels(raw_profile_df, clust_profile_df, cluster_col)
+    # get labels mapping
+    mapping = {}
+    for cid in sorted(merged[cluster_col].unique()):
+        mapping[cid] = st.sidebar.text_input(
+            f"Label for cluster {cid}", value=str(cid), key=f"lbl_{cid}"
+        )
+    merged["cluster_label"] = clusters_to_labels(merged[cluster_col], mapping)
+    # show counts
+    st.markdown("### Cluster Counts")
+    counts_df = count_labels(merged["cluster_label"])
+    counts_df = counts_df.sort_values("count", ascending=False)
+    csv = counts_df.to_csv(index=False).encode("utf-8")
+    st.download_button("Download Cluster Counts", csv, "cluster_counts.csv", "text/csv")
+    st.bar_chart(counts_df.set_index("cluster_label")["count"])
+    # download button
