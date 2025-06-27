@@ -494,7 +494,7 @@ if raw_prof and clust_prof:
     )
 
     # coerce to int and then to str for nice grouping
-    merged["cluster_label"] = merged["cluster_label"].astype(int).astype(str)
+    merged["cluster_label"] = (merged["cluster_label"].astype(int) + 1).astype(str)
 
     # 1) Cluster counts
     counts = (
