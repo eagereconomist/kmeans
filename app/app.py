@@ -15,6 +15,7 @@ from tennis_racquet_analysis.cluster_prep_utils import (
     merge_cluster_labels,
     clusters_to_labels,
     count_labels,
+    get_cluster_profiles,
 )
 
 # ─── 1) Page config ───────────────────────────────────────────────────────────
@@ -475,20 +476,27 @@ if raw_prof and clust_prof:
     # add unique_id
     raw_profile_df["unique_id"] = raw_profile_df.index
     clust_profile_df["unique_id"] = clust_profile_df.index
+    # choose cluster column
+    prof_col = st.sidebar.text_input(
+        "Cluster column name in results CSV", value=st.session_state.get("cluster_col", "")
+    )
     # merge on unique_id
-    merged = merge_cluster_labels(raw_profile_df, clust_profile_df, cluster_col)
+    merged = merge_cluster_labels(raw_profile_df, clust_profile_df, prof_col)
     # get labels mapping
     mapping = {}
-    for cid in sorted(merged[cluster_col].unique()):
+    for cid in sorted(merged[prof_col].unique()):
         mapping[cid] = st.sidebar.text_input(
             f"Label for cluster {cid}", value=str(cid), key=f"lbl_{cid}"
         )
-    merged["cluster_label"] = clusters_to_labels(merged[cluster_col], mapping)
+    merged["cluster_label"] = clusters_to_labels(merged[prof_col], mapping)
     # show counts
-    st.markdown("### Cluster Counts")
     counts_df = count_labels(merged["cluster_label"])
-    counts_df = counts_df.sort_values("count", ascending=False)
-    csv = counts_df.to_csv(index=False).encode("utf-8")
-    st.download_button("Download Cluster Counts", csv, "cluster_counts.csv", "text/csv")
+    st.markdown("## Cluster Counts")
     st.bar_chart(counts_df.set_index("cluster_label")["count"])
+    # show profiles
+    profiles = get_cluster_profiles(merged, prof_col)
+    st.markdown("## Cluster Profiles")
+    st.dataframe(profiles)
     # download button
+    csv = profiles.to_csv(index=False).encode("utf-8")
+    st.download_button("Download cluster profiles", csv, "cluster_profiles.csv", "text/csv")
