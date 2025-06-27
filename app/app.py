@@ -529,6 +529,7 @@ if raw_prof and clust_prof:
         return agg.reset_index()
 
     profiles = _get_profiles(merged, "cluster_label", stats)
+    profiles = profiles.set_index("cluster_label")
 
     st.markdown("### Cluster Profiles")
     st.dataframe(profiles, use_container_width=True)
