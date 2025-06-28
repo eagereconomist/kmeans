@@ -47,10 +47,10 @@ uploaded = st.sidebar.file_uploader(
     "Upload your own CSV",
     type="csv",
     key=uploader_key,
-    help="Choose any local CSV to visualize",
+    help="Choose any local CSV to begin",
 )
 if not uploaded:
-    st.error("Please upload a CSV file to visualize.")
+    st.error("Please upload a CSV file to proceed.")
     st.stop()
 
 # derive base name for downloads
@@ -136,23 +136,23 @@ show_dataset(raw_df)
 show_model_settings = not initial and not is_pca_scores_file
 show_diagnostics = not initial and not is_pca_scores_file
 
-# ─── Model Settings ────────────────────────────────────────────────────────────
-if show_model_settings:
-    st.sidebar.header("Model Settings")
-    n_clusters = st.sidebar.slider("Number of clusters", 2, 20, 3)
-    n_init = st.sidebar.number_input("n_init (k-means)", min_value=1, value=50)
-    algo = st.sidebar.selectbox("Algorithm Method", ["lloyd", "elkan"])
-    init = st.sidebar.selectbox("Init Method", ["k-means++", "random"])
-    use_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
-    seed = st.sidebar.number_input("Random seed", min_value=0, value=42) if use_seed else None
-else:
-    # defaults so downstream code still runs
-    n_clusters = 3
-    n_init = 50
-    algo = "lloyd"
-    init = "k-means++"
-    use_seed = False
-    seed = None
+# Ensure model settings keys exist in session_state with defaults
+for key, default in [
+    ("n_clusters", 3),
+    ("n_init", 50),
+    ("algo", "lloyd"),
+    ("init", "k-means++"),
+    ("use_seed", False),
+    ("seed", 42),
+]:
+    st.session_state.setdefault(key, default)
+
+# Pull the current settings into local vars so diagnostics can use them
+n_clusters = st.session_state.n_clusters
+n_init = st.session_state.n_init
+algo = st.session_state.algo
+init = st.session_state.init
+seed = st.session_state.seed if st.session_state.use_seed else None
 
 # ─── Cluster Diagnostics ──────────────────────────────────────────────────────
 if show_diagnostics:
@@ -202,7 +202,7 @@ if show_diagnostics:
                 "silhouette": sil_ser.tolist(),
             }
         )
-        st.markdown("#### Cluster Diagnostics Data")
+        st.markdown("### Cluster Diagnostics Data")
         st.dataframe(diag_df.style.hide(axis="index"))
         st.sidebar.download_button(
             "Download Diagnostics",
@@ -227,14 +227,34 @@ if show_diagnostics:
         fig_s.update_xaxes(tick0=2, dtick=1, tickformat="d")
         st.plotly_chart(fig_s, use_container_width=True)
 else:
-    # define harmless defaults so nothing downstream breaks
+    # harmless defaults
     max_k = 10
-    show_diag_data = False
-    show_inertia = False
-    show_silhouette = False
+    show_diag_data = show_inertia = show_silhouette = False
     inert_df = pd.DataFrame()
     sil_df = pd.DataFrame()
     sil_ser = pd.Series(dtype=float)
+
+# ─── Model Settings ────────────────────────────────────────────────────────────
+if show_model_settings:
+    st.sidebar.header("Model Settings")
+    st.sidebar.slider("Number of clusters", 2, 20, key="n_clusters")
+    st.sidebar.number_input("n_init (k-means)", min_value=50, key="n_init")
+    st.sidebar.selectbox(
+        "Algorithm Method",
+        ["lloyd", "elkan"],
+        key="algo",
+    )
+    st.sidebar.selectbox(
+        "Init Method",
+        ["k-means++", "random"],
+        key="init",
+    )
+    st.sidebar.checkbox("Specify Random Seed", key="use_seed")
+    if st.session_state.use_seed:
+        st.sidebar.number_input(
+            "Random seed", min_value=0, value=st.session_state.seed, key="seed"
+        )
+
 
 # ─── Run or Re-run K-Means ─────────────────────────────────────────────────────
 if not initial:
@@ -366,14 +386,14 @@ else:
             df,
             x=pc_x,
             y=pc_y,
-            title=f"PC Biplot Using {cluster_col.split('_')[-1]} Clusters",
+            title=f"Principal Component Biplot Using {cluster_col.split('_')[-1]} Clusters",
             hover_data=None,
             **common,
             width=900,
             height=900,
         )
         fig.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
-        fig.update_layout(title_font_size=24, xaxis_title=x_label, yaxis_title=y_label)
+        fig.update_layout(title_font_size=27, xaxis_title=x_label, yaxis_title=y_label)
         fig.update_xaxes(title_font_size=17, tickfont_size=14)
         fig.update_yaxes(title_font_size=17, tickfont_size=14)
 
@@ -443,7 +463,7 @@ else:
             x=pc_x,
             y=pc_y,
             z=pc_z,
-            title=f"PC Biplot Using {cluster_col.split('_')[-1]} Clusters",
+            title=f"Principal Component Biplot Using {cluster_col.split('_')[-1]} Clusters",
             hover_data=None,
             **common,
             width=1000,
@@ -451,7 +471,7 @@ else:
         )
         fig3d.update_traces(hovertemplate=hover_template, selector=dict(mode="markers"))
         fig3d.update_layout(
-            title_font_size=24,
+            title_font_size=27,
             scene=dict(
                 xaxis_title=x_label,
                 yaxis_title=y_label,
@@ -512,10 +532,10 @@ else:
         st.plotly_chart(fig3d, use_container_width=True)
 
     if show_scores:
-        st.markdown("### PC Scores")
+        st.markdown("### Principal Component Scores")
         st.dataframe(scores, use_container_width=True)
     if show_loadings:
-        st.markdown("### PC Loadings")
+        st.markdown("### Principal Component Loadings")
         st.dataframe(loadings.T, use_container_width=True)
     if show_pve:
         st.markdown("### Percentage of Variance Explained")
