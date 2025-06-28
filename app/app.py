@@ -117,6 +117,15 @@ imported_pcs = [column for column in raw_df.columns if re.fullmatch(r"(?i)PC\d+"
 cluster_cols = [column for column in raw_df.columns if re.search(r"cluster", column, re.I)]
 is_pca_scores_file = bool(imported_pcs) and set(raw_df.columns) <= set(imported_pcs + cluster_cols)
 
+# ─── Detect PC-loadings file (rows == #PCs, but no other obs) ───────────────────
+is_pca_loadings_file = is_pca_scores_file and raw_df.shape[0] == len(imported_pcs)
+
+# ─── Flags for hiding controls ─────────────────────────────────────────────────
+# disable settings only for pre-clustered imports (initial) or PC-loadings
+show_model_settings = not initial and not is_pca_loadings_file
+# keep diagnostics disabled only for pre-clustered or pure PC-scores files
+show_diagnostics = not initial and not is_pca_scores_file
+
 # ─── Display imported data ─────────────────────────────────────────────────────
 st.markdown("## Imported Data")
 dataset_placeholder = st.empty()
@@ -131,10 +140,6 @@ def show_dataset(df: pd.DataFrame):
 
 
 show_dataset(raw_df)
-
-# ─── Flags for hiding controls ─────────────────────────────────────────────────
-show_model_settings = not initial and not is_pca_scores_file
-show_diagnostics = not initial and not is_pca_scores_file
 
 # Ensure model settings keys exist in session_state with defaults
 for key, default in [
@@ -162,74 +167,92 @@ if show_diagnostics:
     show_inertia = st.sidebar.checkbox("Show Scree Plot", value=False)
     show_silhouette = st.sidebar.checkbox("Show Silhouette Plot", value=False)
 
-    ks = list(range(1, max_k + 1))
-    inert_df = compute_inertia_scores(
-        df=raw_df,
-        k_range=ks,
-        feature_columns=numeric_cols,
-        init=init,
-        n_init=n_init,
-        random_state=seed,
-        algorithm=algo,
-    )
-    inert_df["k"] = inert_df["k"].astype(int)
+    try:
+        ks = list(range(1, max_k + 1))
+        inert_df = compute_inertia_scores(
+            df=raw_df,
+            k_range=ks,
+            feature_columns=numeric_cols,
+            init=init,
+            n_init=n_init,
+            random_state=seed,
+            algorithm=algo,
+        )
+        inert_df["k"] = inert_df["k"].astype(int)
 
-    ks_sil = [k for k in ks if k >= 2]
-    if ks_sil:
-        sil_df = (
-            compute_silhouette_scores(
-                df=raw_df,
-                k_values=ks_sil,
-                feature_columns=numeric_cols,
-                init=init,
-                n_init=n_init,
-                random_state=seed,
-                algorithm=algo,
+        ks_sil = [k for k in ks if k >= 2]
+        if ks_sil:
+            sil_df = (
+                compute_silhouette_scores(
+                    df=raw_df,
+                    k_values=ks_sil,
+                    feature_columns=numeric_cols,
+                    init=init,
+                    n_init=n_init,
+                    random_state=seed,
+                    algorithm=algo,
+                )
+                .rename(columns={"n_clusters": "k"})
+                .assign(k=lambda d: d["k"].astype(int))
+                .set_index("k")
             )
-            .rename(columns={"n_clusters": "k"})
-            .assign(k=lambda d: d["k"].astype(int))
-            .set_index("k")
-        )
-    else:
-        sil_df = pd.DataFrame(columns=["silhouette_score"])
-    sil_ser = sil_df["silhouette_score"].reindex(ks)
+        else:
+            sil_df = pd.DataFrame(columns=["silhouette_score"])
+        sil_ser = sil_df["silhouette_score"].reindex(ks)
 
-    if show_diag_data:
-        diag_df = pd.DataFrame(
-            {
-                "k": ks,
-                "inertia": inert_df.set_index("k").reindex(ks)["inertia"].tolist(),
-                "silhouette": sil_ser.tolist(),
-            }
-        )
-        st.markdown("### Cluster Diagnostics Data")
-        st.dataframe(diag_df.style.hide(axis="index"))
-        st.sidebar.download_button(
-            "Download Diagnostics",
-            diag_df.to_csv(index=False),
-            file_name=f"{base_name}_diagnostics_k{max_k}.csv",
-            mime="text/csv",
-        )
+        # diagnostics table
+        if show_diag_data:
+            diag_df = pd.DataFrame(
+                {
+                    "k": ks,
+                    "inertia": inert_df.set_index("k").reindex(ks)["inertia"].tolist(),
+                    "silhouette": sil_ser.tolist(),
+                }
+            )
+            st.markdown("#### Cluster Diagnostics Data")
+            st.dataframe(diag_df.style.hide(axis="index"))
+            st.sidebar.download_button(
+                "Download Diagnostics",
+                diag_df.to_csv(index=False),
+                file_name=f"{base_name}_diagnostics_k{max_k}.csv",
+                mime="text/csv",
+            )
 
-    if show_inertia:
-        st.markdown("### Inertia vs. k")
-        fig_i = px.line(inert_df, x="k", y="inertia", markers=True)
-        fig_i.update_xaxes(dtick=1, tickformat="d")
-        st.plotly_chart(fig_i, use_container_width=True)
+        # inertia plot
+        if show_inertia:
+            st.markdown("### Inertia vs. k")
+            fig_i = px.line(inert_df, x="k", y="inertia", markers=True)
+            fig_i.update_xaxes(dtick=1, tickformat="d")
+            st.plotly_chart(fig_i, use_container_width=True)
 
-    if show_silhouette:
-        st.markdown("### Silhouette Score vs. k")
-        sil_plot_df = sil_ser.reset_index().rename(
-            columns={"index": "k", "silhouette_score": "silhouette_score"}
-        )
-        sil_plot_df = sil_plot_df[sil_plot_df["k"] >= 2]
-        fig_s = px.line(sil_plot_df, x="k", y="silhouette_score", markers=True)
-        fig_s.update_xaxes(tick0=2, dtick=1, tickformat="d")
-        st.plotly_chart(fig_s, use_container_width=True)
+        # silhouette plot
+        if show_silhouette:
+            st.markdown("### Silhouette Score vs. k")
+            sil_plot_df = sil_ser.reset_index().rename(
+                columns={"index": "k", "silhouette_score": "silhouette_score"}
+            )
+            sil_plot_df = sil_plot_df[sil_plot_df["k"] >= 2]
+            fig_s = px.line(sil_plot_df, x="k", y="silhouette_score", markers=True)
+            fig_s.update_xaxes(tick0=2, dtick=1, tickformat="d")
+            st.plotly_chart(fig_s, use_container_width=True)
+
+    except ValueError as e:
+        st.error(f"Could not compute diagnostics from imported data: {e}")
+        # fallback dummies so downstream code won't error
+        max_k = 10
+        show_diag_data = False
+        show_inertia = False
+        show_silhouette = False
+        inert_df = pd.DataFrame()
+        sil_df = pd.DataFrame()
+        sil_ser = pd.Series(dtype=float)
+
 else:
-    # harmless defaults
+    # diagnostics hidden
     max_k = 10
-    show_diag_data = show_inertia = show_silhouette = False
+    show_diag_data = False
+    show_inertia = False
+    show_silhouette = False
     inert_df = pd.DataFrame()
     sil_df = pd.DataFrame()
     sil_ser = pd.Series(dtype=float)
@@ -296,7 +319,8 @@ if show_model_settings:
                 mime="text/csv",
             )
 else:
-    st.sidebar.info("K-Means disabled for PCA-loadings or pre-clustered imports.")
+    reason = "pre-clustered import" if initial else "PC-loadings import"
+    st.sidebar.info(f"K-Means disabled for {reason}.")
 
 # ─── Determine df & cluster_col ────────────────────────────────────────────────
 if st.session_state.get("did_cluster", False):
