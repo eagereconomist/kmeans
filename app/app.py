@@ -78,6 +78,9 @@ except Exception:
     st.error("Error parsing the CSV. Please ensure it's well-formed.")
     st.stop()
 
+# assign a unique ID for each row
+raw_df["unique_id"] = raw_df.index.astype(str)
+
 if st.session_state.get("last_uploaded_name") != uploaded.name:
     st.session_state.did_cluster = False
     st.session_state.last_uploaded_name = uploaded.name
@@ -361,9 +364,9 @@ else:
     df = pd.concat([df.reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
     pcs = scores.columns.tolist()
 
-    hover_cols = [st.session_state.get("color_col")] + pcs[:3]
-    hover_template = "Cluster = %{customdata[0]}"
-    for i, pc in enumerate(pcs[:3], 1):
+    hover_cols = ["unique_id", st.session_state.get("color_col")] + pcs[:3]
+    hover_template = "ID = %{customdata[0]}<br>Cluster = %{customdata[1]}"
+    for i, pc in enumerate(pcs[:3], start=2):
         hover_template += f"<br>{pc} = %{{customdata[{i}]:.3f}}"
 
     st.sidebar.header("PCA Output Options")
