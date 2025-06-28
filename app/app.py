@@ -1,3 +1,4 @@
+import os
 import re
 
 import streamlit as st
@@ -52,6 +53,9 @@ if not uploaded:
     st.error("Please upload a CSV file to visualize.")
     st.stop()
 
+# derive base name for downloads
+base_name = os.path.splitext(uploaded.name)[0]
+
 # ─── Reset clustering state on new upload ──────────────────────────────────────
 if st.session_state.get("last_upload") != uploaded.name:
     st.session_state.last_upload = uploaded.name
@@ -84,17 +88,19 @@ if raw_df.isnull().any().any():
     st.stop()
 
 numeric_cols = raw_df.select_dtypes(include="number").columns.tolist()
-has_cluster = any(re.search(r"cluster", c, re.I) for c in raw_df.columns)
+has_cluster = any(re.search(r"cluster", cluster, re.I) for cluster in raw_df.columns)
 if not has_cluster and len(numeric_cols) < 2:
-    st.error("Need at least two numeric feature columns for k-means.")
+    st.error("Need at least two numeric feature columns for K-Means.")
     st.stop()
 
 # ─── Pre-clustered detection ───────────────────────────────────────────────────
-initial = [c for c in raw_df.columns if re.search(r"cluster", c, re.I)]
+initial = [cluster for cluster in raw_df.columns if re.search(r"cluster", cluster, re.I)]
 if initial:
-    feature_cols = [c for c in numeric_cols if c not in initial]
+    feature_cols = [cluster for cluster in numeric_cols if cluster not in initial]
     if len(feature_cols) < 2:
-        st.error("Pre-clustered file must include ≥2 numeric feature columns aside from cluster.")
+        st.error(
+            "Pre-clustered file must include 2 or more numeric feature columns aside from the cluster column."
+        )
         st.stop()
     df_pc = raw_df.copy()
     orig = df_pc[initial[0]].astype(int)
@@ -107,8 +113,8 @@ if initial:
     st.session_state.did_cluster = True
 
 # ─── Detect pure PCA-scores file ────────────────────────────────────────────────
-imported_pcs = [c for c in raw_df.columns if re.fullmatch(r"(?i)PC\d+", c)]
-cluster_cols = [c for c in raw_df.columns if re.search(r"cluster", c, re.I)]
+imported_pcs = [column for column in raw_df.columns if re.fullmatch(r"(?i)PC\d+", column)]
+cluster_cols = [column for column in raw_df.columns if re.search(r"cluster", column, re.I)]
 is_pca_scores_file = bool(imported_pcs) and set(raw_df.columns) <= set(imported_pcs + cluster_cols)
 
 # ─── Display imported data ─────────────────────────────────────────────────────
@@ -140,6 +146,7 @@ if show_model_settings:
     use_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
     seed = st.sidebar.number_input("Random seed", min_value=0, value=42) if use_seed else None
 else:
+    # defaults so downstream code still runs
     n_clusters = 3
     n_init = 50
     algo = "lloyd"
@@ -197,6 +204,12 @@ if show_diagnostics:
         )
         st.markdown("#### Cluster Diagnostics Data")
         st.dataframe(diag_df.style.hide(axis="index"))
+        st.sidebar.download_button(
+            "Download Diagnostics",
+            diag_df.to_csv(index=False),
+            file_name=f"{base_name}_diagnostics_k{max_k}.csv",
+            mime="text/csv",
+        )
 
     if show_inertia:
         st.markdown("### Inertia vs. k")
@@ -249,6 +262,13 @@ if not initial:
         st.session_state.did_cluster = True
 
         show_dataset(df_clustered.drop(columns=["cluster_label"]))
+        export_df = df_clustered.drop(columns=["cluster_label"])
+        st.sidebar.download_button(
+            "Download Clustered Data",
+            export_df.to_csv(index=False),
+            file_name=f"{base_name}_cluster_{n_clusters}.csv",
+            mime="text/csv",
+        )
 
 # ─── Determine df & cluster_col ────────────────────────────────────────────────
 if st.session_state.get("did_cluster", False):
@@ -257,6 +277,11 @@ if st.session_state.get("did_cluster", False):
 else:
     df = raw_df.copy()
     cluster_col = None
+
+# ─── Always refresh the table with the current df ───────────────────────────────
+# (drop the helper column if present)
+to_show = df.drop(columns=["cluster_label"]) if "cluster_label" in df.columns else df
+show_dataset(to_show)
 
 # ─── PCA & Biplot (only after clustering) ──────────────────────────────────────
 if not st.session_state.get("did_cluster", False):
@@ -278,7 +303,7 @@ else:
         )
 
     # combine scores with original df
-    old_pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC\d+", c)]
+    old_pcs = [column for column in df.columns if re.fullmatch(r"(?i)PC\d+", column)]
     if old_pcs:
         df = df.drop(columns=old_pcs)
     df = pd.concat([df.reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
@@ -304,12 +329,12 @@ else:
     dim = st.sidebar.selectbox("Plot dimension", ["2D"] + (["3D"] if len(pcs) >= 3 else []))
     pc_x = st.sidebar.selectbox("X-Axis Principal Component", pcs, index=0)
     pc_y = st.sidebar.selectbox(
-        "Y-Axis Principal Component", [p for p in pcs if p != pc_x], index=0
+        "Y-Axis Principal Component", [pc for pc in pcs if pc != pc_x], index=0
     )
     pc_z = None
     if dim == "3D":
         pc_z = st.sidebar.selectbox(
-            "Z-Axis Principal Component", [p for p in pcs if p not in (pc_x, pc_y)], index=0
+            "Z-Axis Principal Component", [pc for pc in pcs if pc not in (pc_x, pc_y)], index=0
         )
 
     if not is_pca_scores_file:
@@ -335,12 +360,13 @@ else:
         "custom_data": hover_cols,
     }
 
+    # 2D PC Biplot
     if dim == "2D":
         fig = px.scatter(
             df,
             x=pc_x,
             y=pc_y,
-            title=f"PCA Biplot Using {cluster_col.split('_')[-1]} Clusters",
+            title=f"PC Biplot Using {cluster_col.split('_')[-1]} Clusters",
             hover_data=None,
             **common,
             width=900,
@@ -350,6 +376,22 @@ else:
         fig.update_layout(title_font_size=24, xaxis_title=x_label, yaxis_title=y_label)
         fig.update_xaxes(title_font_size=17, tickfont_size=14)
         fig.update_yaxes(title_font_size=17, tickfont_size=14)
+
+        if show_scores:
+            st.download_button(
+                "Download PC Scores",
+                scores.to_csv(index=False),
+                file_name=f"{base_name}_pc_scores.csv",
+                mime="text/csv",
+            )
+        if show_loadings:
+            loadings_df = loadings.T.reset_index().rename(columns={"index": "component"})
+            st.download_button(
+                "Download PC Loadings",
+                loadings_df.to_csv(index=False),
+                file_name=f"{base_name}_pc_loadings.csv",
+                mime="text/csv",
+            )
 
         if scale is not None:
             span_x = df[pc_x].max() - df[pc_x].min()
@@ -394,13 +436,14 @@ else:
                 )
         st.plotly_chart(fig, use_container_width=True)
 
+    # 3D PC Biplot
     else:
         fig3d = px.scatter_3d(
             df,
             x=pc_x,
             y=pc_y,
             z=pc_z,
-            title=f"PCA Biplot Using {cluster_col.split('_')[-1]} Clusters",
+            title=f"PC Biplot Using {cluster_col.split('_')[-1]} Clusters",
             hover_data=None,
             **common,
             width=1000,
@@ -420,7 +463,7 @@ else:
         )
 
         if scale is not None:
-            spans = [df[c].max() - df[c].min() for c in (pc_x, pc_y, pc_z)]
+            spans = [df[column].max() - df[column].min() for column in (pc_x, pc_y, pc_z)]
             vec = min(spans) * scale
             frac = 0.1
             for feat in loadings.columns:
@@ -469,10 +512,10 @@ else:
         st.plotly_chart(fig3d, use_container_width=True)
 
     if show_scores:
-        st.markdown("### PCA Scores")
+        st.markdown("### PC Scores")
         st.dataframe(scores, use_container_width=True)
     if show_loadings:
-        st.markdown("### PCA Loadings")
+        st.markdown("### PC Loadings")
         st.dataframe(loadings.T, use_container_width=True)
     if show_pve:
         st.markdown("### Percentage of Variance Explained")
@@ -483,7 +526,7 @@ else:
 
 # ─── Cluster Profiling ─────────────────────────────────────────────────────────
 st.sidebar.header("Cluster Profiling")
-raw_prof = st.sidebar.file_uploader("Raw data (pre-standardized)", type="csv", key="prof_raw")
+raw_prof = st.sidebar.file_uploader("Raw data (pre-processed)", type="csv", key="prof_raw")
 clust_prof = st.sidebar.file_uploader("Cluster results CSV", type="csv", key="prof_clust")
 
 if raw_prof and clust_prof:
@@ -493,7 +536,7 @@ if raw_prof and clust_prof:
     raw_df["unique_id"] = raw_df.index
     clust_df["unique_id"] = clust_df.index
 
-    cluster_opts = [c for c in clust_df.columns if re.search(r"cluster", c, re.I)]
+    cluster_opts = [column for column in clust_df.columns if re.search(r"cluster", column, re.I)]
     if not cluster_opts:
         st.error("No column matching 'cluster' found in your results CSV.")
         st.stop()
@@ -523,7 +566,7 @@ if raw_prof and clust_prof:
     st.bar_chart(counts.set_index("cluster_label")["count"])
 
     extra = st.sidebar.multiselect(
-        "Additional stats to include", ["median", "min", "max"], default=[]
+        "Additional summary statistics to include", ["median", "min", "max"], default=[]
     )
     stats = ["mean"] + extra
 
@@ -531,11 +574,11 @@ if raw_prof and clust_prof:
 
     def _get_profiles(df, cluster_col, stats):
         feats = [
-            c
-            for c in df.columns
-            if c != cluster_col
-            and pd_types.is_numeric_dtype(df[c])
-            and not re.fullmatch(r"PC\d+", c, flags=re.I)
+            column
+            for column in df.columns
+            if column != cluster_col
+            and pd_types.is_numeric_dtype(df[column])
+            and not re.fullmatch(r"PC\d+", column, flags=re.I)
         ]
         agg = df.groupby(cluster_col)[feats].agg(stats)
         agg.columns = [f"{feat}_{stat}" for feat, stat in agg.columns]
@@ -544,3 +587,9 @@ if raw_prof and clust_prof:
     profiles = _get_profiles(merged, "cluster_label", stats).set_index("cluster_label")
     st.markdown("### Cluster Profiles")
     st.dataframe(profiles, use_container_width=True)
+    st.sidebar.download_button(
+        "Download Cluster Profiles",
+        profiles.reset_index().to_csv(index=False),
+        file_name=f"{base_name}_profiles.csv",
+        mime="text/csv",
+    )
