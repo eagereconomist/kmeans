@@ -257,38 +257,46 @@ if show_model_settings:
 
 
 # ─── Run or Re-run K-Means ─────────────────────────────────────────────────────
-if not initial:
+if show_model_settings:
     if st.sidebar.button("Run K-Means"):
-        df_clustered = fit_kmeans(
-            raw_df.copy(),
-            k=n_clusters,
-            feature_columns=None,
-            init=init,
-            n_init=n_init,
-            random_state=seed,
-            algorithm=algo,
-            label_column="cluster",
-        )
-        col = f"cluster_{n_clusters}"
-        df_clustered[col] = df_clustered[col].astype(int)
-        df_clustered["cluster_label"] = (df_clustered[col] + 1).astype(str)
+        try:
+            df_clustered = fit_kmeans(
+                raw_df.copy(),
+                k=n_clusters,
+                feature_columns=None,
+                init=init,
+                n_init=n_init,
+                random_state=seed,
+                algorithm=algo,
+                label_column="cluster",
+            )
+        except Exception:
+            st.error(
+                "An error occurred during K-Means clustering. Please verify your data and settings."
+            )
+        else:
+            col = f"cluster_{n_clusters}"
+            df_clustered[col] = df_clustered[col].astype(int)
+            df_clustered["cluster_label"] = (df_clustered[col] + 1).astype(str)
 
-        st.session_state.df = df_clustered
-        st.session_state.cluster_col = col
-        st.session_state.color_col = "cluster_label"
-        st.session_state.cluster_order = [
-            str(i) for i in sorted(df_clustered["cluster_label"].astype(int).unique())
-        ]
-        st.session_state.did_cluster = True
+            st.session_state.df = df_clustered
+            st.session_state.cluster_col = col
+            st.session_state.color_col = "cluster_label"
+            st.session_state.cluster_order = [
+                str(i) for i in sorted(df_clustered["cluster_label"].astype(int).unique())
+            ]
+            st.session_state.did_cluster = True
 
-        show_dataset(df_clustered.drop(columns=["cluster_label"]))
-        export_df = df_clustered.drop(columns=["cluster_label"])
-        st.sidebar.download_button(
-            "Download Clustered Data",
-            export_df.to_csv(index=False),
-            file_name=f"{base_name}_cluster_{n_clusters}.csv",
-            mime="text/csv",
-        )
+            show_dataset(df_clustered.drop(columns=["cluster_label"]))
+            export_df = df_clustered.drop(columns=["cluster_label"])
+            st.sidebar.download_button(
+                "Download Clustered Data",
+                export_df.to_csv(index=False),
+                file_name=f"{base_name}_cluster_{n_clusters}.csv",
+                mime="text/csv",
+            )
+else:
+    st.sidebar.info("K-Means disabled for PCA-loadings or pre-clustered imports.")
 
 # ─── Determine df & cluster_col ────────────────────────────────────────────────
 if st.session_state.get("did_cluster", False):
