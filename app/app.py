@@ -44,17 +44,17 @@ st.sidebar.title("Dashboard Settings")
 # ─── 2) Upload ─────────────────────────────────────────────────────────────────
 uploader_key = f"uploader_{st.session_state.get('uploader_count', 0)}"
 uploaded = st.sidebar.file_uploader(
-    "Upload your own CSV",
-    type="csv",
+    "Upload your own data",
+    type=["csv", "tsv", "txt", "xlsx", "xls", "parquet", "json"],
     key=uploader_key,
-    help="Choose any local CSV to begin",
+    help="Choose any local data file to begin",
 )
 if not uploaded:
-    st.error("Please upload a CSV file to proceed.")
+    st.error("Please upload a data file to proceed.")
     st.stop()
 
 # derive base name for downloads
-base_name = os.path.splitext(uploaded.name)[0]
+base_name, ext = os.path.splitext(uploaded.name.lower())
 
 # ─── Reset clustering state on new upload ──────────────────────────────────────
 if st.session_state.get("last_upload") != uploaded.name:
@@ -71,11 +71,25 @@ if st.session_state.get("last_upload") != uploaded.name:
     ):
         st.session_state.pop(key, None)
 
-# ─── Safe CSV parsing ──────────────────────────────────────────────────────────
+# ─── Safe file parsing ──────────────────────────────────────────────────────────
 try:
-    raw_df = pd.read_csv(uploaded)
-except Exception:
-    st.error("Error parsing the CSV. Please ensure it's well-formed.")
+    if ext in (".csv", ".txt"):
+        # assume comma-delimited unless it's .tsv
+        sep = "\t" if ext == ".tsv" else ","
+        raw_df = pd.read_csv(uploaded, sep=sep)
+    elif ext == ".tsv":
+        raw_df = pd.read_csv(uploaded, sep="\t")
+    elif ext in (".xlsx", ".xls"):
+        raw_df = pd.read_excel(uploaded)
+    elif ext == ".parquet":
+        raw_df = pd.read_parquet(uploaded)
+    elif ext == ".json":
+        raw_df = pd.read_json(uploaded)
+    else:
+        st.error(f"Unsupported file type: {ext}")
+        st.stop()
+except Exception as e:
+    st.error(f"Error reading `{uploaded.name}`: {e}")
     st.stop()
 
 # assign a unique ID for each row
