@@ -118,7 +118,8 @@ if initial:
 # ─── Detect pure PCA-scores file ────────────────────────────────────────────────
 imported_pcs = [column for column in raw_df.columns if re.fullmatch(r"(?i)PC\d+", column)]
 cluster_cols = [column for column in raw_df.columns if re.search(r"cluster", column, re.I)]
-is_pca_scores_file = bool(imported_pcs) and set(raw_df.columns) <= set(imported_pcs + cluster_cols)
+cols_without_id = set(raw_df.columns) - {"unique_id"}
+is_pca_scores_file = bool(imported_pcs) and cols_without_id <= set(imported_pcs + cluster_cols)
 
 # ─── Detect PC-loadings file (rows == #PCs, but no other obs) ───────────────────
 is_pca_loadings_file = is_pca_scores_file and raw_df.shape[0] == len(imported_pcs)
