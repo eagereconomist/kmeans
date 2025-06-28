@@ -43,7 +43,10 @@ st.sidebar.title("Dashboard Settings")
 # ─── 2) Upload ─────────────────────────────────────────────────────────────────
 uploader_key = f"uploader_{st.session_state.get('uploader_count', 0)}"
 uploaded = st.sidebar.file_uploader(
-    "Upload your own CSV", type="csv", key=uploader_key, help="Choose any local CSV to visualize"
+    "Upload your own CSV",
+    type="csv",
+    key=uploader_key,
+    help="Choose any local CSV to visualize",
 )
 if not uploaded:
     st.error("Please upload a CSV file to visualize.")
@@ -123,83 +126,104 @@ def show_dataset(df: pd.DataFrame):
 
 show_dataset(raw_df)
 
-# ─── Cluster Diagnostics ──────────────────────────────────────────────────────
-st.sidebar.header("Cluster Diagnostics")
-max_k = st.sidebar.slider("Max Clusters (Diagnostics)", 3, 20, 10)
-show_diag_data = st.sidebar.checkbox("Show Diagnostics Table", value=False)
-show_inertia = st.sidebar.checkbox("Show Scree Plot", value=False)
-show_silhouette = st.sidebar.checkbox("Show Silhouette Plot", value=False)
+# ─── Flags for hiding controls ─────────────────────────────────────────────────
+show_model_settings = not initial and not is_pca_scores_file
+show_diagnostics = not initial and not is_pca_scores_file
 
 # ─── Model Settings ────────────────────────────────────────────────────────────
-st.sidebar.header("Model Settings")
-n_clusters = st.sidebar.slider("Number of clusters", 2, 20, 3)
-n_init = st.sidebar.number_input("n_init (k-means)", min_value=1, value=50)
-algo = st.sidebar.selectbox("Algorithm Method", ["lloyd", "elkan"])
-init = st.sidebar.selectbox("Init Method", ["k-means++", "random"])
-use_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
-seed = st.sidebar.number_input("Random seed", min_value=0, value=42) if use_seed else None
-
-# ─── Compute diagnostics ───────────────────────────────────────────────────────
-ks = list(range(1, max_k + 1))
-inert_df = compute_inertia_scores(
-    df=raw_df,
-    k_range=ks,
-    feature_columns=numeric_cols,
-    init=init,
-    n_init=n_init,
-    random_state=seed,
-    algorithm=algo,
-)
-inert_df["k"] = inert_df["k"].astype(int)
-
-ks_sil = [k for k in ks if k >= 2]
-if ks_sil:
-    sil_df = (
-        compute_silhouette_scores(
-            df=raw_df,
-            k_values=ks_sil,
-            feature_columns=numeric_cols,
-            init=init,
-            n_init=n_init,
-            random_state=seed,
-            algorithm=algo,
-        )
-        .rename(columns={"n_clusters": "k"})
-        .assign(k=lambda d: d["k"].astype(int))
-        .set_index("k")
-    )
+if show_model_settings:
+    st.sidebar.header("Model Settings")
+    n_clusters = st.sidebar.slider("Number of clusters", 2, 20, 3)
+    n_init = st.sidebar.number_input("n_init (k-means)", min_value=1, value=50)
+    algo = st.sidebar.selectbox("Algorithm Method", ["lloyd", "elkan"])
+    init = st.sidebar.selectbox("Init Method", ["k-means++", "random"])
+    use_seed = st.sidebar.checkbox("Specify Random Seed", value=False)
+    seed = st.sidebar.number_input("Random seed", min_value=0, value=42) if use_seed else None
 else:
-    sil_df = pd.DataFrame(columns=["silhouette_score"])
-sil_ser = sil_df["silhouette_score"].reindex(ks)
+    n_clusters = 3
+    n_init = 50
+    algo = "lloyd"
+    init = "k-means++"
+    use_seed = False
+    seed = None
 
-if show_diag_data:
-    diag_df = pd.DataFrame(
-        {
-            "k": ks,
-            "inertia": inert_df.set_index("k").reindex(ks)["inertia"].tolist(),
-            "silhouette": sil_ser.tolist(),
-        }
+# ─── Cluster Diagnostics ──────────────────────────────────────────────────────
+if show_diagnostics:
+    st.sidebar.header("Cluster Diagnostics")
+    max_k = st.sidebar.slider("Max Clusters (Diagnostics)", 3, 20, 10)
+    show_diag_data = st.sidebar.checkbox("Show Diagnostics Table", value=False)
+    show_inertia = st.sidebar.checkbox("Show Scree Plot", value=False)
+    show_silhouette = st.sidebar.checkbox("Show Silhouette Plot", value=False)
+
+    ks = list(range(1, max_k + 1))
+    inert_df = compute_inertia_scores(
+        df=raw_df,
+        k_range=ks,
+        feature_columns=numeric_cols,
+        init=init,
+        n_init=n_init,
+        random_state=seed,
+        algorithm=algo,
     )
-    st.markdown("#### Cluster Diagnostics Data")
-    st.dataframe(diag_df.style.hide(axis="index"))
+    inert_df["k"] = inert_df["k"].astype(int)
 
-if show_inertia:
-    st.markdown("### Inertia vs. k")
-    fig_i = px.line(inert_df, x="k", y="inertia", markers=True)
-    fig_i.update_xaxes(dtick=1, tickformat="d")
-    st.plotly_chart(fig_i, use_container_width=True)
+    ks_sil = [k for k in ks if k >= 2]
+    if ks_sil:
+        sil_df = (
+            compute_silhouette_scores(
+                df=raw_df,
+                k_values=ks_sil,
+                feature_columns=numeric_cols,
+                init=init,
+                n_init=n_init,
+                random_state=seed,
+                algorithm=algo,
+            )
+            .rename(columns={"n_clusters": "k"})
+            .assign(k=lambda d: d["k"].astype(int))
+            .set_index("k")
+        )
+    else:
+        sil_df = pd.DataFrame(columns=["silhouette_score"])
+    sil_ser = sil_df["silhouette_score"].reindex(ks)
 
-if show_silhouette:
-    st.markdown("### Silhouette Score vs. k")
-    sil_plot_df = sil_ser.reset_index().rename(
-        columns={"index": "k", "silhouette_score": "silhouette_score"}
-    )
-    sil_plot_df = sil_plot_df[sil_plot_df["k"] >= 2]
-    fig_s = px.line(sil_plot_df, x="k", y="silhouette_score", markers=True)
-    fig_s.update_xaxes(tick0=2, dtick=1, tickformat="d")
-    st.plotly_chart(fig_s, use_container_width=True)
+    if show_diag_data:
+        diag_df = pd.DataFrame(
+            {
+                "k": ks,
+                "inertia": inert_df.set_index("k").reindex(ks)["inertia"].tolist(),
+                "silhouette": sil_ser.tolist(),
+            }
+        )
+        st.markdown("#### Cluster Diagnostics Data")
+        st.dataframe(diag_df.style.hide(axis="index"))
 
-# ─── Run or Re-run K-Means ──────────────────────────────────────────────────────
+    if show_inertia:
+        st.markdown("### Inertia vs. k")
+        fig_i = px.line(inert_df, x="k", y="inertia", markers=True)
+        fig_i.update_xaxes(dtick=1, tickformat="d")
+        st.plotly_chart(fig_i, use_container_width=True)
+
+    if show_silhouette:
+        st.markdown("### Silhouette Score vs. k")
+        sil_plot_df = sil_ser.reset_index().rename(
+            columns={"index": "k", "silhouette_score": "silhouette_score"}
+        )
+        sil_plot_df = sil_plot_df[sil_plot_df["k"] >= 2]
+        fig_s = px.line(sil_plot_df, x="k", y="silhouette_score", markers=True)
+        fig_s.update_xaxes(tick0=2, dtick=1, tickformat="d")
+        st.plotly_chart(fig_s, use_container_width=True)
+else:
+    # define harmless defaults so nothing downstream breaks
+    max_k = 10
+    show_diag_data = False
+    show_inertia = False
+    show_silhouette = False
+    inert_df = pd.DataFrame()
+    sil_df = pd.DataFrame()
+    sil_ser = pd.Series(dtype=float)
+
+# ─── Run or Re-run K-Means ─────────────────────────────────────────────────────
 if not initial:
     if st.sidebar.button("Run K-Means"):
         df_clustered = fit_kmeans(
@@ -253,7 +277,7 @@ else:
             pca["cpve"],
         )
 
-    # combine scores
+    # combine scores with original df
     old_pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC\d+", c)]
     if old_pcs:
         df = df.drop(columns=old_pcs)
@@ -311,7 +335,6 @@ else:
         "custom_data": hover_cols,
     }
 
-    # ─── 2D biplot ───────────────────────────────────────────────────────────────
     if dim == "2D":
         fig = px.scatter(
             df,
@@ -345,7 +368,7 @@ else:
                         "xref": "x",
                         "yref": "y",
                         "line": {"color": "grey", "width": 2},
-                    }
+                    },
                 )
                 fig.add_annotation(
                     x=x_end,
@@ -371,7 +394,6 @@ else:
                 )
         st.plotly_chart(fig, use_container_width=True)
 
-    # ─── 3D biplot ───────────────────────────────────────────────────────────────
     else:
         fig3d = px.scatter_3d(
             df,
@@ -468,17 +490,14 @@ if raw_prof and clust_prof:
     raw_df = pd.read_csv(raw_prof)
     clust_df = pd.read_csv(clust_prof)
 
-    # assign unique_id
     raw_df["unique_id"] = raw_df.index
     clust_df["unique_id"] = clust_df.index
 
-    # only columns matching "cluster" are valid here
     cluster_opts = [c for c in clust_df.columns if re.search(r"cluster", c, re.I)]
     if not cluster_opts:
         st.error("No column matching 'cluster' found in your results CSV.")
         st.stop()
 
-    # default to the one we used in-session if available
     default = st.session_state.get("cluster_col")
     prof_col = st.sidebar.selectbox(
         "Which column is your cluster ID?",
@@ -486,34 +505,28 @@ if raw_prof and clust_prof:
         index=cluster_opts.index(default) if default in cluster_opts else 0,
     )
 
-    # merge on unique_id, bring in only that one cluster column
     merged = (
         raw_df.merge(clust_df[["unique_id", prof_col]], on="unique_id")
         .rename(columns={prof_col: "cluster_label"})
         .drop(columns=["unique_id"])
     )
-
-    # coerce to int and then to str for nice grouping
     merged["cluster_label"] = (merged["cluster_label"].astype(int) + 1).astype(str)
 
-    # 1) Cluster counts
     counts = (
         merged["cluster_label"]
         .value_counts()
-        .sort_index(key=lambda idx: idx.astype(int))  # sort by numeric cluster ID
+        .sort_index(key=lambda idx: idx.astype(int))
         .rename_axis("cluster_label")
         .reset_index(name="count")
     )
     st.markdown("### Cluster Counts")
     st.bar_chart(counts.set_index("cluster_label")["count"])
 
-    # 2) Summary‐stat selector (mean always on)
     extra = st.sidebar.multiselect(
         "Additional stats to include", ["median", "min", "max"], default=[]
     )
     stats = ["mean"] + extra
 
-    # inline helper, excludes PC* columns and the cluster_label itself
     from pandas.api import types as pd_types
 
     def _get_profiles(df, cluster_col, stats):
@@ -528,8 +541,6 @@ if raw_prof and clust_prof:
         agg.columns = [f"{feat}_{stat}" for feat, stat in agg.columns]
         return agg.reset_index()
 
-    profiles = _get_profiles(merged, "cluster_label", stats)
-    profiles = profiles.set_index("cluster_label")
-
+    profiles = _get_profiles(merged, "cluster_label", stats).set_index("cluster_label")
     st.markdown("### Cluster Profiles")
     st.dataframe(profiles, use_container_width=True)
