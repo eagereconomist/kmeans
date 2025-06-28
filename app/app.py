@@ -565,6 +565,13 @@ if raw_prof and clust_prof:
     st.markdown("### Cluster Counts")
     st.bar_chart(counts.set_index("cluster_label")["count"])
 
+    st.sidebar.download_button(
+        "Download Cluster Counts",
+        counts.to_csv(index=False),
+        file_name=f"{base_name}_cluster_counts.csv",
+        mime="text/csv",
+    )
+
     extra = st.sidebar.multiselect(
         "Additional summary statistics to include", ["median", "min", "max"], default=[]
     )
