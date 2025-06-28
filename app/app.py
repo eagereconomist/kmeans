@@ -366,7 +366,7 @@ else:
     pcs = scores.columns.tolist()
 
     hover_cols = ["unique_id", st.session_state.get("color_col")] + pcs[:3]
-    hover_template = "ID = %{customdata[0]}<br>Cluster = %{customdata[1]}"
+    hover_template = "Unique ID = %{customdata[0]}<br>Cluster = %{customdata[1]}"
     for i, pc in enumerate(pcs[:3], start=2):
         hover_template += f"<br>{pc} = %{{customdata[{i}]:.3f}}"
 
