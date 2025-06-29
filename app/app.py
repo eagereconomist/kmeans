@@ -162,7 +162,7 @@ def show_dataset(df: pd.DataFrame):
     dataset_placeholder.markdown(
         f"**Dataset:** `{uploaded.name}` — {df.shape[0]} rows, {df.shape[1]} cols"
     )
-    table_placeholder.dataframe(df, use_container_width=True)
+    table_placeholder.dataframe(df.set_index("unique_id"), use_container_width=True)
 
 
 show_dataset(raw_df)
@@ -274,7 +274,7 @@ if show_diagnostics:
                 diag_df["silhouette"] = sil_ser.values[: len(diag_df)]
 
             st.markdown("#### Cluster Diagnostics Data")
-            st.dataframe(diag_df.style.hide(axis="index"))
+            st.dataframe(diag_df)
             st.sidebar.download_button(
                 "Download Diagnostics",
                 diag_df.to_csv(index=False),
@@ -659,7 +659,7 @@ if raw_prof and clust_prof:
         st.stop()
 
     default = st.session_state.get("cluster_col")
-    prof_col = st.sidebar.selectbox("Which column is your cluster ID?", cluster_opts, ...)
+    prof_col = st.sidebar.selectbox("Which column is your cluster ID?", cluster_opts)
 
     extra = st.sidebar.multiselect(
         "Additional summary statistics to include", ["median", "min", "max"], default=[]
@@ -674,6 +674,16 @@ if raw_prof and clust_prof:
             .drop(columns=["unique_id"])
         )
         merged["cluster_label"] = (merged["cluster_label"].astype(int) + 1).astype(str)
+
+        counts = (
+            merged["cluster_label"]
+            .value_counts()
+            .sort_index(key=lambda idx: idx.astype(int))
+            .rename_axis("cluster_label")
+            .reset_index(name="count")
+        )
+        st.markdown("### Cluster Counts")
+        st.bar_chart(counts.set_index("cluster_label")["count"])
 
         progress_bar.progress(40, text="Calculating Cluster Summary Statistics...")
 
@@ -697,8 +707,15 @@ if raw_prof and clust_prof:
         progress_bar.empty()
         st.error(f"Cluster profiling failed: {e}")
     else:
+        st.sidebar.download_button(
+            "Download Cluster Counts",
+            counts.reset_index().to_csv(index=False),
+            file_name=f"{base_name}_counts.csv",
+            mime="text/csv",
+        )
+
         st.markdown("### Cluster Profiles")
-        st.dataframe(profiles, use_container_width=True)
+        st.dataframe(profiles.T, use_container_width=True)
         st.sidebar.download_button(
             "Download Cluster Profiles",
             profiles.reset_index().to_csv(index=False),
