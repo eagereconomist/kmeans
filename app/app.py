@@ -218,7 +218,12 @@ init = st.session_state.init
 seed = st.session_state.seed if st.session_state.use_seed else None
 
 # ─── Cluster Diagnostics ──────────────────────────────────────────────────────
-show_diagnostics = st.sidebar.checkbox("Run Clustering Diagnostics", value=False)
+# only hide diagnostics for pre-clustered feature imports (initial)
+# or PC-loadings files (no raw obs, just loading vectors)
+if not initial and not is_pca_loadings_file:
+    show_diagnostics = st.sidebar.checkbox("Run Clustering Diagnostics", value=False)
+else:
+    show_diagnostics = False
 
 if show_diagnostics:
     st.sidebar.header("Cluster Diagnostics")
@@ -271,7 +276,6 @@ if show_diagnostics:
                     )
                 else:
                     sil_df = pd.DataFrame(columns=["silhouette_score"])
-
                 sil_ser = sil_df["silhouette_score"].reindex(ks)
             else:
                 sil_df = pd.DataFrame()
@@ -284,7 +288,6 @@ if show_diagnostics:
             inert_df = pd.DataFrame()
             sil_df = pd.DataFrame()
             sil_ser = pd.Series(dtype=float)
-
         finally:
             progress_bar.empty()
 
