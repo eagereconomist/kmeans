@@ -1,4 +1,5 @@
 import os
+import io
 import re
 
 import streamlit as st
@@ -6,6 +7,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+from pandas.api import types as pd_types
 from tennis_racquet_analysis.modeling.kmeans_utils import fit_kmeans
 from tennis_racquet_analysis.preprocessing_utils import compute_pca_summary
 from tennis_racquet_analysis.evaluation_utils import (
@@ -45,7 +47,7 @@ st.sidebar.title("Dashboard Settings")
 uploader_key = f"uploader_{st.session_state.get('uploader_count', 0)}"
 uploaded = st.sidebar.file_uploader(
     "Upload your own data",
-    type=["csv", "tsv", "txt", "xlsx", "xls", "parquet", "json"],
+    type=["csv", "txt", "xlsx", "xls"],
     key=uploader_key,
     help="Choose any local data file to begin",
 )
@@ -55,6 +57,42 @@ if not uploaded:
 
 # derive base name for downloads
 base_name, ext = os.path.splitext(uploaded.name.lower())
+
+# ─── New: Download format selector ─────────────────────────────────────────────
+download_format = st.sidebar.selectbox(
+    "Download format",
+    ["csv", "txt", "xlsx", "xls"],
+    index=0,
+    help="Choose the file format for all downloads",
+)
+
+
+def make_download(df: pd.DataFrame, name: str, key: str):
+    fname = f"{name}.{download_format}"
+    if download_format == "csv":
+        data = df.to_csv(index=False).encode("utf-8")
+        mime = "text/csv"
+    elif download_format == "txt":
+        data = df.to_csv(sep=",", index=False).encode("utf-8")
+        mime = "text/tab-separated-values"
+    elif download_format == "xlsx":
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False)
+        data = buf.getvalue()
+        mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    else:
+        st.error(f"Unsupported format: {download_format}")
+        return
+
+    st.sidebar.download_button(
+        f"Download (.{download_format})",
+        data,
+        file_name=fname,
+        mime=mime,
+        key=key,
+    )
+
 
 # ─── Reset clustering state on new upload ──────────────────────────────────────
 if st.session_state.get("last_upload") != uploaded.name:
@@ -76,16 +114,10 @@ progress_bar = st.progress(0, text="Reading file...")
 
 try:
     if ext in (".csv", ".txt"):
-        sep = "\t" if ext == ".tsv" else ","
+        sep = ","
         raw_df = pd.read_csv(uploaded, sep=sep)
-    elif ext == ".tsv":
-        raw_df = pd.read_csv(uploaded, sep="\t")
     elif ext in (".xlsx", ".xls"):
         raw_df = pd.read_excel(uploaded)
-    elif ext == ".parquet":
-        raw_df = pd.read_parquet(uploaded)
-    elif ext == ".json":
-        raw_df = pd.read_json(uploaded)
     else:
         raise ValueError(f"Unsupported file type: {ext}")
 
@@ -273,14 +305,15 @@ if show_diagnostics:
             if not sil_ser.empty:
                 diag_df["silhouette"] = sil_ser.values[: len(diag_df)]
 
+            if show_diagnostics:
+                make_download(
+                    diag_df,
+                    f"{base_name}_diagnostics_k{max_k}",
+                    f"download_diagnostics_{download_format}",
+                )
+
             st.markdown("#### Cluster Diagnostics Data")
             st.dataframe(diag_df)
-            st.sidebar.download_button(
-                "Download Diagnostics",
-                diag_df.to_csv(index=False),
-                file_name=f"{base_name}_diagnostics_k{max_k}.csv",
-                mime="text/csv",
-            )
 
     # ─── Inertia Plot ─────────────────────────────────────────────────────────────
     if show_inertia:
@@ -357,7 +390,6 @@ if show_model_settings:
             col = f"cluster_{n_clusters}"
             df_clustered[col] = df_clustered[col].astype(int)
             df_clustered["cluster_label"] = (df_clustered[col] + 1).astype(str)
-
             st.session_state.df = df_clustered
             st.session_state.cluster_col = col
             st.session_state.color_col = "cluster_label"
@@ -365,18 +397,20 @@ if show_model_settings:
                 str(i) for i in sorted(df_clustered["cluster_label"].astype(int).unique())
             ]
             st.session_state.did_cluster = True
-
             show_dataset(df_clustered.drop(columns=["cluster_label"]))
-            export_df = df_clustered.drop(columns=["cluster_label"])
-            st.sidebar.download_button(
-                "Download Clustered Data",
-                export_df.to_csv(index=False),
-                file_name=f"{base_name}_cluster_{n_clusters}.csv",
-                mime="text/csv",
-            )
+
+# ─── Download Clustering Results ────────────────────────────────────────────────
+if st.session_state.get("did_cluster", False):
+    export_df = st.session_state.df.drop(columns=["cluster_label"])
+    make_download(
+        export_df,
+        f"{base_name}_cluster_{st.session_state.n_clusters}",
+        f"download_clustered_{st.session_state.n_clusters}_{download_format}",
+    )
 else:
     reason = "pre-clustered import" if initial else "PC-loadings import"
     st.sidebar.info(f"K-Means disabled for {reason}.")
+
 
 # ─── Determine df & cluster_col ────────────────────────────────────────────────
 if st.session_state.get("did_cluster", False):
@@ -496,19 +530,14 @@ else:
         fig.update_yaxes(title_font_size=17, tickfont_size=14)
 
         if show_scores:
-            st.download_button(
-                "Download PC Scores",
-                scores.to_csv(index=False),
-                file_name=f"{base_name}_pc_scores.csv",
-                mime="text/csv",
+            make_download(
+                scores, f"{base_name}_pc_scores", f"download_pc_scores_{download_format}"
             )
+
         if show_loadings:
             loadings_df = loadings.T.reset_index().rename(columns={"index": "component"})
-            st.download_button(
-                "Download PC Loadings",
-                loadings_df.to_csv(index=False),
-                file_name=f"{base_name}_pc_loadings.csv",
-                mime="text/csv",
+            make_download(
+                loadings_df, f"{base_name}_pc_loadings", f"download_loadings_{download_format}"
             )
 
         if scale is not None:
@@ -684,10 +713,11 @@ if raw_prof and clust_prof:
         )
         st.markdown("### Cluster Counts")
         st.bar_chart(counts.set_index("cluster_label")["count"])
+        make_download(
+            counts, f"{base_name}_cluster_counts", f"download_cluster_counts_{download_format}"
+        )
 
         progress_bar.progress(40, text="Calculating Cluster Summary Statistics...")
-
-        from pandas.api import types as pd_types
 
         def _get_profiles(df, cluster_col, stats):
             feats = [
@@ -707,20 +737,11 @@ if raw_prof and clust_prof:
         progress_bar.empty()
         st.error(f"Cluster profiling failed: {e}")
     else:
-        st.sidebar.download_button(
-            "Download Cluster Counts",
-            counts.reset_index().to_csv(index=False),
-            file_name=f"{base_name}_counts.csv",
-            mime="text/csv",
+        make_download(
+            profiles.reset_index(), f"{base_name}_profiles", f"download_profiles_{download_format}"
         )
 
         st.markdown("### Cluster Profiles")
         st.dataframe(profiles.T, use_container_width=True)
-        st.sidebar.download_button(
-            "Download Cluster Profiles",
-            profiles.reset_index().to_csv(index=False),
-            file_name=f"{base_name}_profiles.csv",
-            mime="text/csv",
-        )
     finally:
         progress_bar.empty()
