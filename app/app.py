@@ -58,11 +58,15 @@ if not uploaded:
 # derive base name for downloads
 base_name, ext = os.path.splitext(uploaded.name.lower())
 
+# set download-format default to match uploaded file extension
+_format_opts = ["csv", "txt", "xlsx", "xls"]
+_default_fmt = ext.lstrip(".") if ext.lstrip(".") in _format_opts else "csv"
+
 # ─── Download format selector ─────────────────────────────────────────────
 download_format = st.sidebar.selectbox(
     "Download format",
-    ["csv", "txt", "xlsx", "xls"],
-    index=0,
+    _format_opts,
+    index=_format_opts.index(_default_fmt),
     help="Choose the file format for all downloads",
 )
 
