@@ -58,7 +58,7 @@ if not uploaded:
 # derive base name for downloads
 base_name, ext = os.path.splitext(uploaded.name.lower())
 
-# ─── New: Download format selector ─────────────────────────────────────────────
+# ─── Download format selector ─────────────────────────────────────────────
 download_format = st.sidebar.selectbox(
     "Download format",
     ["csv", "txt", "xlsx", "xls"],
