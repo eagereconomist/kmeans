@@ -72,9 +72,10 @@ if st.session_state.get("last_upload") != uploaded.name:
         st.session_state.pop(key, None)
 
 # ─── Safe file parsing ──────────────────────────────────────────────────────────
+progress_bar = st.progress(0, text="Reading file...")
+
 try:
     if ext in (".csv", ".txt"):
-        # assume comma-delimited unless it's .tsv
         sep = "\t" if ext == ".tsv" else ","
         raw_df = pd.read_csv(uploaded, sep=sep)
     elif ext == ".tsv":
@@ -86,11 +87,16 @@ try:
     elif ext == ".json":
         raw_df = pd.read_json(uploaded)
     else:
-        st.error(f"Unsupported file type: {ext}")
-        st.stop()
+        raise ValueError(f"Unsupported file type: {ext}")
+
+    progress_bar.progress(100, text="File successfully loaded!")
+
 except Exception as e:
     st.error(f"Error reading `{uploaded.name}`: {e}")
     st.stop()
+
+finally:
+    progress_bar.empty()
 
 # assign a unique ID for each row
 raw_df["unique_id"] = raw_df.index.astype(str)
@@ -139,8 +145,10 @@ is_pca_scores_file = bool(imported_pcs) and cols_without_id <= set(imported_pcs 
 is_pca_loadings_file = is_pca_scores_file and raw_df.shape[0] == len(imported_pcs)
 
 # ─── Flags for hiding controls ─────────────────────────────────────────────────
+
 # disable settings only for pre-clustered imports (initial) or PC-loadings
 show_model_settings = not initial and not is_pca_loadings_file
+
 # keep diagnostics disabled only for pre-clustered or pure PC-scores files
 show_diagnostics = not initial and not is_pca_scores_file
 
@@ -178,6 +186,8 @@ init = st.session_state.init
 seed = st.session_state.seed if st.session_state.use_seed else None
 
 # ─── Cluster Diagnostics ──────────────────────────────────────────────────────
+show_diagnostics = st.sidebar.checkbox("Run Clustering Diagnostics", value=False)
+
 if show_diagnostics:
     st.sidebar.header("Cluster Diagnostics")
     max_k = st.sidebar.slider("Max Clusters (Diagnostics)", 3, 20, 10)
@@ -185,48 +195,84 @@ if show_diagnostics:
     show_inertia = st.sidebar.checkbox("Show Scree Plot", value=False)
     show_silhouette = st.sidebar.checkbox("Show Silhouette Plot", value=False)
 
-    try:
-        ks = list(range(1, max_k + 1))
-        inert_df = compute_inertia_scores(
-            df=raw_df,
-            k_range=ks,
-            feature_columns=numeric_cols,
-            init=init,
-            n_init=n_init,
-            random_state=seed,
-            algorithm=algo,
-        )
-        inert_df["k"] = inert_df["k"].astype(int)
+    diagnostics_requested = show_diag_data or show_inertia or show_silhouette
 
-        ks_sil = [k for k in ks if k >= 2]
-        if ks_sil:
-            sil_df = (
-                compute_silhouette_scores(
+    if diagnostics_requested:
+        progress_bar = st.progress(0, text="Running Clustering Diagnostics...")
+        try:
+            ks = list(range(1, max_k + 1))
+
+            # Only compute inertia if requested
+            if show_diag_data or show_inertia:
+                progress_bar.progress(10, text="Computing Inertia Scores...")
+                inert_df = compute_inertia_scores(
                     df=raw_df,
-                    k_values=ks_sil,
+                    k_range=ks,
                     feature_columns=numeric_cols,
                     init=init,
                     n_init=n_init,
                     random_state=seed,
                     algorithm=algo,
                 )
-                .rename(columns={"n_clusters": "k"})
-                .assign(k=lambda d: d["k"].astype(int))
-                .set_index("k")
+                inert_df["k"] = inert_df["k"].astype(int)
+            else:
+                inert_df = pd.DataFrame()
+
+            # Only compute silhouette if requested
+            if show_silhouette:
+                ks_sil = [k for k in ks if k >= 2]
+                if ks_sil:
+                    progress_bar.progress(60, text="Computing Silhouette Scores...")
+                    sil_df = (
+                        compute_silhouette_scores(
+                            df=raw_df,
+                            k_values=ks_sil,
+                            feature_columns=numeric_cols,
+                            init=init,
+                            n_init=n_init,
+                            random_state=seed,
+                            algorithm=algo,
+                        )
+                        .rename(columns={"n_clusters": "k"})
+                        .assign(k=lambda d: d["k"].astype(int))
+                        .set_index("k")
+                    )
+                else:
+                    sil_df = pd.DataFrame(columns=["silhouette_score"])
+
+                sil_ser = sil_df["silhouette_score"].reindex(ks)
+            else:
+                sil_df = pd.DataFrame()
+                sil_ser = pd.Series(dtype=float)
+
+            progress_bar.progress(100, text="Diagnostics Complete!")
+
+        except Exception as e:
+            st.error(f"Could not compute diagnostics from imported data: {e}")
+            inert_df = pd.DataFrame()
+            sil_df = pd.DataFrame()
+            sil_ser = pd.Series(dtype=float)
+
+        finally:
+            progress_bar.empty()
+
+        # ─── Diagnostics Table ────────────────────────────────────────────────────────
+    if show_diag_data:
+        if inert_df.empty and sil_ser.empty:
+            st.info(
+                "To view the diagnostics table, please first select and generate "
+                "the Scree Plot or Silhouette Plot above."
             )
         else:
-            sil_df = pd.DataFrame(columns=["silhouette_score"])
-        sil_ser = sil_df["silhouette_score"].reindex(ks)
+            diag_df = pd.DataFrame()
 
-        # diagnostics table
-        if show_diag_data:
-            diag_df = pd.DataFrame(
-                {
-                    "k": ks,
-                    "inertia": inert_df.set_index("k").reindex(ks)["inertia"].tolist(),
-                    "silhouette": sil_ser.tolist(),
-                }
-            )
+            if not inert_df.empty:
+                diag_df["k"] = inert_df["k"]
+                diag_df["inertia"] = inert_df["inertia"]
+
+            if not sil_ser.empty:
+                diag_df["silhouette"] = sil_ser.values[: len(diag_df)]
+
             st.markdown("#### Cluster Diagnostics Data")
             st.dataframe(diag_df.style.hide(axis="index"))
             st.sidebar.download_button(
@@ -236,27 +282,26 @@ if show_diagnostics:
                 mime="text/csv",
             )
 
-        # inertia plot
-        if show_inertia:
-            st.markdown("### Inertia vs. k")
-            fig_i = px.line(inert_df, x="k", y="inertia", markers=True)
-            fig_i.update_xaxes(dtick=1, tickformat="d")
-            st.plotly_chart(fig_i, use_container_width=True)
+    # ─── Inertia Plot ─────────────────────────────────────────────────────────────
+    if show_inertia:
+        st.markdown("### Inertia vs. k")
+        fig_i = px.line(inert_df, x="k", y="inertia", markers=True)
+        fig_i.update_xaxes(dtick=1, tickformat="d")
+        st.plotly_chart(fig_i, use_container_width=True)
 
-        # silhouette plot
-        if show_silhouette:
-            st.markdown("### Silhouette Score vs. k")
-            sil_plot_df = sil_ser.reset_index().rename(
-                columns={"index": "k", "silhouette_score": "silhouette_score"}
-            )
-            sil_plot_df = sil_plot_df[sil_plot_df["k"] >= 2]
-            fig_s = px.line(sil_plot_df, x="k", y="silhouette_score", markers=True)
-            fig_s.update_xaxes(tick0=2, dtick=1, tickformat="d")
-            st.plotly_chart(fig_s, use_container_width=True)
+    # ─── Silhouette Plot ──────────────────────────────────────────────────────────
+    if show_silhouette:
+        st.markdown("### Silhouette Score vs. k")
+        sil_plot_df = sil_ser.reset_index().rename(
+            columns={"index": "k", "silhouette_score": "silhouette_score"}
+        )
+        sil_plot_df = sil_plot_df[sil_plot_df["k"] >= 2]
+        fig_s = px.line(sil_plot_df, x="k", y="silhouette_score", markers=True)
+        fig_s.update_xaxes(tick0=2, dtick=1, tickformat="d")
+        st.plotly_chart(fig_s, use_container_width=True)
 
-    except ValueError as e:
-        st.error(f"Could not compute diagnostics from imported data: {e}")
-        # fallback dummies so downstream code won't error
+    else:
+        # diagnostics hidden
         max_k = 10
         show_diag_data = False
         show_inertia = False
@@ -265,15 +310,6 @@ if show_diagnostics:
         sil_df = pd.DataFrame()
         sil_ser = pd.Series(dtype=float)
 
-else:
-    # diagnostics hidden
-    max_k = 10
-    show_diag_data = False
-    show_inertia = False
-    show_silhouette = False
-    inert_df = pd.DataFrame()
-    sil_df = pd.DataFrame()
-    sil_ser = pd.Series(dtype=float)
 
 # ─── Model Settings ────────────────────────────────────────────────────────────
 if show_model_settings:
@@ -300,6 +336,7 @@ if show_model_settings:
 # ─── Run or Re-run K-Means ─────────────────────────────────────────────────────
 if show_model_settings:
     if st.sidebar.button("Run K-Means"):
+        progress_bar = st.progress(0, text="Running K-Means Clustering...")
         try:
             df_clustered = fit_kmeans(
                 raw_df.copy(),
@@ -311,6 +348,7 @@ if show_model_settings:
                 algorithm=algo,
                 label_column="cluster",
             )
+            progress_bar.progress(100, text="K-Means Completed!")
         except Exception:
             st.error(
                 "An error occurred during K-Means clustering. Please verify your data and settings."
@@ -364,13 +402,23 @@ else:
         pve = variances / variances.sum()
         cpve = pve.cumsum()
     else:
-        pca = compute_pca_summary(df=df, hue_column=cluster_col)
-        scores, loadings, pve, cpve = (
-            pca["scores"],
-            pca["loadings"],
-            pca["pve"],
-            pca["cpve"],
-        )
+        progress_bar = st.progress(0, text="Computing PCA Summary...")
+        try:
+            pca = compute_pca_summary(df=df, hue_column=cluster_col)
+            scores, loadings, pve, cpve = (
+                pca["scores"],
+                pca["loadings"],
+                pca["pve"],
+                pca["cpve"],
+            )
+        except Exception as e:
+            progress_bar.empty()
+            st.error(f"PCA computation failed: {e}")
+            st.stop()
+        else:
+            progress_bar.progress(100, text="PCA Computation Complete!")
+        finally:
+            progress_bar.empty()
 
     # combine scores with original df
     old_pcs = [column for column in df.columns if re.fullmatch(r"(?i)PC\d+", column)]
@@ -602,71 +650,60 @@ clust_prof = st.sidebar.file_uploader("Cluster results CSV", type="csv", key="pr
 if raw_prof and clust_prof:
     raw_df = pd.read_csv(raw_prof)
     clust_df = pd.read_csv(clust_prof)
-
     raw_df["unique_id"] = raw_df.index
     clust_df["unique_id"] = clust_df.index
 
-    cluster_opts = [column for column in clust_df.columns if re.search(r"cluster", column, re.I)]
+    cluster_opts = [col for col in clust_df.columns if re.search(r"cluster", col, re.I)]
     if not cluster_opts:
         st.error("No column matching 'cluster' found in your results CSV.")
         st.stop()
 
     default = st.session_state.get("cluster_col")
-    prof_col = st.sidebar.selectbox(
-        "Which column is your cluster ID?",
-        cluster_opts,
-        index=cluster_opts.index(default) if default in cluster_opts else 0,
-    )
-
-    merged = (
-        raw_df.merge(clust_df[["unique_id", prof_col]], on="unique_id")
-        .rename(columns={prof_col: "cluster_label"})
-        .drop(columns=["unique_id"])
-    )
-    merged["cluster_label"] = (merged["cluster_label"].astype(int) + 1).astype(str)
-
-    counts = (
-        merged["cluster_label"]
-        .value_counts()
-        .sort_index(key=lambda idx: idx.astype(int))
-        .rename_axis("cluster_label")
-        .reset_index(name="count")
-    )
-    st.markdown("### Cluster Counts")
-    st.bar_chart(counts.set_index("cluster_label")["count"])
-
-    st.sidebar.download_button(
-        "Download Cluster Counts",
-        counts.to_csv(index=False),
-        file_name=f"{base_name}_cluster_counts.csv",
-        mime="text/csv",
-    )
+    prof_col = st.sidebar.selectbox("Which column is your cluster ID?", cluster_opts, ...)
 
     extra = st.sidebar.multiselect(
         "Additional summary statistics to include", ["median", "min", "max"], default=[]
     )
     stats = ["mean"] + extra
 
-    from pandas.api import types as pd_types
+    progress_bar = st.progress(0, text="Preparing Cluster Profile Data...")
+    try:
+        merged = (
+            raw_df.merge(clust_df[["unique_id", prof_col]], on="unique_id")
+            .rename(columns={prof_col: "cluster_label"})
+            .drop(columns=["unique_id"])
+        )
+        merged["cluster_label"] = (merged["cluster_label"].astype(int) + 1).astype(str)
 
-    def _get_profiles(df, cluster_col, stats):
-        feats = [
-            column
-            for column in df.columns
-            if column != cluster_col
-            and pd_types.is_numeric_dtype(df[column])
-            and not re.fullmatch(r"PC\d+", column, flags=re.I)
-        ]
-        agg = df.groupby(cluster_col)[feats].agg(stats)
-        agg.columns = [f"{feat}_{stat}" for feat, stat in agg.columns]
-        return agg.reset_index()
+        progress_bar.progress(40, text="Calculating Cluster Summary Statistics...")
 
-    profiles = _get_profiles(merged, "cluster_label", stats).set_index("cluster_label")
-    st.markdown("### Cluster Profiles")
-    st.dataframe(profiles, use_container_width=True)
-    st.sidebar.download_button(
-        "Download Cluster Profiles",
-        profiles.reset_index().to_csv(index=False),
-        file_name=f"{base_name}_profiles.csv",
-        mime="text/csv",
-    )
+        from pandas.api import types as pd_types
+
+        def _get_profiles(df, cluster_col, stats):
+            feats = [
+                col
+                for col in df.columns
+                if col != cluster_col
+                and pd_types.is_numeric_dtype(df[col])
+                and not re.fullmatch(r"PC\d+", col, flags=re.I)
+            ]
+            agg = df.groupby(cluster_col)[feats].agg(stats)
+            agg.columns = [f"{feat}_{stat}" for feat, stat in agg.columns]
+            return agg.reset_index()
+
+        profiles = _get_profiles(merged, "cluster_label", stats).set_index("cluster_label")
+        progress_bar.progress(100, text="Cluster Profiles Ready.")
+    except Exception as e:
+        progress_bar.empty()
+        st.error(f"Cluster profiling failed: {e}")
+    else:
+        st.markdown("### Cluster Profiles")
+        st.dataframe(profiles, use_container_width=True)
+        st.sidebar.download_button(
+            "Download Cluster Profiles",
+            profiles.reset_index().to_csv(index=False),
+            file_name=f"{base_name}_profiles.csv",
+            mime="text/csv",
+        )
+    finally:
+        progress_bar.empty()
