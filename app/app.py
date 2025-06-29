@@ -222,15 +222,10 @@ init = st.session_state.init
 seed = st.session_state.seed if st.session_state.use_seed else None
 
 # ─── Cluster Diagnostics ──────────────────────────────────────────────────────
-# only hide diagnostics for pre-clustered feature imports (initial)
-# or PC-loadings files (no raw obs, just loading vectors)
+# only show diagnostics for true raw data imports (not pre-clustered or pure loadings)
 if not initial and not is_pca_loadings_file:
-    show_diagnostics = st.sidebar.checkbox("Run Clustering Diagnostics", value=False)
-else:
-    show_diagnostics = False
-
-if show_diagnostics:
     st.sidebar.header("Cluster Diagnostics")
+
     max_k = st.sidebar.slider("Max Clusters (Diagnostics)", 3, 20, 10)
     show_diag_data = st.sidebar.checkbox("Show Diagnostics Table", value=False)
     show_inertia = st.sidebar.checkbox("Show Scree Plot", value=False)
@@ -243,7 +238,7 @@ if show_diagnostics:
         try:
             ks = list(range(1, max_k + 1))
 
-            # Only compute inertia if requested
+            # compute inertia if requested
             if show_diag_data or show_inertia:
                 progress_bar.progress(10, text="Computing Inertia Scores...")
                 inert_df = compute_inertia_scores(
@@ -259,7 +254,7 @@ if show_diagnostics:
             else:
                 inert_df = pd.DataFrame()
 
-            # Only compute silhouette if requested
+            # compute silhouette if requested
             if show_silhouette:
                 ks_sil = [k for k in ks if k >= 2]
                 if ks_sil:
@@ -288,10 +283,11 @@ if show_diagnostics:
             progress_bar.progress(100, text="Diagnostics Complete!")
 
         except Exception as e:
-            st.error(f"Could not compute diagnostics from imported data: {e}")
+            st.error(f"Could not compute diagnostics: {e}")
             inert_df = pd.DataFrame()
             sil_df = pd.DataFrame()
             sil_ser = pd.Series(dtype=float)
+
         finally:
             progress_bar.empty()
 
