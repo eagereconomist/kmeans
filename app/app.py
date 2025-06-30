@@ -305,6 +305,13 @@ if not initial and not is_pca_loadings_file:
             st.markdown("#### Cluster Diagnostics Data")
             st.dataframe(diag_df)
 
+            # Download Cluster Diagnostics Data
+            make_download(
+                diag_df,
+                f"{base_name}_cluster_diagnostics",
+                f"download_cluster_diagnostics_{download_format}",
+            )
+
     # ─── Inertia Plot ─────────────────────────────────────────────────────────────
     if show_inertia:
         st.markdown("### Inertia vs. k")
