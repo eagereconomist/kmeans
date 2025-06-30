@@ -114,7 +114,7 @@ if st.session_state.get("last_upload") != uploaded.name:
         st.session_state.pop(key, None)
 
 # ─── Safe file parsing ──────────────────────────────────────────────────────────
-progress_bar = st.progress(0, text="Reading file...")
+progress_bar = st.sidebar.progress(0, text="Reading file...")
 
 try:
     if ext in (".csv", ".txt"):
@@ -222,10 +222,9 @@ init = st.session_state.init
 seed = st.session_state.seed if st.session_state.use_seed else None
 
 # ─── Cluster Diagnostics ──────────────────────────────────────────────────────
-# only show diagnostics for true raw data imports (not pre-clustered or pure loadings)
+# only show diagnostics when we have raw feature data (not pre-clustered/pure PC-loadings)
 if not initial and not is_pca_loadings_file:
     st.sidebar.header("Cluster Diagnostics")
-
     max_k = st.sidebar.slider("Max Clusters (Diagnostics)", 3, 20, 10)
     show_diag_data = st.sidebar.checkbox("Show Diagnostics Table", value=False)
     show_inertia = st.sidebar.checkbox("Show Scree Plot", value=False)
@@ -234,13 +233,14 @@ if not initial and not is_pca_loadings_file:
     diagnostics_requested = show_diag_data or show_inertia or show_silhouette
 
     if diagnostics_requested:
-        progress_bar = st.progress(0, text="Running Clustering Diagnostics...")
+        # use a dedicated progress bar
+        diag_bar = st.sidebar.progress(0, text="Running Clustering Diagnostics...")
         try:
             ks = list(range(1, max_k + 1))
 
-            # compute inertia if requested
+            # Inertia
             if show_diag_data or show_inertia:
-                progress_bar.progress(10, text="Computing Inertia Scores...")
+                diag_bar.progress(10, text="Computing Inertia Scores...")
                 inert_df = compute_inertia_scores(
                     df=raw_df,
                     k_range=ks,
@@ -254,11 +254,11 @@ if not initial and not is_pca_loadings_file:
             else:
                 inert_df = pd.DataFrame()
 
-            # compute silhouette if requested
+            # Silhouette
             if show_silhouette:
                 ks_sil = [k for k in ks if k >= 2]
                 if ks_sil:
-                    progress_bar.progress(60, text="Computing Silhouette Scores...")
+                    diag_bar.progress(60, text="Computing Silhouette Scores...")
                     sil_df = (
                         compute_silhouette_scores(
                             df=raw_df,
@@ -280,7 +280,7 @@ if not initial and not is_pca_loadings_file:
                 sil_df = pd.DataFrame()
                 sil_ser = pd.Series(dtype=float)
 
-            progress_bar.progress(100, text="Diagnostics Complete!")
+            diag_bar.progress(100, text="Diagnostics Complete!")
 
         except Exception as e:
             st.error(f"Could not compute diagnostics: {e}")
@@ -289,32 +289,20 @@ if not initial and not is_pca_loadings_file:
             sil_ser = pd.Series(dtype=float)
 
         finally:
-            progress_bar.empty()
+            # guaranteed to clear the bar
+            diag_bar.empty()
 
-        # ─── Diagnostics Table ────────────────────────────────────────────────────────
+    # ─── Diagnostics Table ────────────────────────────────────────────────────────
     if show_diag_data:
         if inert_df.empty and sil_ser.empty:
-            st.info(
-                "To view the diagnostics table, please first select and generate "
-                "the Scree Plot or Silhouette Plot above."
-            )
+            st.info("Select at least one plot or the diagnostics table above to generate metrics.")
         else:
             diag_df = pd.DataFrame()
-
             if not inert_df.empty:
                 diag_df["k"] = inert_df["k"]
                 diag_df["inertia"] = inert_df["inertia"]
-
             if not sil_ser.empty:
                 diag_df["silhouette"] = sil_ser.values[: len(diag_df)]
-
-            if show_diagnostics:
-                make_download(
-                    diag_df,
-                    f"{base_name}_diagnostics_k{max_k}",
-                    f"download_diagnostics_{download_format}",
-                )
-
             st.markdown("#### Cluster Diagnostics Data")
             st.dataframe(diag_df)
 
@@ -372,7 +360,7 @@ if show_model_settings:
 # ─── Run or Re-run K-Means ─────────────────────────────────────────────────────
 if show_model_settings:
     if st.sidebar.button("Run K-Means"):
-        progress_bar = st.progress(0, text="Running K-Means Clustering...")
+        progress_bar = st.sidebar.progress(0, text="Running K-Means Clustering...")
         try:
             df_clustered = fit_kmeans(
                 raw_df.copy(),
