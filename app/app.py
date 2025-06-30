@@ -676,75 +676,125 @@ else:
 
 # ─── Cluster Profiling ─────────────────────────────────────────────────────────
 st.sidebar.header("Cluster Profiling")
-raw_prof = st.sidebar.file_uploader("Raw data (pre-processed)", type="csv", key="prof_raw")
-clust_prof = st.sidebar.file_uploader("Cluster results CSV", type="csv", key="prof_clust")
+
+# allow same file types as main uploader
+upload_types = ["csv", "txt", "xlsx", "xls"]
+raw_prof = st.sidebar.file_uploader("Raw data (pre-processed)", type=upload_types, key="prof_raw")
+clust_prof = st.sidebar.file_uploader("Cluster results file", type=upload_types, key="prof_clust")
 
 if raw_prof and clust_prof:
-    raw_df = pd.read_csv(raw_prof)
-    clust_df = pd.read_csv(clust_prof)
+    # read raw profile file
+    ext_raw = os.path.splitext(raw_prof.name.lower())[1]
+    ext_clust = os.path.splitext(clust_prof.name.lower())[1]
+
+    if ext_raw in (".xlsx", ".xls"):
+        raw_df = pd.read_excel(raw_prof)
+    else:
+        raw_df = pd.read_csv(raw_prof)
+
+    if ext_clust in (".xlsx", ".xls"):
+        clust_df = pd.read_excel(clust_prof)
+    else:
+        clust_df = pd.read_csv(clust_prof)
+
     raw_df["unique_id"] = raw_df.index
     clust_df["unique_id"] = clust_df.index
 
-    cluster_opts = [col for col in clust_df.columns if re.search(r"cluster", col, re.I)]
+    # pick the cluster column
+    cluster_opts = [c for c in clust_df.columns if re.search(r"cluster", c, re.I)]
     if not cluster_opts:
-        st.error("No column matching 'cluster' found in your results CSV.")
+        st.error("No column matching 'cluster' found in your results file.")
         st.stop()
-
-    default = st.session_state.get("cluster_col")
     prof_col = st.sidebar.selectbox("Which column is your cluster ID?", cluster_opts)
 
-    extra = st.sidebar.multiselect(
-        "Additional summary statistics to include", ["median", "min", "max"], default=[]
+    # merge & relabel clusters (1-based, strings)
+    merged = (
+        raw_df.merge(clust_df[["unique_id", prof_col]], on="unique_id")
+        .rename(columns={prof_col: "cluster_label"})
+        .drop(columns=["unique_id"])
     )
+    merged["cluster_label"] = (merged["cluster_label"].astype(int) + 1).astype(str)
+
+    # compute counts
+    counts = (
+        merged["cluster_label"]
+        .value_counts()
+        .sort_index(key=lambda idx: idx.astype(int))
+        .rename_axis("cluster_label")
+        .reset_index(name="count")
+    )
+
+    # allow renaming
+    st.sidebar.subheader("Rename Clusters")
+    name_map = {}
+    for cl in counts["cluster_label"]:
+        name_map[cl] = st.sidebar.text_input(
+            f"Label for cluster {cl}", value=cl, key=f"rename_{cl}"
+        )
+    counts["cluster_name"] = counts["cluster_label"].map(name_map)
+
+    # plot with larger x-axis title
+    st.markdown("### Cluster Counts")
+    fig = px.bar(
+        counts,
+        x="cluster_name",
+        y="count",
+        labels={"cluster_name": "Cluster", "count": "Count"},
+    )
+    fig.update_xaxes(title_font_size=18, tickfont_size=14)
+
+    fig.update_xaxes(
+        type="category",
+        tickmode="array",
+        tickvals=counts["cluster_name"].tolist(),
+        ticktext=[
+            # if it’s a “1.0” style string, turn it into “1”, otherwise leave it alone
+            str(int(float(x))) if re.fullmatch(r"-?\d+(\.0+)?", x) else x
+            for x in counts["cluster_name"]
+        ],
+        title_font_size=18,
+        tickfont_size=14,
+    )
+
+    fig.update_yaxes(title_font_size=18, tickfont_size=12)
+    st.plotly_chart(fig, use_container_width=True)
+
+    # download counts
+    make_download(
+        counts[["cluster_name", "count"]].rename(columns={"cluster_name": "cluster_label"}),
+        f"{base_name}_cluster_counts",
+        f"download_cluster_counts_{download_format}",
+    )
+
+    # now the profile stats
+    extra = st.sidebar.multiselect("Additional stats", ["median", "min", "max"], default=[])
     stats = ["mean"] + extra
 
-    progress_bar = st.progress(0, text="Preparing Cluster Profile Data...")
+    progress = st.progress(0, text="Calculating profiles…")
     try:
-        merged = (
-            raw_df.merge(clust_df[["unique_id", prof_col]], on="unique_id")
-            .rename(columns={prof_col: "cluster_label"})
-            .drop(columns=["unique_id"])
-        )
-        merged["cluster_label"] = (merged["cluster_label"].astype(int) + 1).astype(str)
-
-        counts = (
-            merged["cluster_label"]
-            .value_counts()
-            .sort_index(key=lambda idx: idx.astype(int))
-            .rename_axis("cluster_label")
-            .reset_index(name="count")
-        )
-        st.markdown("### Cluster Counts")
-        st.bar_chart(counts.set_index("cluster_label")["count"])
-        make_download(
-            counts, f"{base_name}_cluster_counts", f"download_cluster_counts_{download_format}"
-        )
-
-        progress_bar.progress(40, text="Calculating Cluster Summary Statistics...")
 
         def _get_profiles(df, cluster_col, stats):
             feats = [
-                col
-                for col in df.columns
-                if col != cluster_col
-                and pd_types.is_numeric_dtype(df[col])
-                and not re.fullmatch(r"PC\d+", col, flags=re.I)
+                c
+                for c in df.columns
+                if c != cluster_col
+                and pd_types.is_numeric_dtype(df[c])
+                and not re.fullmatch(r"PC\d+", c, flags=re.I)
             ]
             agg = df.groupby(cluster_col)[feats].agg(stats)
             agg.columns = [f"{feat}_{stat}" for feat, stat in agg.columns]
             return agg.reset_index()
 
         profiles = _get_profiles(merged, "cluster_label", stats).set_index("cluster_label")
-        progress_bar.progress(100, text="Cluster Profiles Ready.")
+        progress.progress(100, text="Profiles ready!")
     except Exception as e:
-        progress_bar.empty()
         st.error(f"Cluster profiling failed: {e}")
-    else:
-        make_download(
-            profiles.reset_index(), f"{base_name}_profiles", f"download_profiles_{download_format}"
-        )
-
-        st.markdown("### Cluster Profiles")
-        st.dataframe(profiles.T, use_container_width=True)
     finally:
-        progress_bar.empty()
+        progress.empty()
+
+    # download & show profiles
+    make_download(
+        profiles.reset_index(), f"{base_name}_profiles", f"download_profiles_{download_format}"
+    )
+    st.markdown("### Cluster Profiles")
+    st.dataframe(profiles.T, use_container_width=True)
