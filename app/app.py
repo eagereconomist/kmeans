@@ -209,7 +209,6 @@ for key, default in [
     ("n_init", 50),
     ("algo", "lloyd"),
     ("init", "k-means++"),
-    ("use_seed", False),
     ("seed", 42),
 ]:
     st.session_state.setdefault(key, default)
@@ -219,7 +218,7 @@ n_clusters = st.session_state.n_clusters
 n_init = st.session_state.n_init
 algo = st.session_state.algo
 init = st.session_state.init
-seed = st.session_state.seed if st.session_state.use_seed else None
+seed = st.session_state.seed
 
 # ─── Cluster Diagnostics ──────────────────────────────────────────────────────
 # only show diagnostics when we have raw feature data (not pre-clustered/pure PC-loadings)
@@ -350,11 +349,13 @@ if show_model_settings:
         ["k-means++", "random"],
         key="init",
     )
-    st.sidebar.checkbox("Specify Random Seed", key="use_seed")
-    if st.session_state.use_seed:
-        st.sidebar.number_input(
-            "Random seed", min_value=0, value=st.session_state.seed, key="seed"
-        )
+    st.sidebar.number_input(
+        "Random seed",
+        min_value=0,
+        value=st.session_state.seed,
+        key="seed",
+        help="Use this seed for reproducible clustering.",
+    )
 
 
 # ─── Run or Re-run K-Means ─────────────────────────────────────────────────────
@@ -398,10 +399,6 @@ if st.session_state.get("did_cluster", False):
         f"{base_name}_cluster_{st.session_state.n_clusters}",
         f"download_clustered_{st.session_state.n_clusters}_{download_format}",
     )
-else:
-    reason = "pre-clustered import" if initial else "PC-loadings import"
-    st.sidebar.info(f"K-Means disabled for {reason}.")
-
 
 # ─── Determine df & cluster_col ────────────────────────────────────────────────
 if st.session_state.get("did_cluster", False):
