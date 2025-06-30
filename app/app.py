@@ -225,11 +225,16 @@ seed = st.session_state.seed
 if not initial and not is_pca_loadings_file:
     st.sidebar.header("Cluster Diagnostics")
     max_k = st.sidebar.slider("Max Clusters (Diagnostics)", 3, 20, 10)
-    show_diag_data = st.sidebar.checkbox("Show Diagnostics Table", value=False)
-    show_inertia = st.sidebar.checkbox("Show Scree Plot", value=False)
-    show_silhouette = st.sidebar.checkbox("Show Silhouette Plot", value=False)
 
-    diagnostics_requested = show_diag_data or show_inertia or show_silhouette
+    # single dropdown menu for diagnostics options
+    diag_opts = ["Scree Plot", "Silhouette Plot", "Table"]
+    selected_diags = st.sidebar.multiselect("Show Cluster Diagnostics", diag_opts, default=[])
+
+    show_diag_data = "Table" in selected_diags
+    show_inertia = "Scree Plot" in selected_diags
+    show_silhouette = "Silhouette Plot" in selected_diags
+
+    diagnostics_requested = bool(selected_diags)
 
     if diagnostics_requested:
         # use a dedicated progress bar
@@ -361,7 +366,7 @@ if show_model_settings:
         min_value=0,
         value=st.session_state.seed,
         key="seed",
-        help="Use this seed for reproducible clustering.",
+        help="Use a random seed for reproducible results.",
     )
 
 
@@ -462,16 +467,18 @@ else:
         hover_template += f"<br>{pc} = %{{customdata[{i}]:.3f}}"
 
     st.sidebar.header("PCA Output Options")
+
     if is_pca_scores_file:
-        show_pve = st.sidebar.checkbox("Show Proportional Variance Explained", value=False)
-        show_cpve = st.sidebar.checkbox("Show Cumulative Variance Explained", value=False)
-        show_scores = False
-        show_loadings = False
+        pca_opts = ["PVE", "CPVE"]
     else:
-        show_scores = st.sidebar.checkbox("Show Principal Component Scores", value=False)
-        show_loadings = st.sidebar.checkbox("Show Principal Component Loadings", value=False)
-        show_pve = st.sidebar.checkbox("Show Proportional Variance Explained", value=False)
-        show_cpve = st.sidebar.checkbox("Show Cumulative Variance Explained", value=False)
+        pca_opts = ["Scores", "Loadings", "PVE", "CPVE"]
+
+    selected_pca = st.sidebar.multiselect("Show PCA Outputs", pca_opts, default=[])
+
+    show_scores = "Scores" in selected_pca and not is_pca_scores_file
+    show_loadings = "Loadings" in selected_pca and not is_pca_scores_file
+    show_pve = "PVE" in selected_pca
+    show_cpve = "CPVE" in selected_pca
 
     dim = st.sidebar.selectbox("Plot dimension", ["2D"] + (["3D"] if len(pcs) >= 3 else []))
     pc_x = st.sidebar.selectbox("X-Axis Principal Component", pcs, index=0)
