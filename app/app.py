@@ -23,6 +23,80 @@ st.set_page_config(
 )
 st.title("K-Means Clustering Dashboard")
 
+
+with st.sidebar.expander("Help & Instructions", expanded=False):
+    st.markdown(
+        """
+        **1. Inspect Data**  
+        Before uploading, make sure your file:  
+        - Is one of `.csv`, `.txt`, `.xlsx`, or `.xls`  
+        - Has no missing values  
+        - Includes at least 2 numeric features  
+
+       **2. Upload Data**  
+        Upload any of the following:  
+        - Raw or processed feature data (e.g., standardized)  
+        - Principal Component Scores  
+        
+        *(May already contain a cluster column.)*  
+
+        **3. Choose Download Format** (optional)
+        - Defaults to your upload **or** use the `Default Format` 
+        dropdown to pick between supported file types.
+
+        **4. Cluster Diagnostics** *(optional; unclustered data only)*  
+        In `Cluster Diagnostics` (sidebar):  
+        - Set **Max Clusters** using the slider  
+        - Select one or more of:  
+          - **Scree Plot** 
+          - **Silhouette Plot**  
+          - **Table** (view/download inertia & silhouette scores)  
+        
+        - Run diagnostics to generate the selected plots and export the scores table.  
+
+        **5. Run K-Means** *(optional; unclustered data only)*  
+        In `Model Settings` (sidebar), you can adjust:  
+        - **Number of Clusters** (slider)  
+        - **Iterations**, **Algorithm**, **Initialization**, **Random Seed**  
+        
+        Click **Run K-Means** to apply clustering.
+
+        **After** a successful run:  
+        - Imported data includes a new cluster column  
+        - PC Biplot is created using the clustered data and is ready to view in the dashboard immediately  
+        - A download button of the clustered data appears under the `K-Means Completed!` message (sidebar)  
+
+        **6. Biplot**  
+        Once K-Means has run sucessfully:  
+        - Select `Show PCA Outputs` (sidebar) to view/download: **Scores**, **Loadings**, **P.V.E.**, and **C.P.V.E.**  
+        - Tweak display options:  
+          - **Plot dimension** (2D/3D)  
+          - **Plot axes** (X, Y, Z)  
+          - **Loading vector scale** *(only for feature-based data uploads)*
+
+        **7. Cluster Profiling**  
+        Compare how features in data vary by cluster:
+
+        1. **Upload & Merge**  
+           - Raw data file (pre-processed features)  
+           - Cluster results file  
+           - By default, cluster column is chosen to join
+           the two files, but there is the option to change
+           the column  
+
+        2. **Rename Labels**  
+           - Edit each cluster's name in the `Rename Clusters` section 
+
+        3. **Counts & Profiles**  
+           - View/download cluster counts 
+           - Generate per-cluster summary statistics (mean, median, min, max) in `Summary Statistics` section
+        
+        **Still stuck?**  
+        Reach out to your analysis team or check the GitHub README for more details.
+        """
+    )
+
+
 # ─── RESTART BUTTON ───────────────────────────────────────────────────────────
 if st.sidebar.button("Restart"):
     st.session_state.uploader_count = st.session_state.get("uploader_count", 0) + 1
@@ -49,7 +123,7 @@ uploaded = st.sidebar.file_uploader(
     "Upload your own data",
     type=["csv", "txt", "xlsx", "xls"],
     key=uploader_key,
-    help="Choose any local data file to begin",
+    help="Choose a local data file to begin",
 )
 if not uploaded:
     st.error("Please upload a data file to proceed.")
@@ -64,7 +138,7 @@ _default_fmt = ext.lstrip(".") if ext.lstrip(".") in _format_opts else "csv"
 
 # ─── Download format selector ─────────────────────────────────────────────
 download_format = st.sidebar.selectbox(
-    "Download format",
+    "Download Format",
     _format_opts,
     index=_format_opts.index(_default_fmt),
     help="Choose the file format for all downloads",
@@ -224,11 +298,23 @@ seed = st.session_state.seed
 # only show diagnostics when we have raw feature data (not pre-clustered/pure PC-loadings)
 if not initial and not is_pca_loadings_file:
     st.sidebar.header("Cluster Diagnostics")
-    max_k = st.sidebar.slider("Max Clusters (Diagnostics)", 3, 20, 10)
+    max_k = st.sidebar.slider(
+        "Max Clusters", 2, 20, 10, help="Pick the max amount of clusters to use in diagnostics"
+    )
 
     # single dropdown menu for diagnostics options
     diag_opts = ["Scree Plot", "Silhouette Plot", "Table"]
-    selected_diags = st.sidebar.multiselect("Show Cluster Diagnostics", diag_opts, default=[])
+    selected_diags = st.sidebar.multiselect(
+        "Show Cluster Diagnostics",
+        diag_opts,
+        default=[],
+        help=(
+            "Select one or more diagnostics to evaluate clustering:\n"
+            "- Scree Plot: inertia vs. number of clusters (elbow method)\n"
+            "- Silhouette Plot: silhouette per cluster\n"
+            "- Table: numeric inertia & silhouette scores (view/download)"
+        ),
+    )
 
     show_diag_data = "Table" in selected_diags
     show_inertia = "Scree Plot" in selected_diags
@@ -349,24 +435,39 @@ if not initial and not is_pca_loadings_file:
 # ─── Model Settings ────────────────────────────────────────────────────────────
 if show_model_settings:
     st.sidebar.header("Model Settings")
-    st.sidebar.slider("Number of clusters", 2, 20, key="n_clusters")
-    st.sidebar.number_input("n_init (k-means)", min_value=50, key="n_init")
-    st.sidebar.selectbox(
-        "Algorithm Method",
-        ["lloyd", "elkan"],
-        key="algo",
-    )
-    st.sidebar.selectbox(
-        "Init Method",
-        ["k-means++", "random"],
-        key="init",
+    st.sidebar.slider(
+        "Number of Clusters",
+        2,
+        20,
+        key="n_clusters",
+        help="Pick number of clusters/centroids to form",
     )
     st.sidebar.number_input(
-        "Random seed",
+        "Iterations",
+        min_value=50,
+        key="n_init",
+        help="Number of times the algorithm is run, minimum value of 50",
+    )
+    st.sidebar.selectbox(
+        "Algorithm",
+        ["lloyd", "elkan"],
+        key="algo",
+        help="Pick the K-Means algorithm to use.\n"
+        "- Note: `elkan` can be more efficient on some datasets, but is\n"
+        "more memory intensive",
+    )
+    st.sidebar.selectbox(
+        "Initialization",
+        ["k-means++", "random"],
+        key="init",
+        help="Learn more in the [scikit-learn official documentation](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.KMeans.html#)",
+    )
+    st.sidebar.number_input(
+        "Random Seed",
         min_value=0,
         value=st.session_state.seed,
         key="seed",
-        help="Use a random seed for reproducible results.",
+        help="**Important**: set a fixed random seed so that clustering results and any downloaded files are **exactly** reproducible.",
     )
 
 
@@ -473,7 +574,18 @@ else:
     else:
         pca_opts = ["Scores", "Loadings", "PVE", "CPVE"]
 
-    selected_pca = st.sidebar.multiselect("Show PCA Outputs", pca_opts, default=[])
+    selected_pca = st.sidebar.multiselect(
+        "Show PCA Outputs",
+        pca_opts,
+        default=[],
+        help=(
+            "Choose which PCA results to display or download:\n"
+            "- **Scores**: PC coordinates per observation\n"
+            "- **Loadings**: feature contributions to each PC\n"
+            "- **PVE**: percent variance explained by each PC\n"
+            "- **CPVE**: cumulative percent variance explained"
+        ),
+    )
 
     show_scores = "Scores" in selected_pca and not is_pca_scores_file
     show_loadings = "Loadings" in selected_pca and not is_pca_scores_file
@@ -492,7 +604,18 @@ else:
         )
 
     if not is_pca_scores_file:
-        scale = st.sidebar.slider("Loading Vector Scale", 0.1, 5.0, 0.7, step=0.05)
+        scale = st.sidebar.slider(
+            "Loading Vector Scale",
+            0.1,
+            10.0,
+            0.7,
+            step=0.05,
+            help=(
+                "Scale factor for PC loading vectors in the biplot:\n"
+                "- Multiplies arrow lengths for visibility\n"
+                "- Only applies when you’ve uploaded feature data (not pure PC scores)"
+            ),
+        )
     else:
         scale = None
 
@@ -520,7 +643,7 @@ else:
             df,
             x=pc_x,
             y=pc_y,
-            title=f"Principal Component Biplot Using {cluster_col.split('_')[-1]} Clusters",
+            title=f"Biplot Using {cluster_col.split('_')[-1]} Clusters",
             hover_data=None,
             **common,
             width=900,
@@ -592,7 +715,7 @@ else:
             x=pc_x,
             y=pc_y,
             z=pc_z,
-            title=f"Principal Component Biplot Using {cluster_col.split('_')[-1]} Clusters",
+            title=f"Biplot Using {cluster_col.split('_')[-1]} Clusters",
             hover_data=None,
             **common,
             width=1000,
@@ -678,8 +801,8 @@ st.sidebar.header("Cluster Profiling")
 
 # allow same file types as main uploader
 upload_types = ["csv", "txt", "xlsx", "xls"]
-raw_prof = st.sidebar.file_uploader("Raw data (pre-processed)", type=upload_types, key="prof_raw")
-clust_prof = st.sidebar.file_uploader("Cluster results file", type=upload_types, key="prof_clust")
+raw_prof = st.sidebar.file_uploader("Raw Data (pre-processed)", type=upload_types, key="prof_raw")
+clust_prof = st.sidebar.file_uploader("Cluster Results", type=upload_types, key="prof_clust")
 
 if raw_prof and clust_prof:
     # read raw profile file
@@ -728,7 +851,7 @@ if raw_prof and clust_prof:
     name_map = {}
     for cl in counts["cluster_label"]:
         name_map[cl] = st.sidebar.text_input(
-            f"Label for cluster {cl}", value=cl, key=f"rename_{cl}"
+            f"Label for Cluster {cl}", value=cl, key=f"rename_{cl}"
         )
     counts["cluster_name"] = counts["cluster_label"].map(name_map)
 
@@ -766,7 +889,7 @@ if raw_prof and clust_prof:
     )
 
     # now the profile stats
-    extra = st.sidebar.multiselect("Additional stats", ["median", "min", "max"], default=[])
+    extra = st.sidebar.multiselect("Summary Statistics", ["median", "min", "max"], default=[])
     stats = ["mean"] + extra
 
     progress = st.progress(0, text="Calculating profiles…")
