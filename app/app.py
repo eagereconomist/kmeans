@@ -145,7 +145,7 @@ download_format = st.sidebar.selectbox(
 )
 
 
-def make_download(df: pd.DataFrame, name: str, key: str):
+def make_download(df: pd.DataFrame, name: str, key: str, label: str = None):
     fname = f"{name}.{download_format}"
     if download_format == "csv":
         data = df.to_csv(index=False).encode("utf-8")
@@ -163,8 +163,12 @@ def make_download(df: pd.DataFrame, name: str, key: str):
         st.error(f"Unsupported format: {download_format}")
         return
 
+    # derive base label and always append extension
+    base_label = label or name.replace("_", " ").title()
+    button_label = f"{base_label} (.{download_format})"
+
     st.sidebar.download_button(
-        f"Download (.{download_format})",
+        button_label,
         data,
         file_name=fname,
         mime=mime,
@@ -401,6 +405,7 @@ if not initial and not is_pca_loadings_file:
                 diag_df,
                 f"{base_name}_cluster_diagnostics",
                 f"download_cluster_diagnostics_{download_format}",
+                label="Cluster Diagnostics Table",
             )
 
     # ─── Inertia Plot ─────────────────────────────────────────────────────────────
@@ -443,6 +448,13 @@ if show_model_settings:
         help="Pick number of clusters/centroids to form",
     )
     st.sidebar.number_input(
+        "Random Seed",
+        min_value=0,
+        value=st.session_state.seed,
+        key="seed",
+        help="**Important**: set a fixed random seed so that clustering results and any downloaded files are **exactly** reproducible.",
+    )
+    st.sidebar.number_input(
         "Iterations",
         min_value=50,
         key="n_init",
@@ -461,13 +473,6 @@ if show_model_settings:
         ["k-means++", "random"],
         key="init",
         help="Learn more in the [scikit-learn official documentation](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.KMeans.html#)",
-    )
-    st.sidebar.number_input(
-        "Random Seed",
-        min_value=0,
-        value=st.session_state.seed,
-        key="seed",
-        help="**Important**: set a fixed random seed so that clustering results and any downloaded files are **exactly** reproducible.",
     )
 
 
@@ -509,9 +514,11 @@ if st.session_state.get("did_cluster", False):
     export_df = st.session_state.df.drop(columns=["cluster_label"])
     make_download(
         export_df,
-        f"{base_name}_cluster_{st.session_state.n_clusters}",
-        f"download_clustered_{st.session_state.n_clusters}_{download_format}",
+        f"{base_name}_cluster_{n_clusters}",
+        f"download_clustered_{n_clusters}_{download_format}",
+        label="Clustered Data",
     )
+
 
 # ─── Determine df & cluster_col ────────────────────────────────────────────────
 if st.session_state.get("did_cluster", False):
@@ -656,13 +663,19 @@ else:
 
         if show_scores:
             make_download(
-                scores, f"{base_name}_pc_scores", f"download_pc_scores_{download_format}"
+                scores,
+                f"{base_name}_pc_scores",
+                f"download_pc_scores_{download_format}",
+                label="PC Scores Data",
             )
 
         if show_loadings:
             loadings_df = loadings.T.reset_index().rename(columns={"index": "component"})
             make_download(
-                loadings_df, f"{base_name}_pc_loadings", f"download_loadings_{download_format}"
+                loadings_df,
+                f"{base_name}_pc_loadings",
+                f"download_loadings_{download_format}",
+                label="PC Loadings Data",
             )
 
         if scale is not None:
@@ -797,7 +810,9 @@ else:
             pve_df,
             f"{base_name}_pve",
             f"download_pve_{download_format}",
+            label="PVE Table",
         )
+
     if show_cpve:
         st.markdown("### Cumulative Variance Explained")
         st.line_chart(cpve)
@@ -806,14 +821,16 @@ else:
             cpve_df,
             f"{base_name}_cpve",
             f"download_cpve_{download_format}",
+            label="CPVE Table",
         )
+
 
 # ─── Cluster Profiling ─────────────────────────────────────────────────────────
 st.sidebar.header("Cluster Profiling")
 
 # allow same file types as main uploader
 upload_types = ["csv", "txt", "xlsx", "xls"]
-raw_prof = st.sidebar.file_uploader("Raw Data (pre-processed)", type=upload_types, key="prof_raw")
+raw_prof = st.sidebar.file_uploader("Pre-processed Data", type=upload_types, key="prof_raw")
 clust_prof = st.sidebar.file_uploader("Cluster Results", type=upload_types, key="prof_clust")
 
 if raw_prof and clust_prof:
@@ -898,6 +915,7 @@ if raw_prof and clust_prof:
         counts[["cluster_name", "count"]].rename(columns={"cluster_name": "cluster_label"}),
         f"{base_name}_cluster_counts",
         f"download_cluster_counts_{download_format}",
+        label="Cluster Counts Data",
     )
 
     # now the profile stats
@@ -928,7 +946,11 @@ if raw_prof and clust_prof:
 
     # download & show profiles
     make_download(
-        profiles.reset_index(), f"{base_name}_profiles", f"download_profiles_{download_format}"
+        profiles.T.reset_index(),
+        f"{base_name}_profiles",
+        f"download_profiles_{download_format}",
+        label="Cluster Profiles Data",
     )
+
     st.markdown("### Cluster Profiles")
     st.dataframe(profiles.T, use_container_width=True)
