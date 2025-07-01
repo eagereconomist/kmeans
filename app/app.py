@@ -78,7 +78,7 @@ with st.sidebar.expander("Help & Instructions", expanded=False):
         Compare how features in data vary by cluster:
 
         - **Upload & Merge**  
-           - Raw data file (pre-processed features)  
+           - Raw data file (preprocessed features)  
            - Cluster results file  
            - By default, cluster column is chosen to join
            the two files, but there is the option to change
@@ -833,7 +833,7 @@ st.sidebar.header("Cluster Profiling")
 # allow same file types as main uploader
 upload_types = ["csv", "txt", "xlsx", "xls"]
 raw_prof = st.sidebar.file_uploader(
-    "Pre-processed Data",
+    "Preprocessed Data",
     type=upload_types,
     key="prof_raw",
     help=(
