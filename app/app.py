@@ -979,3 +979,65 @@ if raw_prof and clust_prof:
 
     st.markdown("### Cluster Profiles")
     st.dataframe(profiles.T, use_container_width=True)
+
+# ─── Professional Footer (auto-themed) ─────────────────────────────────────────
+st.markdown("---")
+st.markdown(
+    """
+    <style>
+    .footer-container {
+        background-color: var(--primaryBackgroundColor);
+        padding: 2rem 1rem;
+        margin-top: 2rem;
+        border-top: 1px solid var(--secondaryBackgroundColor);
+    }
+    .footer-container h4 {
+        margin-bottom: 0.5rem;
+        color: var(--textColor);
+    }
+    .footer-container p,
+    .footer-container a {
+        font-size: 0.9rem;
+        color: var(--textColorSecondary);
+        text-decoration: none;
+    }
+    .footer-container a:hover {
+        text-decoration: underline;
+    }
+    .footer-columns {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2rem;
+    }
+    .footer-column {
+        flex: 1;
+        min-width: 150px;
+    }
+    </style>
+    <div class="footer-container">
+      <div class="footer-columns">
+        <div class="footer-column">
+          <h4>Source API &amp; Documentation</h4>
+          <p><a href="https://scikit-learn.org/stable/modules/generated/sklearn.cluster.KMeans.html" target="_blank">scikit-learn KMeans API</a></p>
+          <p><a href="https://numpy.org/doc/" target="_blank">Numpy Documentation</a></p>
+          <p><a href="https://pandas.pydata.org/docs/" target="_blank">Pandas Documentation</a></p>
+          <p><a href="https://matplotlib.org/stable/index.html" target="_blank">matplotlib Documentation</a></p>
+          <p><a href="https://plotly.com/python/" target="_blank">plotly Documentation</a></p>
+        </div>
+        <div class="footer-column">
+          <h4>About</h4>
+          <p>K-Means Dashboard Developed by <a href="https://your-website-or-linkedin" target="_blank">Eric Miller</a></p>
+          <p>Artifical Intelligence was partially used in the development of this project</p>
+        </div>
+        <div class="footer-column">
+          <h4>Connect &amp; Support</h4>
+          <p><a href="https://github.com/eagereconomist" target="_blank">GitHub</a></p>
+          <p><a href="https://www.linkedin.com/in/eric-miller-20a162224/" target="_blank">LinkedIn</a></p>
+          <p><a href="https://www.paypal.com/donate/?hosted_button_id=LZBY6QZL5H2SE" target="_blank">Donate</a></p>
+        </div>
+      </div>
+      <p style="margin-top:1rem; font-size:0.8rem; color: var(--textColorSecondary);">© 2025 eagereconomist. All rights reserved.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
