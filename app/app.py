@@ -77,22 +77,24 @@ with st.sidebar.expander("Help & Instructions", expanded=False):
         **7. Cluster Profiling**  
         Compare how features in data vary by cluster:
 
-        1. **Upload & Merge**  
+        - **Upload & Merge**  
            - Raw data file (pre-processed features)  
            - Cluster results file  
            - By default, cluster column is chosen to join
            the two files, but there is the option to change
            the column  
 
-        2. **Rename Labels**  
+        - **Rename Labels**  
            - Edit each cluster's name in the `Rename Clusters` section 
 
-        3. **Counts & Profiles**  
+        - **Counts & Profiles**  
            - View/download cluster counts 
            - Generate per-cluster summary statistics (mean, median, min, max) in `Summary Statistics` section
         
         **Still stuck?**  
-        Reach out to your analysis team or check the GitHub README for more details.
+        Look for the `?` icons next to sidebar controls for quick tips, or:
+        - check the GitHub README for more details
+        - message me on [GitHub](https://github.com/eagereconomist)
         """
     )
 
