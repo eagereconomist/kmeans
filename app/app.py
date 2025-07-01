@@ -830,8 +830,24 @@ st.sidebar.header("Cluster Profiling")
 
 # allow same file types as main uploader
 upload_types = ["csv", "txt", "xlsx", "xls"]
-raw_prof = st.sidebar.file_uploader("Pre-processed Data", type=upload_types, key="prof_raw")
-clust_prof = st.sidebar.file_uploader("Cluster Results", type=upload_types, key="prof_clust")
+raw_prof = st.sidebar.file_uploader(
+    "Pre-processed Data",
+    type=upload_types,
+    key="prof_raw",
+    help=(
+        "Your original feature data on the raw scale. "
+        "We'll use the `unique_id` to link these back for interpretation."
+    ),
+)
+clust_prof = st.sidebar.file_uploader(
+    "Cluster Results",
+    type=upload_types,
+    key="prof_clust",
+    help=(
+        "Your clustering output (must include unique_id and cluster labels). "
+        "This lets us merge scaled clusters with the raw data exactly."
+    ),
+)
 
 if raw_prof and clust_prof:
     # read raw profile file
@@ -856,7 +872,11 @@ if raw_prof and clust_prof:
     if not cluster_opts:
         st.error("No column matching 'cluster' found in your results file.")
         st.stop()
-    prof_col = st.sidebar.selectbox("Which column is your cluster ID?", cluster_opts)
+    prof_col = st.sidebar.selectbox(
+        "Which column is your cluster ID?",
+        cluster_opts,
+        help="Pick the column in your results file that has the cluster labels for merging.",
+    )
 
     # merge & relabel clusters (1-based, strings)
     merged = (
@@ -877,6 +897,9 @@ if raw_prof and clust_prof:
 
     # allow renaming
     st.sidebar.subheader("Rename Clusters")
+    st.sidebar.caption(
+        "Optionally give each cluster a name - the bar chart and downloads update automatically"
+    )
     name_map = {}
     for cl in counts["cluster_label"]:
         name_map[cl] = st.sidebar.text_input(
