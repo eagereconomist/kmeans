@@ -792,9 +792,21 @@ else:
     if show_pve:
         st.markdown("### Percentage of Variance Explained")
         st.line_chart(pve)
+        pve_df = pve.rename_axis("PC").reset_index(name="PVE")
+        make_download(
+            pve_df,
+            f"{base_name}_pve",
+            f"download_pve_{download_format}",
+        )
     if show_cpve:
         st.markdown("### Cumulative Variance Explained")
         st.line_chart(cpve)
+        cpve_df = cpve.rename_axis("PC").reset_index(name="CPVE")
+        make_download(
+            cpve_df,
+            f"{base_name}_cpve",
+            f"download_cpve_{download_format}",
+        )
 
 # ─── Cluster Profiling ─────────────────────────────────────────────────────────
 st.sidebar.header("Cluster Profiling")
