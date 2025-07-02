@@ -452,7 +452,6 @@ if show_model_settings:
     st.sidebar.number_input(
         "Random Seed",
         min_value=0,
-        value=st.session_state.seed,
         key="seed",
         help="**Important**: set a fixed random seed so that clustering results and any downloaded files are **exactly** reproducible.",
     )
