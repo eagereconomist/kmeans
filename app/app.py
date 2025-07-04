@@ -29,7 +29,8 @@ with st.sidebar.expander("Help & Instructions", expanded=False):
         """
         **1. Inspect Data**  
         Before uploading, make sure your file:  
-        - Is one of `.csv`, `.txt`, `.xlsx`, or `.xls`  
+        - Is one of `.csv`, `.txt`, `.xlsx`, or `.xls`
+        - Is 200MB or less  
         - Has no missing values  
         - Includes at least 2 numeric features  
 
