@@ -2,8 +2,8 @@ import typer
 from pathlib import Path
 from tqdm import tqdm
 from loguru import logger
-from tennis_racquet_analysis.config import RAW_DATA_DIR
-from tennis_racquet_analysis.preprocessing_utils import load_data
+from module.config import RAW_DATA_DIR
+from module.preprocessing_utils import load_data
 
 app = typer.Typer()
 

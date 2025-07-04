@@ -1,1 +1,1 @@
-from tennis_racquet_analysis import config  # noqa: F401
+from module import config  # noqa: F401

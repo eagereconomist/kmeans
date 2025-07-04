@@ -3,12 +3,12 @@ from loguru import logger
 from tqdm import tqdm
 from typing import List, Optional
 import typer
-from tennis_racquet_analysis.config import (
+from module.config import (
     RAW_DATA_DIR,
     INTERIM_DATA_DIR,
     DATA_DIR,
 )
-from tennis_racquet_analysis.preprocessing_utils import (
+from module.preprocessing_utils import (
     load_data,
     find_iqr_outliers,
     compute_pca_summary,
@@ -16,7 +16,7 @@ from tennis_racquet_analysis.preprocessing_utils import (
     drop_row,
     dotless_column,
 )
-from tennis_racquet_analysis.processing_utils import (
+from module.processing_utils import (
     write_csv,
 )
 

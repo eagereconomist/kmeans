@@ -4,10 +4,10 @@ from pathlib import Path
 from typing import List
 from tqdm import tqdm
 
-from tennis_racquet_analysis.config import DATA_DIR
-from tennis_racquet_analysis.preprocessing_utils import load_data
-from tennis_racquet_analysis.processing_utils import write_csv
-from tennis_racquet_analysis.evaluation_utils import (
+from module.config import DATA_DIR
+from module.preprocessing_utils import load_data
+from module.processing_utils import write_csv
+from module.evaluation_utils import (
     compute_inertia_scores,
     compute_silhouette_scores,
     compute_calinski_scores,

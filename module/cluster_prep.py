@@ -1,9 +1,9 @@
 import typer
 from pathlib import Path
 from loguru import logger
-from tennis_racquet_analysis.config import DATA_DIR, EXTERNAL_DATA_DIR
-from tennis_racquet_analysis.preprocessing_utils import load_data
-from tennis_racquet_analysis.cluster_prep_utils import (
+from module.config import DATA_DIR, EXTERNAL_DATA_DIR
+from module.preprocessing_utils import load_data
+from module.cluster_prep_utils import (
     merge_cluster_labels,
     clusters_to_labels,
     count_labels,
