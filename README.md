@@ -1,4 +1,4 @@
-# tennis-racquet-analysis
+# Modular K-Means CLI
 
 <a target="_blank" href="https://cookiecutter-data-science.drivendata.org/">
     <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
@@ -27,7 +27,7 @@ Modular Data Segmentation Using PCA and K-Means in Python
 │                         `1.0-jqp-initial-data-exploration`.
 │
 ├── pyproject.toml     <- Project configuration file with package metadata for 
-│                         tennis_racquet_analysis and configuration for tools like black
+│                         module and configuration for tools like black
 │
 ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
 │
@@ -39,9 +39,9 @@ Modular Data Segmentation Using PCA and K-Means in Python
 │
 ├── setup.cfg          <- Configuration file for flake8
 │
-└── tennis_racquet_analysis   <- Source code for use in this project.
+└── module   <- Source code for use in this project.
     │
-    ├── __init__.py             <- Makes tennis_racquet_analysis a Python module
+    ├── __init__.py             <- Makes module a Python module
     │
     ├── config.py               <- Store useful variables and configuration
     │
