@@ -1026,11 +1026,12 @@ st.markdown(
         </div>
         <div class="footer-column">
           <h4>About</h4>
-          <p>K-Means Dashboard Developed by <a href="https://your-website-or-linkedin" target="_blank">Eric Miller</a></p>
+          <p>K-Means Dashboard Developed by <a href="https://eagereconomist.carrd.co" target="_blank">Eric Miller</a></p>
           <p>Artifical Intelligence was partially used in the development of this project</p>
         </div>
         <div class="footer-column">
           <h4>Connect &amp; Support</h4>
+          <p><a href="https://eagereconomist.carrd.co" target="_blank">Website</a></p>
           <p><a href="https://github.com/eagereconomist" target="_blank">GitHub</a></p>
           <p><a href="https://www.linkedin.com/in/eric-miller-20a162224/" target="_blank">LinkedIn</a></p>
           <p><a href="https://www.paypal.com/donate/?hosted_button_id=LZBY6QZL5H2SE" target="_blank">Donate</a></p>
