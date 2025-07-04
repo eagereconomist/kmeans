@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import Path
 from sklearn import preprocessing
 from sklearn.preprocessing import Normalizer, StandardScaler, MinMaxScaler
-from module.preprocessing_utils import load_data  # noqa: F401
+from kmflow.preprocessing_utils import load_data  # noqa: F401
 
 
 def write_csv(dataframe: pd.DataFrame, prefix: str, suffix: str, output_dir: Path) -> Path:

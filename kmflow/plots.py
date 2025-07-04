@@ -8,9 +8,9 @@ from math import ceil
 import plotly.express as px
 
 
-from module.config import DATA_DIR, FIGURES_DIR
-from module.preprocessing_utils import load_data
-from module.plots_utils import (
+from kmflow.config import DATA_DIR, FIGURES_DIR
+from kmflow.preprocessing_utils import load_data
+from kmflow.plots_utils import (
     _save_fig,
     _apply_cubehelix_style,
     bar_plot,
@@ -31,7 +31,7 @@ from module.plots_utils import (
     plot_batch_clusters,
 )
 
-from module.preprocessing_utils import compute_pca_summary
+from kmflow.preprocessing_utils import compute_pca_summary
 
 app = typer.Typer()
 

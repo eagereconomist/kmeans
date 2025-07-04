@@ -27,7 +27,7 @@ Modular Data Segmentation Using PCA and K-Means in Python
 │                         `1.0-jqp-initial-data-exploration`.
 │
 ├── pyproject.toml     <- Project configuration file with package metadata for 
-│                         module and configuration for tools like black
+│                         kmflow and configuration for tools like black
 │
 ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
 │
@@ -39,9 +39,9 @@ Modular Data Segmentation Using PCA and K-Means in Python
 │
 ├── setup.cfg          <- Configuration file for flake8
 │
-└── module   <- Source code for use in this project.
+└── kmflow   <- Source code for use in this project.
     │
-    ├── __init__.py             <- Makes module a Python module
+    ├── __init__.py             <- Makes kmflow a Python module
     │
     ├── config.py               <- Store useful variables and configuration
     │

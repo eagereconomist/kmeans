@@ -2,8 +2,8 @@ import typer
 from pathlib import Path
 from tqdm import tqdm
 from loguru import logger
-from module.config import RAW_DATA_DIR
-from module.preprocessing_utils import load_data
+from kmflow.config import RAW_DATA_DIR
+from kmflow.preprocessing_utils import load_data
 
 app = typer.Typer()
 

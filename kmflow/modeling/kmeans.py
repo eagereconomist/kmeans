@@ -4,13 +4,13 @@ from pathlib import Path
 from typing import List
 from tqdm import tqdm
 
-from module.config import DATA_DIR
-from module.preprocessing_utils import load_data
-from module.modeling.kmeans_utils import (
+from kmflow.config import DATA_DIR
+from kmflow.preprocessing_utils import load_data
+from kmflow.modeling.kmeans_utils import (
     fit_kmeans,
     batch_kmeans,
 )
-from module.processing_utils import write_csv
+from kmflow.processing_utils import write_csv
 
 app = typer.Typer()
 

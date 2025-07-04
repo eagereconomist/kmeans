@@ -1,9 +1,9 @@
 import typer
 from pathlib import Path
 from loguru import logger
-from module.config import DATA_DIR, EXTERNAL_DATA_DIR
-from module.preprocessing_utils import load_data
-from module.cluster_prep_utils import (
+from kmflow.config import DATA_DIR, EXTERNAL_DATA_DIR
+from kmflow.preprocessing_utils import load_data
+from kmflow.cluster_prep_utils import (
     merge_cluster_labels,
     clusters_to_labels,
     count_labels,

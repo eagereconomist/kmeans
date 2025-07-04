@@ -3,8 +3,8 @@ from loguru import logger
 from tqdm import tqdm
 import typer
 
-from module.config import INTERIM_DATA_DIR, PROCESSED_DATA_DIR
-from module.processing_utils import (
+from kmflow.config import INTERIM_DATA_DIR, PROCESSED_DATA_DIR
+from kmflow.processing_utils import (
     load_data,
     write_csv,
     apply_normalizer,
