@@ -8,9 +8,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from pandas.api import types as pd_types
-from tennis_racquet_analysis.modeling.kmeans_utils import fit_kmeans
-from tennis_racquet_analysis.preprocessing_utils import compute_pca_summary
-from tennis_racquet_analysis.evaluation_utils import (
+from module.modeling.kmeans_utils import fit_kmeans
+from module.preprocessing_utils import compute_pca_summary
+from module.evaluation_utils import (
     compute_inertia_scores,
     compute_silhouette_scores,
 )
