@@ -120,7 +120,29 @@ if st.sidebar.button("Restart"):
 
 st.sidebar.title("Dashboard Settings")
 
+
 # ─── 2) Upload ─────────────────────────────────────────────────────────────────
+@st.cache_data(show_spinner=False)
+def load_data(raw_bytes: bytes, name: str) -> pd.DataFrame:
+    """Read CSV/TXT or Excel once per file content."""
+    ext = os.path.splitext(name.lower())[1]
+
+    if ext in (".csv", ".txt"):
+        # Decode entire file to text, then let pandas read from StringIO
+        text = raw_bytes.decode("utf-8", errors="replace")
+        df = pd.read_csv(io.StringIO(text), sep=",", engine="c")
+
+    elif ext in (".xls", ".xlsx"):
+        df = pd.read_excel(io.BytesIO(raw_bytes), engine="openpyxl")
+
+    else:
+        raise ValueError(f"Unsupported file type: {ext}")
+
+    if df.shape[1] == 0:
+        raise ValueError("Parsed file, but no columns were found.")
+    return df
+
+
 uploader_key = f"uploader_{st.session_state.get('uploader_count', 0)}"
 uploaded = st.sidebar.file_uploader(
     "Upload your own data",
@@ -128,16 +150,30 @@ uploaded = st.sidebar.file_uploader(
     key=uploader_key,
     help="Choose a local data file to begin",
 )
+
+# 1) Stop if nothing’s uploaded
 if not uploaded:
     st.error("Please upload a data file to proceed.")
     st.stop()
 
-# derive base name for downloads
-base_name, ext = os.path.splitext(uploaded.name.lower())
+# 2) Pull the raw bytes via getvalue() (never empties the buffer)
+raw_bytes = uploaded.getvalue()
 
-# set download-format default to match uploaded file extension
+# 3) Now actually load, with a progress bar and clear error messaging
+try:
+    progress = st.sidebar.progress(0, text="Reading file…")
+    raw_df = load_data(raw_bytes, uploaded.name)
+    progress.progress(100, text="File loaded!")
+    progress.empty()
+except Exception as err:
+    st.error(f"Error reading `{uploaded.name}`: {err}")
+    st.stop()
+
+# 4 It’s now safe to do this:
+base_name, ext = os.path.splitext(uploaded.name.lower())
 _format_opts = ["csv", "txt", "xlsx", "xls"]
 _default_fmt = ext.lstrip(".") if ext.lstrip(".") in _format_opts else "csv"
+
 
 # ─── Download format selector ─────────────────────────────────────────────
 download_format = st.sidebar.selectbox(
