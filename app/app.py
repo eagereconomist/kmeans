@@ -391,7 +391,6 @@ seed = st.session_state.seed
 
 # ─── Cluster Diagnostics ──────────────────────────────────────────────────────
 # only show diagnostics when we have raw feature data (not pre-clustered/pure PC-loadings)
-# ─── Cluster Diagnostics ──────────────────────────────────────────────────────
 if not initial and not is_pca_loadings_file:
     st.sidebar.header("Cluster Diagnostics")
     max_k = st.sidebar.slider(
