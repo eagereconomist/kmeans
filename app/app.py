@@ -547,7 +547,7 @@ if show_model_settings:
         progress_bar = st.sidebar.progress(0, text="Running K-Means Clustering...")
         try:
             df_clustered = fit_kmeans(
-                raw_df.copy(),
+                raw_df,
                 k=n_clusters,
                 feature_columns=None,
                 init=init,
@@ -562,17 +562,27 @@ if show_model_settings:
                 "An error occurred during K-Means clustering. Please verify your data and settings."
             )
         else:
-            col = f"cluster_{n_clusters}"
-            df_clustered[col] = df_clustered[col].astype(int)
-            df_clustered["cluster_label"] = (df_clustered[col] + 1).astype(str)
+            # Define the new cluster column name
+            cluster_col_name = f"cluster_{n_clusters}"
+            # Convert to int in-place
+            df_clustered[cluster_col_name] = df_clustered[cluster_col_name].astype(int)
+            # Create a 1-based string label in-place
+            df_clustered["cluster_label"] = (df_clustered[cluster_col_name] + 1).astype(str)
+
+            # Persist to session_state
             st.session_state.df = df_clustered
-            st.session_state.cluster_col = col
+            st.session_state.cluster_col = cluster_col_name
             st.session_state.color_col = "cluster_label"
             st.session_state.cluster_order = [
-                str(i) for i in sorted(df_clustered["cluster_label"].astype(int).unique())
+                str(i) for i in sorted(df_clustered[cluster_col_name].astype(int).unique())
             ]
             st.session_state.did_cluster = True
-            show_dataset(df_clustered.drop(columns=["cluster_label"]))
+
+            # Update the display (no need to drop/reset anything)
+            show_dataset(df_clustered)
+        finally:
+            progress_bar.empty()
+
 
 # ─── Download Clustering Results ────────────────────────────────────────────────
 if st.session_state.get("did_cluster", False):
@@ -603,37 +613,42 @@ if not st.session_state.get("did_cluster", False):
     st.warning("Please run K-Means to view the PCA Biplot.")
 else:
     if is_pca_scores_file:
-        scores = raw_df[imported_pcs].copy()
+        # Use the uploaded PC scores directly (no .copy())
+        scores = raw_df[imported_pcs]
+        pcs = list(imported_pcs)
         loadings = None
         variances = scores.var(ddof=0)
         pve = variances / variances.sum()
         cpve = pve.cumsum()
     else:
+        # Cached PCA compute
+        import pandas as pd
+
         clustered_hash = pd.util.hash_pandas_object(df, index=True).values.tobytes()
         pca_bar = st.progress(0, text="Computing PCA Summary...")
         try:
             pca_res = cached_pca(clustered_hash, st.session_state.cluster_col)
-            scores, loadings, pve, cpve = (
-                pca_res["scores"],
-                pca_res["loadings"],
-                pca_res["pve"],
-                pca_res["cpve"],
-            )
+            scores = pca_res["scores"]
+            loadings = pca_res["loadings"]
+            pve = pca_res["pve"]
+            cpve = pca_res["cpve"]
+            pcs = list(scores.columns)
+            pca_bar.progress(100, text="PCA Computation Complete!")
         except Exception as e:
-            progress_bar.empty()
+            pca_bar.empty()
             st.error(f"PCA computation failed: {e}")
             st.stop()
-        else:
-            progress_bar.progress(100, text="PCA Computation Complete!")
         finally:
-            progress_bar.empty()
+            pca_bar.empty()
 
-    # combine scores with original df
-    old_pcs = [column for column in df.columns if re.fullmatch(r"(?i)PC\d+", column)]
-    if old_pcs:
-        df = df.drop(columns=old_pcs)
-    df = pd.concat([df.reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
-    pcs = scores.columns.tolist()
+    # drop any old PC columns in-place
+    old_pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC\\d+", c)]
+    for col in old_pcs:
+        df.drop(columns=col, inplace=True)
+
+    # assign each new PC directly
+    for pc in pcs:
+        df[pc] = scores[pc].values
 
     hover_cols = ["unique_id", st.session_state.get("color_col")] + pcs[:3]
     hover_template = "Unique ID = %{customdata[0]}<br>Cluster = %{customdata[1]}"
@@ -902,7 +917,7 @@ raw_prof = st.sidebar.file_uploader(
     key="prof_raw",
     help=(
         "Your original feature data on the raw scale. "
-        "We'll use the `unique_id` to link these back for interpretation."
+        "We'll use `unique_id` to link these back for interpretation."
     ),
 )
 clust_prof = st.sidebar.file_uploader(
@@ -916,65 +931,54 @@ clust_prof = st.sidebar.file_uploader(
 )
 
 if raw_prof and clust_prof:
-    # read raw profile file
+    # 1) Read files once
     ext_raw = os.path.splitext(raw_prof.name.lower())[1]
     ext_clust = os.path.splitext(clust_prof.name.lower())[1]
+    raw_df_prof = (
+        pd.read_excel(raw_prof) if ext_raw in (".xls", ".xlsx") else pd.read_csv(raw_prof)
+    )
+    clust_df_prof = (
+        pd.read_excel(clust_prof) if ext_clust in (".xls", ".xlsx") else pd.read_csv(clust_prof)
+    )
 
-    if ext_raw in (".xlsx", ".xls"):
-        raw_df = pd.read_excel(raw_prof)
-    else:
-        raw_df = pd.read_csv(raw_prof)
+    # 2) Ensure unique_id columns
+    raw_df_prof["unique_id"] = raw_df_prof.index
+    clust_df_prof["unique_id"] = clust_df_prof.index
 
-    if ext_clust in (".xlsx", ".xls"):
-        clust_df = pd.read_excel(clust_prof)
-    else:
-        clust_df = pd.read_csv(clust_prof)
-
-    raw_df["unique_id"] = raw_df.index
-    clust_df["unique_id"] = clust_df.index
-
-    # pick the cluster column
-    cluster_opts = [c for c in clust_df.columns if re.search(r"cluster", c, re.I)]
-    if not cluster_opts:
-        st.error("No column matching 'cluster' found in your results file.")
-        st.stop()
+    # 3) Pick the cluster column
+    cluster_opts = [c for c in clust_df_prof.columns if re.search(r"cluster", c, re.I)]
     prof_col = st.sidebar.selectbox(
         "Which column is your cluster ID?",
         cluster_opts,
         help="Pick the column in your results file that has the cluster labels for merging.",
     )
 
-    # merge & relabel clusters (1-based, strings)
-    merged = (
-        raw_df.merge(clust_df[["unique_id", prof_col]], on="unique_id")
-        .rename(columns={prof_col: "cluster_label"})
-        .drop(columns=["unique_id"])
-    )
-    merged["cluster_label"] = (merged["cluster_label"].astype(int) + 1).astype(str)
+    # 4) Join in-place on unique_id (index join)
+    raw_df_prof.set_index("unique_id", inplace=True)
+    clust_df_prof.set_index("unique_id", inplace=True)
+    raw_df_prof["cluster_label"] = (clust_df_prof[prof_col].astype(int) + 1).astype(str)
 
-    # compute counts
+    # 5) Compute counts
     counts = (
-        merged["cluster_label"]
+        raw_df_prof["cluster_label"]
         .value_counts()
         .sort_index(key=lambda idx: idx.astype(int))
         .rename_axis("cluster_label")
         .reset_index(name="count")
     )
 
-    # allow renaming
+    # 6) Rename labels
     st.sidebar.subheader("Rename Clusters")
     st.sidebar.caption(
         "Optionally give each cluster a name - the bar chart and downloads update automatically"
     )
-    name_map = {}
-    for cl in counts["cluster_label"]:
-        name_map[cl] = st.sidebar.text_input(
-            f"Label for Cluster {cl}", value=cl, key=f"rename_{cl}"
-        )
+    name_map = {
+        cl: st.sidebar.text_input(f"Label for Cluster {cl}", value=cl, key=f"rename_{cl}")
+        for cl in counts["cluster_label"]
+    }
     counts["cluster_name"] = counts["cluster_label"].map(name_map)
 
-    # plot with larger x-axis title
-    st.markdown("### Cluster Counts")
+    # 7) Plot counts
     fig = px.bar(
         counts,
         x="cluster_name",
@@ -982,24 +986,19 @@ if raw_prof and clust_prof:
         labels={"cluster_name": "Cluster", "count": "Count"},
     )
     fig.update_xaxes(title_font_size=18, tickfont_size=14)
-
     fig.update_xaxes(
         type="category",
         tickmode="array",
-        tickvals=counts["cluster_name"].tolist(),
+        tickvals=counts["cluster_name"],
         ticktext=[
-            # if it’s a “1.0” style string, turn it into “1”, otherwise leave it alone
             str(int(float(x))) if re.fullmatch(r"-?\d+(\.0+)?", x) else x
             for x in counts["cluster_name"]
         ],
-        title_font_size=18,
-        tickfont_size=14,
     )
-
     fig.update_yaxes(title_font_size=18, tickfont_size=12)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, key="cluster_counts")
 
-    # download counts
+    # 8) Download counts
     make_download(
         counts[["cluster_name", "count"]].rename(columns={"cluster_name": "cluster_label"}),
         f"{base_name}_cluster_counts",
@@ -1007,42 +1006,39 @@ if raw_prof and clust_prof:
         label="Cluster Counts Data",
     )
 
-    # now the profile stats
+    # 9) Summary statistics
     extra = st.sidebar.multiselect("Summary Statistics", ["median", "min", "max"], default=[])
     stats = ["mean"] + extra
 
-    progress = st.progress(0, text="Calculating profiles…")
+    progress = st.sidebar.progress(0, text="Calculating profiles…")
     try:
-
-        def _get_profiles(df, cluster_col, stats):
-            feats = [
-                c
-                for c in df.columns
-                if c != cluster_col
-                and pd_types.is_numeric_dtype(df[c])
-                and not re.fullmatch(r"PC\d+", c, flags=re.I)
-            ]
-            agg = df.groupby(cluster_col)[feats].agg(stats)
-            agg.columns = [f"{feat}_{stat}" for feat, stat in agg.columns]
-            return agg.reset_index()
-
-        profiles = _get_profiles(merged, "cluster_label", stats).set_index("cluster_label")
+        # pick numeric feature columns (exclude the cluster column and any PCs)
+        feats = [
+            c
+            for c in raw_df_prof.columns
+            if c != "cluster_label"
+            and pd_types.is_numeric_dtype(raw_df_prof[c])
+            and not re.fullmatch(r"PC\d+", c, flags=re.I)
+        ]
+        agg = raw_df_prof.groupby("cluster_label")[feats].agg(stats)
+        agg.columns = [f"{feat}_{stat}" for feat, stat in agg.columns]
+        profiles = agg.reset_index().set_index("cluster_label")
         progress.progress(100, text="Profiles ready!")
     except Exception as e:
         st.error(f"Cluster profiling failed: {e}")
     finally:
         progress.empty()
 
-    # download & show profiles
+    # 10) Download & display profiles
     make_download(
         profiles.T.reset_index(),
         f"{base_name}_profiles",
         f"download_profiles_{download_format}",
         label="Cluster Profiles Data",
     )
-
     st.markdown("### Cluster Profiles")
     st.dataframe(profiles.T, use_container_width=True)
+
 
 # ─── Professional Footer (auto-themed) ─────────────────────────────────────────
 st.markdown("---")
