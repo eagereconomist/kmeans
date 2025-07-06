@@ -15,6 +15,58 @@ from kmflow.evaluation_utils import (
     compute_silhouette_scores,
 )
 
+
+# ─── 0) Cache wrappers for heavy computations ───────────────────────────────────
+@st.cache_data(show_spinner=False)
+def cached_inertia(
+    df_hash: bytes,
+    k_range: tuple[int, ...],
+    feature_columns: tuple[str, ...],
+    init_method: str,
+    n_init: int,
+    random_state: int,
+    algorithm: str,
+) -> pd.DataFrame:
+    return compute_inertia_scores(
+        df=raw_df,
+        k_range=list(k_range),
+        feature_columns=list(feature_columns),
+        init=init_method,
+        n_init=n_init,
+        random_state=random_state,
+        algorithm=algorithm,
+    )
+
+
+@st.cache_data(show_spinner=False)
+def cached_silhouette(
+    df_hash: bytes,
+    k_values: tuple[int, ...],
+    feature_columns: tuple[str, ...],
+    init_method: str,
+    n_init: int,
+    random_state: int,
+    algorithm: str,
+) -> pd.DataFrame:
+    return compute_silhouette_scores(
+        df=raw_df,
+        k_values=list(k_values),
+        feature_columns=list(feature_columns),
+        init=init_method,
+        n_init=n_init,
+        random_state=random_state,
+        algorithm=algorithm,
+    )
+
+
+@st.cache_data(show_spinner=False)
+def cached_pca(
+    df_hash: bytes,
+    hue_column: str,
+) -> dict:
+    return compute_pca_summary(df=df, hue_column=hue_column)
+
+
 # ─── 1) Page config ───────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="K-Means Clustering Dashboard",
@@ -339,71 +391,51 @@ seed = st.session_state.seed
 
 # ─── Cluster Diagnostics ──────────────────────────────────────────────────────
 # only show diagnostics when we have raw feature data (not pre-clustered/pure PC-loadings)
+# ─── Cluster Diagnostics ──────────────────────────────────────────────────────
 if not initial and not is_pca_loadings_file:
     st.sidebar.header("Cluster Diagnostics")
     max_k = st.sidebar.slider(
         "Max Clusters", 2, 20, 10, help="Pick the max amount of clusters to use in diagnostics"
     )
 
-    # single dropdown menu for diagnostics options
     diag_opts = ["Scree Plot", "Silhouette Plot", "Table"]
     selected_diags = st.sidebar.multiselect(
-        "Show Cluster Diagnostics",
-        diag_opts,
-        default=[],
-        help=(
-            "Select one or more diagnostics to evaluate clustering:\n"
-            "- Scree Plot: inertia vs. number of clusters (elbow method)\n"
-            "- Silhouette Plot: silhouette per cluster\n"
-            "- Table: numeric inertia & silhouette scores (view/download)"
-        ),
+        "Show Cluster Diagnostics", diag_opts, default=[], help="Select one or more diagnostics"
     )
 
     show_diag_data = "Table" in selected_diags
     show_inertia = "Scree Plot" in selected_diags
     show_silhouette = "Silhouette Plot" in selected_diags
-
     diagnostics_requested = bool(selected_diags)
 
     if diagnostics_requested:
-        # use a dedicated progress bar
         diag_bar = st.sidebar.progress(0, text="Running Clustering Diagnostics...")
-        try:
-            ks = list(range(1, max_k + 1))
 
+        # Build cache key parts
+        import pandas as pd
+
+        df_hash = pd.util.hash_pandas_object(raw_df, index=True).values.tobytes()
+        ks = tuple(range(1, max_k + 1))
+        num_cols = tuple(numeric_cols)
+        params = (init, n_init, seed, algo)
+
+        try:
             # Inertia
             if show_diag_data or show_inertia:
                 diag_bar.progress(10, text="Computing Inertia Scores...")
-                inert_df = compute_inertia_scores(
-                    df=raw_df,
-                    k_range=ks,
-                    feature_columns=numeric_cols,
-                    init=init,
-                    n_init=n_init,
-                    random_state=seed,
-                    algorithm=algo,
-                )
+                inert_df = cached_inertia(df_hash, ks, num_cols, *params)
                 inert_df["k"] = inert_df["k"].astype(int)
             else:
                 inert_df = pd.DataFrame()
 
             # Silhouette
             if show_silhouette:
-                ks_sil = [k for k in ks if k >= 2]
+                ks_sil = tuple(k for k in ks if k >= 2)
                 if ks_sil:
                     diag_bar.progress(60, text="Computing Silhouette Scores...")
                     sil_df = (
-                        compute_silhouette_scores(
-                            df=raw_df,
-                            k_values=ks_sil,
-                            feature_columns=numeric_cols,
-                            init=init,
-                            n_init=n_init,
-                            random_state=seed,
-                            algorithm=algo,
-                        )
+                        cached_silhouette(df_hash, ks_sil, num_cols, *params)
                         .rename(columns={"n_clusters": "k"})
-                        .assign(k=lambda d: d["k"].astype(int))
                         .set_index("k")
                     )
                 else:
@@ -414,15 +446,12 @@ if not initial and not is_pca_loadings_file:
                 sil_ser = pd.Series(dtype=float)
 
             diag_bar.progress(100, text="Diagnostics Complete!")
-
         except Exception as e:
             st.error(f"Could not compute diagnostics: {e}")
             inert_df = pd.DataFrame()
             sil_df = pd.DataFrame()
             sil_ser = pd.Series(dtype=float)
-
         finally:
-            # guaranteed to clear the bar
             diag_bar.empty()
 
     # ─── Diagnostics Table ────────────────────────────────────────────────────────
@@ -438,8 +467,6 @@ if not initial and not is_pca_loadings_file:
                 diag_df["silhouette"] = sil_ser.values[: len(diag_df)]
             st.markdown("#### Cluster Diagnostics Data")
             st.dataframe(diag_df)
-
-            # Download Cluster Diagnostics Data
             make_download(
                 diag_df,
                 f"{base_name}_cluster_diagnostics",
@@ -452,7 +479,7 @@ if not initial and not is_pca_loadings_file:
         st.markdown("### Inertia vs. k")
         fig_i = px.line(inert_df, x="k", y="inertia", markers=True)
         fig_i.update_xaxes(dtick=1, tickformat="d")
-        st.plotly_chart(fig_i, use_container_width=True)
+        st.plotly_chart(fig_i, use_container_width=True, key="inertia_plot")
 
     # ─── Silhouette Plot ──────────────────────────────────────────────────────────
     if show_silhouette:
@@ -463,7 +490,7 @@ if not initial and not is_pca_loadings_file:
         sil_plot_df = sil_plot_df[sil_plot_df["k"] >= 2]
         fig_s = px.line(sil_plot_df, x="k", y="silhouette_score", markers=True)
         fig_s.update_xaxes(tick0=2, dtick=1, tickformat="d")
-        st.plotly_chart(fig_s, use_container_width=True)
+        st.plotly_chart(fig_s, use_container_width=True, key="silhouette_plot")
 
     else:
         # diagnostics hidden
@@ -582,14 +609,15 @@ else:
         pve = variances / variances.sum()
         cpve = pve.cumsum()
     else:
-        progress_bar = st.progress(0, text="Computing PCA Summary...")
+        clustered_hash = pd.util.hash_pandas_object(df, index=True).values.tobytes()
+        pca_bar = st.progress(0, text="Computing PCA Summary...")
         try:
-            pca = compute_pca_summary(df=df, hue_column=cluster_col)
+            pca_res = cached_pca(clustered_hash, st.session_state.cluster_col)
             scores, loadings, pve, cpve = (
-                pca["scores"],
-                pca["loadings"],
-                pca["pve"],
-                pca["cpve"],
+                pca_res["scores"],
+                pca_res["loadings"],
+                pca_res["pve"],
+                pca_res["cpve"],
             )
         except Exception as e:
             progress_bar.empty()
