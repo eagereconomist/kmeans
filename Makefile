@@ -64,7 +64,7 @@ create_environment:
 ## Make dataset
 .PHONY: data
 data: requirements
-	$(PYTHON_INTERPRETER) tennis_racquet_analysis/dataset.py
+	$(PYTHON_INTERPRETER) kmflow/dataset.py
 
 
 #################################################################################
