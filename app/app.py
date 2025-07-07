@@ -8,60 +8,85 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from pandas.api import types as pd_types
+from sklearn.cluster import KMeans
 from kmflow.modeling.kmeans_utils import fit_kmeans
+from joblib import Parallel, delayed
 from kmflow.preprocessing_utils import compute_pca_summary
-from kmflow.evaluation_utils import (
-    compute_inertia_scores,
-    compute_silhouette_scores,
-)
 
 
 # ─── 0) Cache wrappers for heavy computations ───────────────────────────────────
+
+# maximum number of clusters we ever compute diagnostics for
+
+MAX_DIAG_K = 20
+
+
 @st.cache_data(show_spinner=False)
 def cached_inertia(
-    df_hash: bytes,
-    k_range: tuple[int, ...],
     feature_columns: tuple[str, ...],
     init_method: str,
     n_init: int,
     random_state: int,
     algorithm: str,
 ) -> pd.DataFrame:
-    return compute_inertia_scores(
-        df=raw_df,
-        k_range=list(k_range),
-        feature_columns=list(feature_columns),
-        init=init_method,
-        n_init=n_init,
-        random_state=random_state,
-        algorithm=algorithm,
-    )
+    X = raw_df[list(feature_columns)].to_numpy()
+
+    def _inertia(k: int) -> dict:
+        # elkan doesn't make sense for k=1, so switch to lloyd in that one case
+        algo_use = "lloyd" if (algorithm == "elkan" and k == 1) else algorithm
+        km = KMeans(
+            n_clusters=k,
+            init=init_method,
+            n_init=n_init,
+            random_state=random_state,
+            algorithm=algo_use,
+        )
+        km.fit(X)
+        return {"k": k, "inertia": km.inertia_}
+
+    results = Parallel(n_jobs=-1)(delayed(_inertia)(k) for k in range(1, MAX_DIAG_K + 1))
+    inert_df = pd.DataFrame(results)
+    inert_df["k"] = inert_df["k"].astype(int)
+    return inert_df
 
 
 @st.cache_data(show_spinner=False)
 def cached_silhouette(
-    df_hash: bytes,
-    k_values: tuple[int, ...],
     feature_columns: tuple[str, ...],
     init_method: str,
     n_init: int,
     random_state: int,
     algorithm: str,
 ) -> pd.DataFrame:
-    return compute_silhouette_scores(
-        df=raw_df,
-        k_values=list(k_values),
-        feature_columns=list(feature_columns),
-        init=init_method,
-        n_init=n_init,
-        random_state=random_state,
-        algorithm=algorithm,
-    )
+    """
+    Compute silhouette scores for k=2..MAX_DIAG_K in parallel.
+    """
+    X = raw_df[list(feature_columns)].to_numpy()
+
+    def _sil(k):
+        km = KMeans(
+            n_clusters=k,
+            init=init_method,
+            n_init=n_init,
+            random_state=random_state,
+            algorithm=algorithm,
+        )
+        labels = km.fit_predict(X)
+        # we import here to avoid top‐level overhead
+        from sklearn.metrics import silhouette_score
+
+        score = silhouette_score(X, labels)
+        return {"k": k, "silhouette_score": score}
+
+    results = Parallel(n_jobs=-1)(delayed(_sil)(k) for k in range(2, MAX_DIAG_K + 1))
+    sil_df = pd.DataFrame(results).rename(columns={"silhouette_score": "silhouette_score"})
+    sil_df["k"] = sil_df["k"].astype(int)
+    sil_df.set_index("k", inplace=True)
+    return sil_df
 
 
 @st.cache_data(show_spinner=False)
 def cached_pca(
-    df_hash: bytes,
     hue_column: str,
 ) -> dict:
     return compute_pca_summary(df=df, hue_column=hue_column)
@@ -81,7 +106,7 @@ with st.sidebar.expander("Help & Instructions", expanded=False):
         """
         **1. Inspect Data**  
         Before uploading, make sure your file:  
-        - Is one of `.csv`, `.txt`, `.xlsx`, or `.xls`
+        - Is one of `.csv`, `.txt`, or `.xlsx`
         - Is 200MB or less  
         - Has no missing values  
         - Includes at least 2 numeric features  
@@ -184,7 +209,7 @@ def load_data(raw_bytes: bytes, name: str) -> pd.DataFrame:
         text = raw_bytes.decode("utf-8", errors="replace")
         df = pd.read_csv(io.StringIO(text), sep=",", engine="c")
 
-    elif ext in (".xls", ".xlsx"):
+    elif ext in (".xlsx"):
         df = pd.read_excel(io.BytesIO(raw_bytes), engine="openpyxl")
 
     else:
@@ -223,7 +248,7 @@ except Exception as err:
 
 # 4 It’s now safe to do this:
 base_name, ext = os.path.splitext(uploaded.name.lower())
-_format_opts = ["csv", "txt", "xlsx", "xls"]
+_format_opts = ["csv", "txt", "xlsx"]
 _default_fmt = ext.lstrip(".") if ext.lstrip(".") in _format_opts else "csv"
 
 
@@ -254,10 +279,8 @@ def make_download(df: pd.DataFrame, name: str, key: str, label: str = None):
         st.error(f"Unsupported format: {download_format}")
         return
 
-    # derive base label and always append extension
     base_label = label or name.replace("_", " ").title()
     button_label = f"{base_label} (.{download_format})"
-
     st.sidebar.download_button(
         button_label,
         data,
@@ -289,7 +312,7 @@ try:
     if ext in (".csv", ".txt"):
         sep = ","
         raw_df = pd.read_csv(uploaded, sep=sep)
-    elif ext in (".xlsx", ".xls"):
+    elif ext in (".xlsx"):
         raw_df = pd.read_excel(uploaded)
     else:
         raise ValueError(f"Unsupported file type: {ext}")
@@ -391,7 +414,6 @@ seed = st.session_state.seed
 
 # ─── Cluster Diagnostics ──────────────────────────────────────────────────────
 # only show diagnostics when we have raw feature data (not pre-clustered/pure PC-loadings)
-# ─── Cluster Diagnostics ──────────────────────────────────────────────────────
 if not initial and not is_pca_loadings_file:
     st.sidebar.header("Cluster Diagnostics")
     max_k = st.sidebar.slider(
@@ -415,32 +437,27 @@ if not initial and not is_pca_loadings_file:
         import pandas as pd
 
         df_hash = pd.util.hash_pandas_object(raw_df, index=True).values.tobytes()
-        ks = tuple(range(1, max_k + 1))
         num_cols = tuple(numeric_cols)
         params = (init, n_init, seed, algo)
 
         try:
             # Inertia
             if show_diag_data or show_inertia:
-                diag_bar.progress(10, text="Computing Inertia Scores...")
-                inert_df = cached_inertia(df_hash, ks, num_cols, *params)
-                inert_df["k"] = inert_df["k"].astype(int)
+                diag_bar.progress(10, text="Loading Cached Inertia...")
+                inert_all = cached_inertia(df_hash, num_cols, *params)
+
+                # now slice down to what the user chose
+                if show_diag_data or show_inertia:
+                    inert_df = inert_all[inert_all["k"] <= max_k]
             else:
                 inert_df = pd.DataFrame()
 
             # Silhouette
             if show_silhouette:
-                ks_sil = tuple(k for k in ks if k >= 2)
-                if ks_sil:
-                    diag_bar.progress(60, text="Computing Silhouette Scores...")
-                    sil_df = (
-                        cached_silhouette(df_hash, ks_sil, num_cols, *params)
-                        .rename(columns={"n_clusters": "k"})
-                        .set_index("k")
-                    )
-                else:
-                    sil_df = pd.DataFrame(columns=["silhouette_score"])
-                sil_ser = sil_df["silhouette_score"].reindex(ks)
+                diag_bar.progress(60, text="Loading Cached Silhouette...")
+                sil_all = cached_silhouette(df_hash, num_cols, *params)
+                sil_df = sil_all.loc[2:max_k]
+                sil_ser = sil_df["silhouette_score"].reindex(range(1, max_k + 1), fill_value=None)
             else:
                 sil_df = pd.DataFrame()
                 sil_ser = pd.Series(dtype=float)
@@ -934,11 +951,9 @@ if raw_prof and clust_prof:
     # 1) Read files once
     ext_raw = os.path.splitext(raw_prof.name.lower())[1]
     ext_clust = os.path.splitext(clust_prof.name.lower())[1]
-    raw_df_prof = (
-        pd.read_excel(raw_prof) if ext_raw in (".xls", ".xlsx") else pd.read_csv(raw_prof)
-    )
+    raw_df_prof = pd.read_excel(raw_prof) if ext_raw in (".xlsx") else pd.read_csv(raw_prof)
     clust_df_prof = (
-        pd.read_excel(clust_prof) if ext_clust in (".xls", ".xlsx") else pd.read_csv(clust_prof)
+        pd.read_excel(clust_prof) if ext_clust in (".xlsx") else pd.read_csv(clust_prof)
     )
 
     # 2) Ensure unique_id columns
