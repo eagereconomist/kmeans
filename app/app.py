@@ -223,7 +223,7 @@ def load_data(raw_bytes: bytes, name: str) -> pd.DataFrame:
 uploader_key = f"uploader_{st.session_state.get('uploader_count', 0)}"
 uploaded = st.sidebar.file_uploader(
     "Upload your own data",
-    type=["csv", "txt", "xlsx", "xls"],
+    type=["csv", "txt", "xlsx"],
     key=uploader_key,
     help="Choose a local data file to begin",
 )
@@ -927,7 +927,7 @@ else:
 st.sidebar.header("Cluster Profiling")
 
 # allow same file types as main uploader
-upload_types = ["csv", "txt", "xlsx", "xls"]
+upload_types = ["csv", "txt", "xlsx"]
 raw_prof = st.sidebar.file_uploader(
     "Preprocessed Data",
     type=upload_types,
