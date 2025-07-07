@@ -117,6 +117,7 @@ def scatter_plot(
     x_axis: str,
     y_axis: str,
     output_path: Path,
+    scale: float = 1.0,
     save: bool = True,
     ax: plt.Axes = None,
 ) -> pd.DataFrame:
@@ -131,6 +132,17 @@ def scatter_plot(
     x_vals, y_vals = df[x_axis], df[y_axis]
     _set_axis_bounds(ax, x_vals, axis="x")
     _set_axis_bounds(ax, y_vals, axis="y")
+
+    if scale != 1.0:
+        x0, x1 = ax.get_xlim()
+        x_mid = (x0 + x1) / 2
+        half_width = (x1 - x0) / 2 * scale
+        ax.set_xlim(x_mid - half_width, x_mid + half_width)
+
+        y0, y1 = ax.get_ylim()
+        y_mid = (y0 + y1) / 2
+        half_height = (y1 - y0) / 2 * scale
+        ax.set_ylim(y_mid - half_height, y_mid + half_height)
     ax.set(
         xlabel=x_axis.capitalize(),
         ylabel=y_axis.capitalize(),
@@ -548,6 +560,7 @@ def cluster_scatter(
     x_axis: str,
     y_axis: str,
     output_path: Path,
+    scale: float = 1.0,
     label_column: str = "cluster",
     save: bool = True,
     ax: plt.Axes | None = None,
@@ -566,6 +579,21 @@ def cluster_scatter(
         palette="dark",
         legend="full",
     )
+
+    _set_axis_bounds(ax, df[x_axis], axis="x")
+    _set_axis_bounds(ax, df[y_axis], axis="y")
+
+    if scale != 1.0:
+        x0, x1 = ax.get_xlim()
+        x_mid = (x0 + x1) / 2
+        half_w = (x1 - x0) / 2 * scale
+        ax.set_xlim(x_mid - half_w, x_mid + half_w)
+
+        y0, y1 = ax.get_ylim()
+        y_mid = (y0 + y1) / 2
+        half_h = (y1 - y0) / 2 * scale
+        ax.set_ylim(y_mid - half_h, y_mid + half_h)
+
     ax.set_title(f"{x_axis.capitalize()} vs. {y_axis.capitalize()} by {label_column}")
     if save:
         _save_fig(fig, output_path)

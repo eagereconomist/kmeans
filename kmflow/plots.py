@@ -130,6 +130,7 @@ def scatter(
         dir_okay=True,
         file_okay=False,
     ),
+    scale: float = typer.Option(1.0, "--scale", "-s", help="Multiplier for x and y axes ranges."),
     no_save: bool = typer.Option(
         False, "--no-save", "-n", help="Generate plot, but don't write to disk."
     ),
@@ -138,7 +139,7 @@ def scatter(
     df = load_data(input_path)
     output_path = output_dir / f"{Path(input_file).stem}_{x_axis}_vs._{y_axis}_scatter.png"
     steps = tqdm(total=1, desc="Scatter", ncols=100)
-    scatter_plot(df, x_axis, y_axis, output_path, save=not no_save)
+    scatter_plot(df, x_axis, y_axis, output_path, scale, save=not no_save)
     steps.update(1)
     steps.close()
     if not no_save:
@@ -427,6 +428,7 @@ def cluster_plot(
         "-l",
         help="Column with cluster labels.",
     ),
+    scale: float = typer.Option(1.0, "--scale", "-s", help="Mutliplier for x/y axis ranges."),
     output_dir: Path = typer.Option(
         FIGURES_DIR,
         "--output-dir",
@@ -453,6 +455,7 @@ def cluster_plot(
                 y_axis=y_col,
                 label_column=label_column,
                 output_path=output_path,
+                scale=scale,
                 save=not no_save,
             ),
         )
