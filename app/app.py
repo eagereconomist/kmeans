@@ -23,6 +23,7 @@ MAX_DIAG_K = 20
 
 @st.cache_data(show_spinner=False)
 def cached_inertia(
+    df_hash: bytes,
     feature_columns: tuple[str, ...],
     init_method: str,
     n_init: int,
@@ -52,6 +53,7 @@ def cached_inertia(
 
 @st.cache_data(show_spinner=False)
 def cached_silhouette(
+    df_hash: bytes,
     feature_columns: tuple[str, ...],
     init_method: str,
     n_init: int,
@@ -87,6 +89,7 @@ def cached_silhouette(
 
 @st.cache_data(show_spinner=False)
 def cached_pca(
+    df_hash: bytes,
     hue_column: str,
 ) -> dict:
     return compute_pca_summary(df=df, hue_column=hue_column)
