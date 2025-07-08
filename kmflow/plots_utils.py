@@ -567,17 +567,23 @@ def cluster_scatter(
     save: bool = True,
     ax: plt.Axes | None = None,
 ) -> plt.Axes:
+    df_plot = df.copy()
+    df_plot[label_column] = df_plot[label_column].astype(int)
+    df_plot[label_column] = (df_plot[label_column] + 1).astype(str)
+    categories = sorted(df_plot[label_column].unique(), key=lambda v: int(v))
     if ax is None:
         fig, ax = _init_fig()
     else:
         fig = ax.figure
     sns.scatterplot(
-        data=df,
+        data=df_plot,
         x=x_axis,
         y=y_axis,
         style=label_column,
         marker=True,
         hue=label_column,
+        hue_order=categories,
+        style_order=categories,
         palette="dark",
         legend="full",
     )
@@ -610,9 +616,12 @@ def cluster_scatter_3d(
     scale: float = 1.0,
     save: bool = True,
 ) -> px.scatter_3d:
+    df_plot = df.copy()
+    df_plot[label_column] = df_plot[label_column].astype(int) + 1
+    df_plot[label_column] = df_plot[label_column].astype(str)
     if len(features) < 3:
         raise ValueError("Need at least 3 features for a 3D plot.")
-    df_scaled = df.copy()
+    df_scaled = df_plot.copy()
     for _, feat in enumerate(features):
         df_scaled[feat] *= scale
 
@@ -649,37 +658,50 @@ def plot_batch_clusters(
     columns_per_row: int = 3,
     figsize_per_plot: tuple[int, int] = (12, 12),
 ) -> plt.Figure:
+    """
+    Create a grid of 2D cluster-colored scatters for each column in cluster_columns,
+    ensuring each subplot uses its own cluster column.
+    """
     n = len(cluster_columns)
-    columns = columns_per_row or n
-    rows = (n + columns - 1) // columns
+    cols = columns_per_row or n
+    rows = (n + cols - 1) // cols
+
+    df_plot = df.copy()
+    for col in cluster_columns:
+        df_plot[col] = df_plot[col].astype(int) + 1
+        df_plot[col] = df_plot[col].astype(str)
+
     fig, axes = plt.subplots(
         rows,
-        columns,
-        figsize=(columns * figsize_per_plot[0], rows * figsize_per_plot[1]),
+        cols,
+        figsize=(cols * figsize_per_plot[0], rows * figsize_per_plot[1]),
         squeeze=False,
     )
+
     for ax, column in zip(axes.flat, cluster_columns):
+        categories = sorted(df_plot[column].unique(), key=lambda v: int(v))
+
         sns.scatterplot(
-            data=df,
+            data=df_plot,
             x=x_axis,
             y=y_axis,
             hue=column,
             style=column,
-            markers=True,
+            palette="dark",
             s=100,
             alpha=1,
-            palette="dark",
-            ax=ax,
             edgecolor="grey",
+            hue_order=categories,
+            style_order=categories,
+            ax=ax,
             legend="full",
         )
         ax.set_xlabel(x_axis.capitalize())
         ax.set_ylabel(y_axis.capitalize())
-        ax.set_title(f"{column} ")
+        ax.set_title(f"{column}")
 
-        _set_axis_bounds(ax, df[x_axis], axis="x")
-        _set_axis_bounds(ax, df[y_axis], axis="y")
-
+        _set_axis_bounds(ax, df_plot[x_axis], axis="x")
+        _set_axis_bounds(ax, df_plot[y_axis], axis="y")
         if scale != 1.0:
             x0, x1 = ax.get_xlim()
             xm = (x0 + x1) / 2
@@ -693,7 +715,9 @@ def plot_batch_clusters(
 
     for ax in axes.flat[n:]:
         fig.delaxes(ax)
+
     fig.tight_layout()
     if save:
         _save_fig(fig, output_path)
+
     return fig

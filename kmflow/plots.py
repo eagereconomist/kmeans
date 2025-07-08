@@ -516,13 +516,13 @@ def cluster_3d_plot(
             raise typer.BadParameter("Must specify exactly three features for 3D.")
         progress_bar.update(1)
         stem = Path(input_file).stem
-        png_path = output_dir / f"{stem}_{label_column}_3d.png"
+        png_path = output_dir / f"{stem}_3d.png"
         fig = cluster_scatter_3d(
             df=df,
             features=chosen,
             label_column=label_column,
             scale=scale,
-            output_path=None if no_save else png_path,
+            output_path=png_path,
             save=not no_save,
         )
         fig.update_traces(marker=dict(size=5, opacity=1))
@@ -535,11 +535,10 @@ def cluster_3d_plot(
             ),
         )
         progress_bar.update(1)
-        if no_save:
-            fig.show(renderer="browser")
-            logger.info("Interactive plot displayed (not saved).")
-        else:
+        if not no_save:
             logger.success(f"Static PNG saved to {png_path!r}")
+        else:
+            fig.show(renderer="browser")
 
 
 @app.command("cluster-subplot")
