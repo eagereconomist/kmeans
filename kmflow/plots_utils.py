@@ -157,48 +157,72 @@ def box_plot(
     df: pd.DataFrame,
     y_axis: str,
     output_path: Path,
-    brand: str = None,
+    brand: str | None = None,
+    by_brand: bool = False,
     orient: str = "v",
     save: bool = True,
-    ax: plt.Axes = None,
+    ax: plt.Axes | None = None,
 ) -> pd.DataFrame:
     if y_axis not in df.columns:
         raise ValueError(f"Column '{y_axis}' not found in DataFrame.")
+
+    # extract Brand from Racquet
+    df = df.copy()
     df["Brand"] = df["Racquet"].apply(lambda s: re.findall(r"[A-Z][a-z]+", s)[0])
+
     all_brands = sorted(df["Brand"].unique())
+
+    # decide grouping
     if brand:
         if brand not in all_brands:
-            raise ValueError(f"Brand '{brand}' not one of the available brands: {all_brands!r}")
+            raise ValueError(f"Brand '{brand}' not among {all_brands!r}")
         df = df[df["Brand"] == brand]
         x_col = "Racquet"
         order = sorted(df[x_col].unique())
-    else:
+    elif by_brand:
         x_col = "Brand"
         order = all_brands
+    else:
+        x_col = None
+        order = None
+
+    # init figure/axis
     if ax is None:
         fig, ax = _init_fig()
     else:
         fig = ax.figure
-    sns.boxplot(
-        data=df,
-        x=(x_col if orient == "v" else y_axis),
-        y=(y_axis if orient == "v" else x_col),
-        order=order,
-        orient=orient,
-        ax=ax,
-    )
-    vals = df[y_axis]
-    if orient.lower().startswith("h"):
-        _set_axis_bounds(ax, vals, axis="x")
-        xlabel, ylabel = x_col, y_axis
+
+    # draw
+    if x_col is None:
+        # global, no grouping
+        if orient.lower().startswith("h"):
+            sns.boxplot(data=df, x=y_axis, orient=orient, ax=ax)
+            _set_axis_bounds(ax, df[y_axis], axis="x")
+        else:
+            sns.boxplot(data=df, y=y_axis, orient=orient, ax=ax)
+            _set_axis_bounds(ax, df[y_axis], axis="y")
     else:
-        _set_axis_bounds(ax, vals, axis="y")
-        xlabel, ylabel = (x_col, y_axis) if orient.lower().startswith("v") else (y_axis, x_col)
+        # grouped
+        sns.boxplot(
+            data=df,
+            x=(x_col if orient.lower().startswith("v") else y_axis),
+            y=(y_axis if orient.lower().startswith("v") else x_col),
+            order=order,
+            orient=orient,
+            ax=ax,
+        )
+        vals = df[y_axis]
+        axis = "y" if orient.lower().startswith("v") else "x"
+        _set_axis_bounds(ax, vals, axis=axis)
+
+    # labels & title
+    subtitle = f"Brand={brand}" if brand else ("By Brand" if by_brand else "Observations")
     ax.set(
-        xlabel=xlabel.capitalize(),
-        ylabel=ylabel.capitalize(),
-        title=f"Box Plot of {y_axis.capitalize()} for {brand or 'All Brands'}",
+        xlabel=None if orient.lower().startswith("h") and x_col is None else (x_col or ""),
+        ylabel=None if orient.lower().startswith("v") and x_col is None else y_axis.capitalize(),
+        title=f"Box Plot of {y_axis.capitalize()} {subtitle}",
     )
+
     if save:
         _save_fig(fig, output_path)
     return df
@@ -208,50 +232,66 @@ def violin_plot(
     df: pd.DataFrame,
     y_axis: str,
     output_path: Path,
-    brand: str = None,
+    brand: str | None = None,
+    by_brand: bool = False,
     orient: str = "v",
     inner: str = "box",
     save: bool = True,
-    ax: plt.Axes = None,
+    ax: plt.Axes | None = None,
 ) -> pd.DataFrame:
     if y_axis not in df.columns:
         raise ValueError(f"Column '{y_axis}' not found in DataFrame.")
+
+    df = df.copy()
     df["Brand"] = df["Racquet"].apply(lambda s: re.findall(r"[A-Z][a-z]+", s)[0])
     all_brands = sorted(df["Brand"].unique())
+
     if brand:
         if brand not in all_brands:
-            raise ValueError(f"Brand '{brand}' not one of the available brands: {all_brands!r}")
+            raise ValueError(f"Brand '{brand}' not among {all_brands!r}")
         df = df[df["Brand"] == brand]
         x_col = "Racquet"
         order = sorted(df[x_col].unique())
-    else:
+    elif by_brand:
         x_col = "Brand"
         order = all_brands
+    else:
+        x_col = None
+        order = None
+
     if ax is None:
         fig, ax = _init_fig()
     else:
         fig = ax.figure
-    sns.violinplot(
-        data=df,
-        x=(x_col if orient == "v" else y_axis),
-        y=(y_axis if orient == "v" else x_col),
-        order=order,
-        orient=orient,
-        inner=inner,
-        ax=ax,
-    )
-    vals = df[y_axis]
-    if orient.lower().startswith("h"):
-        _set_axis_bounds(ax, vals, axis="x")
-        xlabel, ylabel = x_col, y_axis
+
+    if x_col is None:
+        if orient.lower().startswith("h"):
+            sns.violinplot(data=df, x=y_axis, orient=orient, inner=inner, ax=ax)
+            _set_axis_bounds(ax, df[y_axis], axis="x")
+        else:
+            sns.violinplot(data=df, y=y_axis, orient=orient, inner=inner, ax=ax)
+            _set_axis_bounds(ax, df[y_axis], axis="y")
     else:
-        _set_axis_bounds(ax, vals, axis="y")
-        xlabel, ylabel = (x_col, y_axis) if orient.lower().startswith("v") else (y_axis, x_col)
+        sns.violinplot(
+            data=df,
+            x=(x_col if orient.lower().startswith("v") else y_axis),
+            y=(y_axis if orient.lower().startswith("v") else x_col),
+            order=order,
+            orient=orient,
+            inner=inner,
+            ax=ax,
+        )
+        vals = df[y_axis]
+        axis = "y" if orient.lower().startswith("v") else "x"
+        _set_axis_bounds(ax, vals, axis=axis)
+
+    subtitle = f"Brand={brand}" if brand else ("By Brand" if by_brand else "Observations")
     ax.set(
-        xlabel=xlabel.capitalize(),
-        ylabel=ylabel.capitalize(),
-        title=f"Violin Plot of {y_axis.capitalize()} for {brand or 'All Brands'}",
+        xlabel=None if orient.lower().startswith("h") and x_col is None else (x_col or ""),
+        ylabel=None if orient.lower().startswith("v") and x_col is None else y_axis.capitalize(),
+        title=f"Violin Plot of {y_axis.capitalize()} {subtitle}",
     )
+
     if save:
         _save_fig(fig, output_path)
     return df

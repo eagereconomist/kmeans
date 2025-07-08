@@ -149,100 +149,107 @@ def scatter(
 
 @app.command("boxplot")
 def boxplt(
-    input_file: str = typer.Argument(..., help="csv filename."),
+    input_file: str = typer.Argument(..., help="CSV filename."),
     dir_label: str = typer.Argument("Sub-folder under data/"),
     y_axis: str = typer.Argument(..., help="Y-axis column."),
-    brand: str = typer.Option(
+    by_brand: bool = typer.Option(
+        False,
+        "--by-brand",
+        "-B",
+        help="One box per brand (defaults to all observations).",
+    ),
+    brand: str | None = typer.Option(
         None,
         "--brand",
         "-b",
-        help="Filter to a single brand (defaults to all).",
+        help="Specific brand to filter to.",
     ),
-    orient: str = typer.Option("v", "--orient", "-a", help="Orientation of the plot."),
+    orient: str = typer.Option("v", "--orient", "-a", help="Orientation."),
     output_dir: Path = typer.Option(
-        FIGURES_DIR,
-        "--output-dir",
-        "-o",
-        dir_okay=True,
-        file_okay=False,
+        FIGURES_DIR, "--output-dir", "-o", dir_okay=True, file_okay=False
     ),
-    no_save: bool = typer.Option(
-        False, "--no-save", "-n", help="Generate plot, but don't write to disk."
-    ),
+    no_save: bool = typer.Option(False, "--no-save", "-n", help="Generate but don’t save."),
 ):
+    if by_brand and brand:
+        raise typer.BadParameter("Cannot use --brand and --by-brand together.")
     input_path = DATA_DIR / dir_label / input_file
     df = load_data(input_path)
     stem = Path(input_file).stem
-    stem_label = brand.lower() if brand else "by_brand"
-    file_name = f"{stem}_{stem_label}_{y_axis}_boxplot.png"
+    mode = "global" if not (by_brand or brand) else ("by_brand" if by_brand else brand)
+    file_name = f"{stem}_{mode}_{y_axis}_boxplot.png"
     output_path = output_dir / file_name
-    steps = tqdm(total=1, desc="Boxplot", ncols=100)
-    box_plot(
-        df=df,
-        y_axis=y_axis,
-        output_path=output_path,
-        brand=brand,
-        orient=orient,
-        save=not no_save,
-    )
-    steps.update(1)
-    steps.close()
+
+    with tqdm(total=1, desc="Boxplot") as pbar:
+        box_plot(
+            df=df,
+            y_axis=y_axis,
+            output_path=output_path,
+            brand=brand,
+            by_brand=by_brand,
+            orient=orient,
+            save=not no_save,
+        )
+        pbar.update(1)
+
     if no_save:
-        logger.success("Box plot generated (not saved to disk).")
+        logger.success("Box plot generated (not saved).")
     else:
         logger.success(f"Box plot saved to {output_path!r}")
 
 
 @app.command("violin")
 def violinplt(
-    input_file: str = typer.Argument(..., help="csv filename."),
+    input_file: str = typer.Argument(..., help="CSV filename."),
     dir_label: str = typer.Argument("Sub-folder under data/"),
     y_axis: str = typer.Argument(..., help="Y-axis column."),
-    brand: str = typer.Option(
+    by_brand: bool = typer.Option(
+        False,
+        "--by-brand",
+        "-B",
+        help="One violin per brand (defaults to global).",
+    ),
+    brand: str | None = typer.Option(
         None,
         "--brand",
         "-b",
-        help="Filter to a single brand (defaults to all).",
+        help="Specific brand to filter to.",
     ),
-    orient: str = typer.Option("v", "--orient", "-a", help="Orientation of the plot."),
+    orient: str = typer.Option("v", "--orient", "-a", help="Orientation."),
     inner: str = typer.Option(
         "box",
         "--inner",
         "-i",
-        help="Representation of the data in the interior of the violin plot. "
-        "Use 'box', 'point', 'quartile', 'point', or 'stick' inside the violin.",
+        help="Interior representation inside violins.",
     ),
     output_dir: Path = typer.Option(
-        FIGURES_DIR,
-        "--output-dir",
-        "-o",
-        dir_okay=True,
-        file_okay=False,
+        FIGURES_DIR, "--output-dir", "-o", dir_okay=True, file_okay=False
     ),
-    no_save: bool = typer.Option(
-        False, "--no-save", "-n", help="Generate plot, but don't write to disk."
-    ),
+    no_save: bool = typer.Option(False, "--no-save", "-n", help="Generate but don’t save."),
 ):
+    if by_brand and brand:
+        raise typer.BadParameter("Cannot use --brand and --by-brand together.")
     input_path = DATA_DIR / dir_label / input_file
     df = load_data(input_path)
     stem = Path(input_file).stem
-    stem_label = brand.lower() if brand else "by_brand"
-    file_name = f"{stem}_{stem_label}_{y_axis}_violin.png"
+    mode = "global" if not (by_brand or brand) else ("by_brand" if by_brand else brand)
+    file_name = f"{stem}_{mode}_{y_axis}_violin.png"
     output_path = output_dir / file_name
-    steps = tqdm(total=1, desc="Violin", ncols=100)
-    violin_plot(
-        df=df,
-        y_axis=y_axis,
-        output_path=output_path,
-        brand=brand,
-        orient=orient,
-        inner=inner,
-        save=not no_save,
-    )
-    steps.update(1)
-    steps.close()
+
+    with tqdm(total=1, desc="Violin") as pbar:
+        violin_plot(
+            df=df,
+            y_axis=y_axis,
+            output_path=output_path,
+            brand=brand,
+            by_brand=by_brand,
+            orient=orient,
+            inner=inner,
+            save=not no_save,
+        )
+        pbar.update(1)
+
     if no_save:
-        logger.success("Violin plot generated (not saved to disk).")
+        logger.success("Violin plot generated (not saved).")
     else:
         logger.success(f"Violin plot saved to {output_path!r}")
 
