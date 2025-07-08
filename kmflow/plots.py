@@ -5,7 +5,6 @@ from loguru import logger
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from math import ceil
-import plotly.express as px
 
 
 from kmflow.config import DATA_DIR, FIGURES_DIR
@@ -473,13 +472,13 @@ def cluster_3d_plot(
         "processed",
         "--input-dir",
         "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
+        help="Sub-folder under data/ (e.g. external, interim, processed, raw).",
     ),
     features: list[str] = typer.Option(
         None,
         "--feature",
         "-f",
-        help="Exactly three numeric columns to plot; defaults to first three.",
+        help="Exactly three numeric columns; defaults to first three.",
     ),
     label_column: str = typer.Option(
         "cluster_",
@@ -487,18 +486,25 @@ def cluster_3d_plot(
         "-l",
         help="Name of the cluster label column (e.g. cluster_5).",
     ),
+    scale: float = typer.Option(
+        1.0,
+        "--scale",
+        "-s",
+        help="Multiplier for x/y/z axis ranges.",
+    ),
     output_dir: Path = typer.Option(
         FIGURES_DIR,
         "--output-dir",
         "-o",
         dir_okay=True,
         file_okay=False,
+        help="Where to save the static PNG.",
     ),
     no_save: bool = typer.Option(
         False,
         "--no-save",
         "-n",
-        help="Don't write to disk. Opens html plot in browser.",
+        help="Skip writing PNG and open interactive plot.",
     ),
 ):
     with tqdm(total=3, desc="Cluster-3D") as progress_bar:
@@ -508,18 +514,16 @@ def cluster_3d_plot(
         chosen = features or num_cols[:3]
         if len(chosen) != 3:
             raise typer.BadParameter("Must specify exactly three features for 3D.")
-        df[label_column] = df[label_column].astype(str)
-        cluster_order = sorted(df[label_column].unique(), key=lambda x: int(x))
+        progress_bar.update(1)
         stem = Path(input_file).stem
-        base = f"{stem}_{label_column}_3d"
-        fig = px.scatter_3d(
-            df,
-            x=chosen[0],
-            y=chosen[1],
-            z=chosen[2],
-            color=label_column,
-            category_orders={label_column: cluster_order},
-            title=f"3D Cluster Scatter (k={label_column.split('_')[-1]})",
+        png_path = output_dir / f"{stem}_{label_column}_3d.png"
+        fig = cluster_scatter_3d(
+            df=df,
+            features=chosen,
+            label_column=label_column,
+            scale=scale,
+            output_path=None if no_save else png_path,
+            save=not no_save,
         )
         fig.update_traces(marker=dict(size=5, opacity=1))
         fig.update_layout(
@@ -531,19 +535,11 @@ def cluster_3d_plot(
             ),
         )
         progress_bar.update(1)
-        if not no_save:
-            png_path = output_dir / f"{base}.png"
-            _ = cluster_scatter_3d(
-                df=df,
-                features=chosen,
-                label_column=label_column,
-                output_path=png_path,
-            )
-            logger.success(f"Static PNG saved to {png_path!r}")
-            progress_bar.update(1)
+        if no_save:
+            fig.show(renderer="browser")
+            logger.info("Interactive plot displayed (not saved).")
         else:
-            fig.show()
-            progress_bar.update(1)
+            logger.success(f"Static PNG saved to {png_path!r}")
 
 
 @app.command("cluster-subplot")
@@ -573,6 +569,7 @@ def batch_cluster_plot(
         "-l",
         help="Name of the column containing clusters in DataFrame from `input_file`",
     ),
+    scale: float = typer.Option(1.0, "--scale", "-s", help="Multiplier for x/y axis ranges."),
     output_dir: Path = typer.Option(
         FIGURES_DIR,
         "--output-dir",
@@ -589,7 +586,7 @@ def batch_cluster_plot(
     x_col = x_axis or numeric_columns[0]
     y_col = y_axis or (numeric_columns[1] if len(numeric_columns) > 1 else numeric_columns[0])
     cluster_columns = sorted(
-        (c for c in df.columns if c.startswith(label_column)),
+        (column for column in df.columns if column.startswith(label_column)),
         key=lambda c: int(c.replace(label_column, "")),
     )
     if not cluster_columns:
@@ -603,6 +600,7 @@ def batch_cluster_plot(
             cluster_columns=cluster_columns,
             output_path=output_path,
             save=True,
+            scale=scale,
         )
         progress_bar.update(1)
     logger.success(f"Saved batch-cluster plot for {cluster_columns} -> {output_path!r}")

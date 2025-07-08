@@ -605,22 +605,30 @@ def cluster_scatter_3d(
     features: list[str],
     label_column: str,
     output_path: Path,
+    scale: float = 1.0,
     save: bool = True,
 ) -> px.scatter_3d:
     if len(features) < 3:
         raise ValueError("Need at least 3 features for a 3D plot.")
-    x, y, z = features[:3]
-    cluster_order = sorted(df[label_column].unique(), key=lambda x: int(x))
+    df_scaled = df.copy()
+    for _, feat in enumerate(features):
+        df_scaled[feat] *= scale
+
+    df_scaled[label_column] = df_scaled[label_column].astype(str)
+    try:
+        order = sorted(df_scaled[label_column].unique(), key=int)
+    except ValueError:
+        order = list(df_scaled[label_column].unique())
     fig = px.scatter_3d(
-        df,
-        x=x,
-        y=y,
-        z=z,
+        df_scaled,
+        x=features[0],
+        y=features[1],
+        z=features[2],
         color=label_column,
-        category_orders={label_column: cluster_order},
+        category_orders={label_column: order},
         title=f"3D Cluster Scatter (k={label_column.split('_')[-1]})",
-        width=1300,
-        height=1300,
+        width=1000,
+        height=1000,
     )
     if save:
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -635,6 +643,7 @@ def plot_batch_clusters(
     cluster_columns: list[str],
     output_path: Path,
     save: bool = True,
+    scale: float = 1.0,
     columns_per_row: int = 3,
     figsize_per_plot: tuple[int, int] = (12, 12),
 ) -> plt.Figure:
@@ -662,9 +671,24 @@ def plot_batch_clusters(
             edgecolor="grey",
             legend="full",
         )
-        ax.set_title(f"{column} ")
         ax.set_xlabel(x_axis.capitalize())
         ax.set_ylabel(y_axis.capitalize())
+        ax.set_title(f"{column} ")
+
+        _set_axis_bounds(ax, df[x_axis], axis="x")
+        _set_axis_bounds(ax, df[y_axis], axis="y")
+
+        if scale != 1.0:
+            x0, x1 = ax.get_xlim()
+            xm = (x0 + x1) / 2
+            width = (x1 - x0) / 2 * scale
+            ax.set_xlim(xm - width, xm + width)
+
+            y0, y1 = ax.get_ylim()
+            ym = (y0 + y1) / 2
+            height = (y1 - y0) / 2 * scale
+            ax.set_ylim(ym - height, ym + height)
+
     for ax in axes.flat[n:]:
         fig.delaxes(ax)
     fig.tight_layout()
