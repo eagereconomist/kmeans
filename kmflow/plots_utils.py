@@ -312,6 +312,7 @@ def inertia_plot(inertia_df: pd.DataFrame, output_path: Path, save: bool = True)
     ax.set_xlabel("Number of Clusters (k)")
     ax.set_ylabel("Inertia")
     ax.set_title(f"Elbow Plot for K-Means Inertia from {output_path} ")
+    ax.set_xticks(inertia_df["k"].tolist())
     if save:
         _save_fig(fig, output_path)
     return fig
@@ -323,6 +324,7 @@ def silhouette_plot(silhouette_df: pd.DataFrame, output_path: Path, save: bool =
     ax.set_xlabel("Number of Clusters (k)")
     ax.set_ylabel("Silhouette Score")
     ax.set_title(f"Silhouette Score vs. Number of Clusters from {output_path}")
+    ax.set_xticks(silhouette_df["n_clusters"].tolist())
     if save:
         _save_fig(fig, output_path)
     return fig
