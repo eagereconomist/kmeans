@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 import typer
 from pathlib import Path
 from loguru import logger
@@ -12,6 +12,7 @@ from kmflow.preprocessing_utils import load_data
 from kmflow.plots_utils import (
     _save_fig,
     _apply_cubehelix_style,
+    _ensure_unique_path,
     bar_plot,
     histogram,
     scatter_plot,
@@ -65,6 +66,8 @@ def barplt(
     stem = Path(input_file).stem
     file_name = f"{stem}_{cat_col}_by_{val_col}_barplot.png"
     output_path = output_dir / file_name
+    output_path = _ensure_unique_path(output_path)
+
     steps = tqdm(total=1, desc="Barplot")
     bar_plot(
         df=df,
@@ -106,6 +109,7 @@ def hist(
     input_path = DATA_DIR / dir_label / input_file
     df = load_data(input_path)
     output_path = output_dir / f"{Path(input_file).stem}_{x_axis}_hist.png"
+    output_path = _ensure_unique_path(output_path)
     steps = tqdm(total=1, desc="Histogram", ncols=100)
     histogram(df, x_axis, num_bins, output_path, save=not no_save)
     steps.update(1)
@@ -137,6 +141,7 @@ def scatter(
     input_path = DATA_DIR / dir_label / input_file
     df = load_data(input_path)
     output_path = output_dir / f"{Path(input_file).stem}_{x_axis}_vs._{y_axis}_scatter.png"
+    output_path = _ensure_unique_path(output_path)
     steps = tqdm(total=1, desc="Scatter", ncols=100)
     scatter_plot(df, x_axis, y_axis, output_path, scale, save=not no_save)
     steps.update(1)
@@ -151,41 +156,45 @@ def scatter(
 def boxplt(
     input_file: str = typer.Argument(..., help="CSV filename."),
     dir_label: str = typer.Argument("Sub-folder under data/"),
-    y_axis: str = typer.Argument(..., help="Y-axis column."),
-    by_brand: bool = typer.Option(
-        False,
-        "--by-brand",
-        "-B",
-        help="One box per brand (defaults to all observations).",
+    numeric_col: str = typer.Argument(..., help="Y-axis column."),
+    category_col: Optional[str] = typer.Option(
+        None, "--category-col", "-c", help="Column to group by (one box per category)."
     ),
-    brand: str | None = typer.Option(
-        None,
-        "--brand",
-        "-b",
-        help="Specific brand to filter to.",
+    patterns: Optional[List[str]] = typer.Option(
+        None, "--pattern", "-p", help="Comma-separated regex pattern(s) to filter categories."
     ),
-    orient: str = typer.Option("v", "--orient", "-a", help="Orientation."),
+    orient: str = typer.Option("v", "--orient", "-a", help="Orientation of the plot."),
     output_dir: Path = typer.Option(
         FIGURES_DIR, "--output-dir", "-o", dir_okay=True, file_okay=False
     ),
-    no_save: bool = typer.Option(False, "--no-save", "-n", help="Generate but don’t save."),
+    no_save: bool = typer.Option(False, "--no-save", "-n", help="Generate plot but don't save."),
 ):
-    if by_brand and brand:
-        raise typer.BadParameter("Cannot use --brand and --by-brand together.")
+    """
+    Box plot of Y, optionally grouped by a category column and filtered by regex patterns.
+    """
     input_path = DATA_DIR / dir_label / input_file
     df = load_data(input_path)
+
+    # Determine mode for filename
     stem = Path(input_file).stem
-    mode = "global" if not (by_brand or brand) else ("by_brand" if by_brand else brand)
-    file_name = f"{stem}_{mode}_{y_axis}_boxplot.png"
+    if category_col is None:
+        mode = "all"
+    elif patterns:
+        mode = f"filtered_{category_col}"
+    else:
+        mode = f"by_{category_col}"
+
+    file_name = f"{stem}_{mode}_{numeric_col}_boxplot.png"
     output_path = output_dir / file_name
+    output_path = _ensure_unique_path(output_path)
 
     with tqdm(total=1, desc="Boxplot") as pbar:
         box_plot(
             df=df,
-            y_axis=y_axis,
+            numeric_col=numeric_col,
             output_path=output_path,
-            brand=brand,
-            by_brand=by_brand,
+            category_col=category_col,
+            patterns=patterns[0].split(", ") if patterns else None,
             orient=orient,
             save=not no_save,
         )
@@ -201,47 +210,48 @@ def boxplt(
 def violinplt(
     input_file: str = typer.Argument(..., help="CSV filename."),
     dir_label: str = typer.Argument("Sub-folder under data/"),
-    y_axis: str = typer.Argument(..., help="Y-axis column."),
-    by_brand: bool = typer.Option(
-        False,
-        "--by-brand",
-        "-B",
-        help="One violin per brand (defaults to global).",
+    numeric_col: str = typer.Argument(..., help="Y-axis column."),
+    category_col: Optional[str] = typer.Option(
+        None, "--category-col", "-c", help="Column to group by (one violin per category)."
     ),
-    brand: str | None = typer.Option(
-        None,
-        "--brand",
-        "-b",
-        help="Specific brand to filter to.",
+    patterns: Optional[List[str]] = typer.Option(
+        None, "--pattern", "-p", help="Comma-separated regex pattern(s) to filter categories."
     ),
-    orient: str = typer.Option("v", "--orient", "-a", help="Orientation."),
+    orient: str = typer.Option("v", "--orient", "-a", help="Orientation of the plot."),
     inner: str = typer.Option(
-        "box",
-        "--inner",
-        "-i",
-        help="Interior representation inside violins.",
+        "box", "--inner", "-i", help="Interior representation inside the violins."
     ),
     output_dir: Path = typer.Option(
         FIGURES_DIR, "--output-dir", "-o", dir_okay=True, file_okay=False
     ),
-    no_save: bool = typer.Option(False, "--no-save", "-n", help="Generate but don’t save."),
+    no_save: bool = typer.Option(False, "--no-save", "-n", help="Generate plot but don't save."),
 ):
-    if by_brand and brand:
-        raise typer.BadParameter("Cannot use --brand and --by-brand together.")
+    """
+    Violin plot of Y, optionally grouped by a category column and filtered by regex patterns.
+    """
     input_path = DATA_DIR / dir_label / input_file
     df = load_data(input_path)
+
+    # Determine mode for filename
     stem = Path(input_file).stem
-    mode = "global" if not (by_brand or brand) else ("by_brand" if by_brand else brand)
-    file_name = f"{stem}_{mode}_{y_axis}_violin.png"
+    if category_col is None:
+        mode = "all"
+    elif patterns:
+        mode = f"filtered_{category_col}"
+    else:
+        mode = f"by_{category_col}"
+
+    file_name = f"{stem}_{mode}_{numeric_col}_violin.png"
     output_path = output_dir / file_name
+    output_path = _ensure_unique_path(output_path)
 
     with tqdm(total=1, desc="Violin") as pbar:
         violin_plot(
             df=df,
-            y_axis=y_axis,
+            numeric_col=numeric_col,
             output_path=output_path,
-            brand=brand,
-            by_brand=by_brand,
+            category_col=category_col,
+            patterns=patterns[0].split(", ") if patterns else None,
             orient=orient,
             inner=inner,
             save=not no_save,
@@ -276,6 +286,7 @@ def corr_heat(
     input_path = DATA_DIR / dir_label / input_file
     df = load_data(input_path)
     output_path = output_dir / f"{Path(input_file).stem}_heatmap.png"
+    output_path = _ensure_unique_path(output_path)
     steps = tqdm(total=1, desc="Heatmap", ncols=100)
     correlation_matrix_heatmap(df, output_path, save=not no_save)
     steps.update(1)
@@ -290,9 +301,7 @@ def corr_heat(
 def qq(
     input_file: str = typer.Argument(..., help="csv filename under the data subfolder."),
     dir_label: str = typer.Argument(..., help="Sub-folder under data/"),
-    column: list[str] = typer.Option(
-        [], "--column", "-c", help="Column(s) to plot; repeat for multiple."
-    ),
+    column: list[str] = typer.Option([], "--column", "-c", help="Column to plot."),
     all_cols: bool = typer.Option(
         False,
         "--all",
@@ -318,6 +327,7 @@ def qq(
         for col in tqdm(column, desc="Q-Q Plot"):
             file_name = f"{stem}_{col}_qq.png"
             output_path = output_dir / file_name
+            output_path = _ensure_unique_path(output_path)
             qq_plot(df=df, column=col, output_path=output_path, save=not no_save)
             if not no_save:
                 logger.success(f"Saved Q-Q Plot for '{col}' -> {output_path!r}")
@@ -339,6 +349,7 @@ def qq(
         fig.tight_layout()
         file_name = f"{stem}_qq_all.png"
         output_path = output_dir / file_name
+        output_path = _ensure_unique_path(output_path)
         if not no_save:
             _save_fig(fig, output_path)
             logger.success(f"Saved Combined Q-Q Plots -> {output_path!r}")
@@ -370,6 +381,7 @@ def elbow_plot(
     df = load_data(DATA_DIR / input_dir / input_file)
     stem = Path(input_file).stem
     output_path = output_dir / f"{stem}.png"
+    output_path = _ensure_unique_path(output_path)
     fig = inertia_plot(
         df,
         output_path,
@@ -404,6 +416,7 @@ def plot_silhouette(
     df = load_data(DATA_DIR / input_dir / input_file)
     stem = Path(input_file).stem
     output_path = output_dir / f"{stem}.png"
+    output_path = _ensure_unique_path(output_path)
     fig = silhouette_plot(df, output_path, save=not no_save)
     if not no_save:
         _save_fig(fig, output_path)
@@ -454,6 +467,7 @@ def cluster_plot(
     y_col = y_axis or (numeric_columns[1] if len(numeric_columns) > 1 else numeric_columns[0])
     with tqdm(total=1, desc="Generating Cluster Scatter") as pbar:
         output_path = output_dir / f"{Path(input_file).stem}_{x_col}_vs_{y_col}_cluster.png"
+        output_path = _ensure_unique_path(output_path)
         (
             cluster_scatter(
                 df=df,
@@ -524,12 +538,13 @@ def cluster_3d_plot(
         progress_bar.update(1)
         stem = Path(input_file).stem
         png_path = output_dir / f"{stem}_3d.png"
+        output_path = _ensure_unique_path(png_path)
         fig = cluster_scatter_3d(
             df=df,
             features=chosen,
             label_column=label_column,
             scale=scale,
-            output_path=png_path,
+            output_path=output_path,
             save=not no_save,
         )
         fig.update_traces(marker=dict(size=5, opacity=1))
@@ -598,6 +613,7 @@ def batch_cluster_plot(
     if not cluster_columns:
         raise typer.BadParameter(f"No columns found with prefix {label_column!r}")
     output_path = output_dir / f"{Path(input_file).stem}_{x_col}_vs_{y_col}_batch.png"
+    output_path = _ensure_unique_path(output_path)
     with tqdm(total=1, desc="Generating Batch Subplots") as progress_bar:
         plot_batch_clusters(
             df,
@@ -639,6 +655,7 @@ def plot_scree(
     df = load_data(DATA_DIR / input_dir / input_file)
     stem = Path(input_file).stem
     output_path = output_dir / f"{stem}_scree.png"
+    output_path = _ensure_unique_path(output_path)
     fig = scree_plot(
         df,
         output_path,
@@ -678,6 +695,7 @@ def plot_cumulative_prop_var(
     df = load_data(DATA_DIR / input_dir / input_file)
     stem = Path(input_file).stem
     output_path = output_dir / f"{stem}_cumulative_prop_var.png"
+    output_path = _ensure_unique_path(output_path)
     fig = cumulative_prop_var_plot(
         df,
         output_path,
@@ -760,9 +778,10 @@ def plot_pca_biplot(
 
     stem = Path(input_file).stem
     out_file = f"{stem}_pca_biplot_PC{pc_x + 1}_{pc_y + 1}.png"
-    out_path = output_dir / out_file
-    _save_fig(fig, out_path)
-    logger.success(f"Saved PCA biplot → {out_path!r}")
+    output_path = output_dir / out_file
+    output_path = _ensure_unique_path(output_path)
+    _save_fig(fig, output_path)
+    logger.success(f"Saved PCA biplot → {output_path!r}")
 
 
 @app.command("pca-biplot-3d")
@@ -825,6 +844,7 @@ def plot_3d_pca_biplot(
 
     stem = Path(input_file).stem
     png_path = output_dir / f"{stem}_3d_pca_biplot.png"
+    output_path = _ensure_unique_path(png_path)
 
     pca_biplot_3d(
         df=df,
@@ -836,7 +856,7 @@ def plot_3d_pca_biplot(
         pc_z=pc_z,
         scale=scale,
         hue=hue,
-        output_path=None if no_save else png_path,
+        output_path=None if no_save else output_path,
         show=no_save,
     )
 

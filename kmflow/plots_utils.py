@@ -43,6 +43,50 @@ def _set_axis_bounds(ax, vals: pd.Series, axis: str = "x"):
         ax.set_ylim(lower, higher)
 
 
+def _prepare_category(
+    df: pd.DataFrame,
+    category_col: str,
+    patterns: Optional[Sequence[str]] = None,
+) -> tuple[pd.DataFrame, list[str]]:
+    """Create a 'Category' column from df[category_col], then optionally
+    fileter and sort its unique values via regex patterns. Returns a tuple:
+    (df_with_Category, ordered list of categories).
+    """
+    if category_col not in df.columns:
+        raise ValueError(f"Column '{category_col}' not found in DataFrame.")
+    df_plot = df.copy()
+    df_plot["Category"] = df_plot[category_col].astype(str)
+    categories = sorted(df_plot["Category"].unique())
+    if patterns:
+        filtered = [cat for cat in categories if any(re.search(pat, cat) for pat in patterns)]
+        if not filtered:
+            raise ValueError(
+                f"No categories match patterns {patterns!r}\n"
+                "Hint: when specifying multiple patterns, separate them with\n"
+                "a comma and space, (e.g. -p 'Price, Weight')."
+            )
+        df_plot = df_plot[df_plot["Category"].isin(filtered)]
+        categories = filtered
+
+    return df_plot, categories
+
+
+def _ensure_unique_path(path: Path) -> Path:
+    """
+    If `path` already exists, append _1, _2, ... before the suffix
+    until we find a filename that doesn't exist.
+    """
+    if not path.exists():
+        return path
+    base, ext = path.stem, path.suffix
+    i = 1
+    while True:
+        candidate = path.parent / f"{base}_{i}{ext}"
+        if not candidate.exists():
+            return candidate
+        i += 1
+
+
 def _save_fig(fig: plt.Figure, path: Path):
     """
     Ensure directory exists, save and close.
@@ -155,146 +199,152 @@ def scatter_plot(
 
 def box_plot(
     df: pd.DataFrame,
-    y_axis: str,
+    numeric_col: str,
     output_path: Path,
-    brand: str | None = None,
-    by_brand: bool = False,
+    category_col: Optional[str] = None,
+    patterns: Optional[Sequence[str]] = None,
     orient: str = "v",
     save: bool = True,
-    ax: plt.Axes | None = None,
+    ax: Optional[plt.Axes] = None,
 ) -> pd.DataFrame:
-    if y_axis not in df.columns:
-        raise ValueError(f"Column '{y_axis}' not found in DataFrame.")
+    """
+    Draw a box plot of numeric_col.
+    - If category_col is None: one global box.
+    - Else: one box per category extracted from df[category_col];
+      if patterns is given, only matching categories are shown.
+    """
+    if numeric_col not in df.columns:
+        raise ValueError(f"Column '{numeric_col}' not found in DataFrame.")
 
-    # extract Brand from Racquet
-    df = df.copy()
-    df["Brand"] = df["Racquet"].apply(lambda s: re.findall(r"[A-Z][a-z]+", s)[0])
-
-    all_brands = sorted(df["Brand"].unique())
-
-    # decide grouping
-    if brand:
-        if brand not in all_brands:
-            raise ValueError(f"Brand '{brand}' not among {all_brands!r}")
-        df = df[df["Brand"] == brand]
-        x_col = "Racquet"
-        order = sorted(df[x_col].unique())
-    elif by_brand:
-        x_col = "Brand"
-        order = all_brands
+    # Prepare DataFrame and ordering
+    if category_col:
+        df_plot, order = _prepare_category(df, category_col, patterns)
+        x_col = "Category"
     else:
+        df_plot = df.copy()
         x_col = None
         order = None
 
-    # init figure/axis
+    # Init figure & axis
     if ax is None:
         fig, ax = _init_fig()
     else:
         fig = ax.figure
 
-    # draw
+    # Plot
     if x_col is None:
-        # global, no grouping
-        if orient.lower().startswith("h"):
-            sns.boxplot(data=df, x=y_axis, orient=orient, ax=ax)
-            _set_axis_bounds(ax, df[y_axis], axis="x")
-        else:
-            sns.boxplot(data=df, y=y_axis, orient=orient, ax=ax)
-            _set_axis_bounds(ax, df[y_axis], axis="y")
+        sns.boxplot(data=df_plot, y=numeric_col, orient=orient, ax=ax)
+        _set_axis_bounds(ax, df_plot[numeric_col], axis="y")
     else:
-        # grouped
         sns.boxplot(
-            data=df,
-            x=(x_col if orient.lower().startswith("v") else y_axis),
-            y=(y_axis if orient.lower().startswith("v") else x_col),
+            data=df_plot,
+            x=(x_col if orient.lower().startswith("v") else numeric_col),
+            y=(numeric_col if orient.lower().startswith("v") else x_col),
             order=order,
             orient=orient,
             ax=ax,
         )
-        vals = df[y_axis]
+        vals = df_plot[numeric_col]
         axis = "y" if orient.lower().startswith("v") else "x"
         _set_axis_bounds(ax, vals, axis=axis)
 
-    # labels & title
-    subtitle = f"Brand={brand}" if brand else ("By Brand" if by_brand else "Observations")
+    # Title & labels
+    if category_col:
+        title = f"Box Plot of {numeric_col.capitalize()} by {category_col}"
+    else:
+        title = f"Box Plot of {numeric_col.capitalize()}"
+
     ax.set(
-        xlabel=None if orient.lower().startswith("h") and x_col is None else (x_col or ""),
-        ylabel=None if orient.lower().startswith("v") and x_col is None else y_axis.capitalize(),
-        title=f"Box Plot of {y_axis.capitalize()} {subtitle}",
+        xlabel=None if x_col is None and orient.lower().startswith("h") else (x_col or ""),
+        ylabel=None
+        if x_col is None and orient.lower().startswith("v")
+        else numeric_col.capitalize(),
+        title=title,
     )
 
     if save:
         _save_fig(fig, output_path)
-    return df
+
+    return df_plot
 
 
 def violin_plot(
     df: pd.DataFrame,
-    y_axis: str,
+    numeric_col: str,
     output_path: Path,
-    brand: str | None = None,
-    by_brand: bool = False,
+    category_col: Optional[str] = None,
+    patterns: Optional[Sequence[str]] = None,
     orient: str = "v",
     inner: str = "box",
     save: bool = True,
-    ax: plt.Axes | None = None,
+    ax: Optional[plt.Axes] = None,
 ) -> pd.DataFrame:
-    if y_axis not in df.columns:
-        raise ValueError(f"Column '{y_axis}' not found in DataFrame.")
+    """
+    Draw a violin plot of numeric_col.
+    - If category_col is None: one global violin.
+    - Else: one violin per category extracted from df[category_col];
+      if patterns is given, only matching categories are shown.
+    """
+    if numeric_col not in df.columns:
+        raise ValueError(f"Column '{numeric_col}' not found in DataFrame.")
 
-    df = df.copy()
-    df["Brand"] = df["Racquet"].apply(lambda s: re.findall(r"[A-Z][a-z]+", s)[0])
-    all_brands = sorted(df["Brand"].unique())
-
-    if brand:
-        if brand not in all_brands:
-            raise ValueError(f"Brand '{brand}' not among {all_brands!r}")
-        df = df[df["Brand"] == brand]
-        x_col = "Racquet"
-        order = sorted(df[x_col].unique())
-    elif by_brand:
-        x_col = "Brand"
-        order = all_brands
+    # Prepare DataFrame and ordering
+    if category_col:
+        df_plot, order = _prepare_category(df, category_col, patterns)
+        x_col = "Category"
     else:
+        df_plot = df.copy()
         x_col = None
         order = None
 
+    # Init figure & axis
     if ax is None:
         fig, ax = _init_fig()
     else:
         fig = ax.figure
 
+    # Plot
     if x_col is None:
+        # global violin
         if orient.lower().startswith("h"):
-            sns.violinplot(data=df, x=y_axis, orient=orient, inner=inner, ax=ax)
-            _set_axis_bounds(ax, df[y_axis], axis="x")
+            sns.violinplot(data=df_plot, x=numeric_col, orient=orient, inner=inner, ax=ax)
+            _set_axis_bounds(ax, df_plot[numeric_col], axis="x")
         else:
-            sns.violinplot(data=df, y=y_axis, orient=orient, inner=inner, ax=ax)
-            _set_axis_bounds(ax, df[y_axis], axis="y")
+            sns.violinplot(data=df_plot, y=numeric_col, orient=orient, inner=inner, ax=ax)
+            _set_axis_bounds(ax, df_plot[numeric_col], axis="y")
     else:
         sns.violinplot(
-            data=df,
-            x=(x_col if orient.lower().startswith("v") else y_axis),
-            y=(y_axis if orient.lower().startswith("v") else x_col),
+            data=df_plot,
+            x=(x_col if orient.lower().startswith("v") else numeric_col),
+            y=(numeric_col if orient.lower().startswith("v") else x_col),
             order=order,
             orient=orient,
             inner=inner,
             ax=ax,
         )
-        vals = df[y_axis]
+        vals = df_plot[numeric_col]
         axis = "y" if orient.lower().startswith("v") else "x"
         _set_axis_bounds(ax, vals, axis=axis)
 
-    subtitle = f"Brand={brand}" if brand else ("By Brand" if by_brand else "Observations")
+    # Title & labels
+    if category_col:
+        title = f"Violin Plot of {numeric_col.capitalize()} by {category_col}"
+    else:
+        title = f"Violin Plot of {numeric_col.capitalize()}"
+
     ax.set(
-        xlabel=None if orient.lower().startswith("h") and x_col is None else (x_col or ""),
-        ylabel=None if orient.lower().startswith("v") and x_col is None else y_axis.capitalize(),
-        title=f"Violin Plot of {y_axis.capitalize()} {subtitle}",
+        xlabel=None if x_col is None and orient.lower().startswith("h") else (x_col or ""),
+        ylabel=None
+        if x_col is None and orient.lower().startswith("v")
+        else numeric_col.capitalize(),
+        title=title,
     )
 
+    # Save if needed
     if save:
         _save_fig(fig, output_path)
-    return df
+
+    return df_plot
 
 
 def correlation_matrix_heatmap(
