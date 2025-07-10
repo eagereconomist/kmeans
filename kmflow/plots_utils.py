@@ -98,33 +98,33 @@ def _save_fig(fig: plt.Figure, path: Path):
 
 def bar_plot(
     df: pd.DataFrame,
-    cat_col: str,
-    val_col: str,
+    category_col: str,
+    numeric_col: str,
     output_path: Path,
     orient: str = "v",
     save: bool = True,
     ax: plt.Axes = None,
 ) -> pd.DataFrame:
-    for col in (cat_col, val_col):
+    for col in (category_col, numeric_col):
         if col not in df.columns:
             raise ValueError(f"Column '{col}' not found in DataFrame.")
-    df[val_col] = pd.to_numeric(df[val_col], errors="coerce")
-    if df[val_col].isna().any():
-        raise ValueError(f"Column '{val_col}' must be numeric.")
+    df[numeric_col] = pd.to_numeric(df[numeric_col], errors="coerce")
+    if df[numeric_col].isna().any():
+        raise ValueError(f"Column '{numeric_col}' must be category.")
     if ax is None:
         fig, ax = _init_fig()
     else:
         fig = ax.figure
     if orient.lower().startswith("h"):
-        x, y = val_col, cat_col
+        x, y = numeric_col, category_col
     else:
-        x, y = cat_col, val_col
+        x, y = category_col, numeric_col
     sns.barplot(data=df, x=x, y=y, orient=orient, ax=ax)
-    _set_axis_bounds(ax, df[val_col], axis=("x" if orient.lower().startswith("h") else "y"))
+    _set_axis_bounds(ax, df[numeric_col], axis=("x" if orient.lower().startswith("h") else "y"))
     ax.set(
         xlabel=x.replace("_", " ").capitalize(),
         ylabel=y.replace("_", " ").capitalize(),
-        title=f"Bar Plot of {val_col.replace('_', ' ').capitalize()} by {cat_col.replace('_', ' ').capitalize()}",
+        title=f"Bar Plot of {numeric_col.replace('_', ' ').capitalize()} by {category_col.replace('_', ' ').capitalize()}",
     )
     if save:
         _save_fig(fig, output_path)
@@ -133,8 +133,8 @@ def bar_plot(
 
 def histogram(
     df: pd.DataFrame,
-    x_axis: str,
     num_bins: int,
+    x_axis: str,
     output_path: Path,
     save: bool = True,
     ax: plt.Axes = None,
@@ -215,8 +215,6 @@ def box_plot(
     """
     if numeric_col not in df.columns:
         raise ValueError(f"Column '{numeric_col}' not found in DataFrame.")
-
-    # Prepare DataFrame and ordering
     if category_col:
         df_plot, order = _prepare_category(df, category_col, patterns)
         x_col = "Category"
@@ -224,14 +222,10 @@ def box_plot(
         df_plot = df.copy()
         x_col = None
         order = None
-
-    # Init figure & axis
     if ax is None:
         fig, ax = _init_fig()
     else:
         fig = ax.figure
-
-    # Plot
     if x_col is None:
         sns.boxplot(data=df_plot, y=numeric_col, orient=orient, ax=ax)
         _set_axis_bounds(ax, df_plot[numeric_col], axis="y")
@@ -247,13 +241,10 @@ def box_plot(
         vals = df_plot[numeric_col]
         axis = "y" if orient.lower().startswith("v") else "x"
         _set_axis_bounds(ax, vals, axis=axis)
-
-    # Title & labels
     if category_col:
         title = f"Box Plot of {numeric_col.capitalize()} by {category_col}"
     else:
         title = f"Box Plot of {numeric_col.capitalize()}"
-
     ax.set(
         xlabel=None if x_col is None and orient.lower().startswith("h") else (x_col or ""),
         ylabel=None
@@ -261,10 +252,8 @@ def box_plot(
         else numeric_col.capitalize(),
         title=title,
     )
-
     if save:
         _save_fig(fig, output_path)
-
     return df_plot
 
 
@@ -287,8 +276,6 @@ def violin_plot(
     """
     if numeric_col not in df.columns:
         raise ValueError(f"Column '{numeric_col}' not found in DataFrame.")
-
-    # Prepare DataFrame and ordering
     if category_col:
         df_plot, order = _prepare_category(df, category_col, patterns)
         x_col = "Category"
@@ -296,16 +283,11 @@ def violin_plot(
         df_plot = df.copy()
         x_col = None
         order = None
-
-    # Init figure & axis
     if ax is None:
         fig, ax = _init_fig()
     else:
         fig = ax.figure
-
-    # Plot
     if x_col is None:
-        # global violin
         if orient.lower().startswith("h"):
             sns.violinplot(data=df_plot, x=numeric_col, orient=orient, inner=inner, ax=ax)
             _set_axis_bounds(ax, df_plot[numeric_col], axis="x")
@@ -325,13 +307,10 @@ def violin_plot(
         vals = df_plot[numeric_col]
         axis = "y" if orient.lower().startswith("v") else "x"
         _set_axis_bounds(ax, vals, axis=axis)
-
-    # Title & labels
     if category_col:
         title = f"Violin Plot of {numeric_col.capitalize()} by {category_col}"
     else:
         title = f"Violin Plot of {numeric_col.capitalize()}"
-
     ax.set(
         xlabel=None if x_col is None and orient.lower().startswith("h") else (x_col or ""),
         ylabel=None
@@ -339,21 +318,21 @@ def violin_plot(
         else numeric_col.capitalize(),
         title=title,
     )
-
-    # Save if needed
     if save:
         _save_fig(fig, output_path)
-
     return df_plot
 
 
-def correlation_matrix_heatmap(
+def corr_heatmap(
     df: pd.DataFrame,
     output_path: Path,
     save: bool = True,
     ax: plt.Axes = None,
 ) -> pd.DataFrame:
-    corr = df.corr(method="pearson")
+    numeric_df = df.select_dtypes(include="number")
+    if numeric_df.empty:
+        raise ValueError("No numeric columns found for correlation heatmap.")
+    corr = numeric_df.corr(method="pearson")
     if ax is None:
         fig, ax = _init_fig()
     else:
@@ -370,7 +349,7 @@ def correlation_matrix_heatmap(
         ax=ax,
     )
     ax.set(
-        title=f"Correlation Matrix Heatmap {output_path.stem}",
+        title="Correlation Matrix Heatmap",
         xlabel="Features",
     )
     ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
@@ -382,15 +361,19 @@ def correlation_matrix_heatmap(
 
 
 def qq_plot(
-    df: pd.DataFrame, column: str, output_path: Path, save: bool = True, ax: plt.Axes | None = None
+    df: pd.DataFrame,
+    numeric_col: str,
+    output_path: Path,
+    save: bool = True,
+    ax: plt.Axes | None = None,
 ) -> plt.Axes:
-    if column not in df.columns:
-        raise ValueError(f"Column {column!r} not found")
-    series = df[column]
+    if numeric_col not in df.columns:
+        raise ValueError(f"numeric_col {numeric_col!r} not found")
+    series = df[numeric_col]
     if ax is None:
         fig, ax = _init_fig()
     sm.qqplot(series, line="r", ax=ax)
-    ax.set_title(f"Q-Q Plot: {column.capitalize()}")
+    ax.set_title(f"Q-Q Plot: {numeric_col.capitalize()}")
     if save:
         _save_fig(fig, output_path)
     return ax
@@ -401,7 +384,7 @@ def inertia_plot(inertia_df: pd.DataFrame, output_path: Path, save: bool = True)
     ax.plot(inertia_df["k"], inertia_df["inertia"], marker="o")
     ax.set_xlabel("Number of Clusters (k)")
     ax.set_ylabel("Inertia")
-    ax.set_title(f"Elbow Plot for K-Means Inertia from {output_path} ")
+    ax.set_title("Inertia Plot")
     ax.set_xticks(inertia_df["k"].tolist())
     if save:
         _save_fig(fig, output_path)
@@ -413,7 +396,7 @@ def silhouette_plot(silhouette_df: pd.DataFrame, output_path: Path, save: bool =
     ax.plot(silhouette_df["n_clusters"], silhouette_df["silhouette_score"], marker="o")
     ax.set_xlabel("Number of Clusters (k)")
     ax.set_ylabel("Silhouette Score")
-    ax.set_title(f"Silhouette Score vs. Number of Clusters from {output_path}")
+    ax.set_title("Silhouette Score vs. k")
     ax.set_xticks(silhouette_df["n_clusters"].tolist())
     if save:
         _save_fig(fig, output_path)
@@ -431,13 +414,13 @@ def scree_plot(
     ax.plot(x, y, marker="o")
     ax.set_xlabel("Principal Component")
     ax.set_ylabel("Prop. Variance Explained")
-    ax.set_title(f"Scree Plot ({output_path.name})")
+    ax.set_title("Scree Plot")
     if save:
         _save_fig(fig, output_path)
     return fig
 
 
-def cumulative_prop_var_plot(
+def cumulative_var_plot(
     df: pd.DataFrame,
     output_path: Path,
     save: bool = True,
@@ -447,13 +430,190 @@ def cumulative_prop_var_plot(
     y = df["cumulative_prop_var"].values
     ax.plot(x, y, marker="o")
     ax.set_xlabel("Principal Component")
-    ax.set_ylabel("Cumulative Prop. Variance Explained")
+    ax.set_ylabel("Cumulative Proportion of Variance Explained")
     if save:
         _save_fig(fig, output_path)
     return fig
 
 
-def pca_biplot(
+def cluster_scatter(
+    df: pd.DataFrame,
+    x_axis: str,
+    y_axis: str,
+    output_path: Path,
+    scale: float = 1.0,
+    cluster_col: str = "cluster",
+    save: bool = True,
+    ax: plt.Axes | None = None,
+) -> plt.Axes:
+    df_plot = df.copy()
+    df_plot[cluster_col] = df_plot[cluster_col].astype(int)
+    df_plot[cluster_col] = (df_plot[cluster_col] + 1).astype(str)
+    categories = sorted(df_plot[cluster_col].unique(), key=lambda v: int(v))
+    if ax is None:
+        fig, ax = _init_fig()
+    else:
+        fig = ax.figure
+    sns.scatterplot(
+        data=df_plot,
+        x=x_axis,
+        y=y_axis,
+        style=cluster_col,
+        marker=True,
+        hue=cluster_col,
+        hue_order=categories,
+        style_order=categories,
+        palette="dark",
+        legend="full",
+    )
+
+    _set_axis_bounds(ax, df[x_axis], axis="x")
+    _set_axis_bounds(ax, df[y_axis], axis="y")
+
+    if scale != 1.0:
+        x0, x1 = ax.get_xlim()
+        x_mid = (x0 + x1) / 2
+        half_w = (x1 - x0) / 2 * scale
+        ax.set_xlim(x_mid - half_w, x_mid + half_w)
+
+        y0, y1 = ax.get_ylim()
+        y_mid = (y0 + y1) / 2
+        half_h = (y1 - y0) / 2 * scale
+        ax.set_ylim(y_mid - half_h, y_mid + half_h)
+
+    ax.set_title(f"{x_axis.capitalize()} vs. {y_axis.capitalize()} by {cluster_col}")
+    if save:
+        _save_fig(fig, output_path)
+    return ax
+
+
+def cluster_scatter_3d(
+    df: pd.DataFrame,
+    numeric_cols: list[str],
+    cluster_col: str,
+    output_path: Path,
+    scale: float = 1.0,
+    save: bool = True,
+) -> px.scatter_3d:
+    if len(numeric_cols) != 3:
+        raise ValueError(
+            "Need exactly three numeric features for 3D plotting;e.g. 'weight' 'height' 'width'"
+        )
+    missing = [column for column in numeric_cols if column not in df.columns]
+    if missing:
+        raise KeyError(
+            f"Column(s) {missing!r} not found in the DataFrame. "
+            "Please choose three valid numeric columns, "
+            "for example: 'beamwidth' 'headsize' 'length'."
+        )
+    df_plot = df.copy()
+    df_plot[cluster_col] = df_plot[cluster_col].astype(int) + 1
+    df_plot[cluster_col] = df_plot[cluster_col].astype(str)
+    if len(numeric_cols) < 3:
+        raise ValueError("Need at least 3 numeric_cols for a 3D plot.")
+    df_scaled = df_plot.copy()
+    for _, feat in enumerate(numeric_cols):
+        df_scaled[feat] *= scale
+
+    df_scaled[cluster_col] = df_scaled[cluster_col].astype(str)
+    try:
+        order = sorted(df_scaled[cluster_col].unique(), key=int)
+    except ValueError:
+        order = list(df_scaled[cluster_col].unique())
+    fig = px.scatter_3d(
+        df_scaled,
+        x=numeric_cols[0],
+        y=numeric_cols[1],
+        z=numeric_cols[2],
+        color=cluster_col,
+        category_orders={cluster_col: order},
+        title=f"3D Cluster Scatter (k={cluster_col.split('_')[-1]})",
+        width=1000,
+        height=1000,
+    )
+    if save:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.write_image(str(output_path))
+    return fig
+
+
+def plot_batch_clusters(
+    df: pd.DataFrame,
+    x_axis: str,
+    y_axis: str,
+    cluster_cols: list[str],
+    output_path: Path,
+    save: bool = True,
+    scale: float = 1.0,
+    columns_per_row: int = 3,
+    figsize_per_plot: tuple[int, int] = (12, 12),
+) -> plt.Figure:
+    """
+    Create a grid of 2D cluster-colored scatters for each column in cluster_cols,
+    ensuring each subplot uses its own cluster column.
+    """
+    n = len(cluster_cols)
+    cols = columns_per_row or n
+    rows = (n + cols - 1) // cols
+
+    df_plot = df.copy()
+    for col in cluster_cols:
+        df_plot[col] = df_plot[col].astype(int) + 1
+        df_plot[col] = df_plot[col].astype(str)
+
+    fig, axes = plt.subplots(
+        rows,
+        cols,
+        figsize=(cols * figsize_per_plot[0], rows * figsize_per_plot[1]),
+        squeeze=False,
+    )
+
+    for ax, column in zip(axes.flat, cluster_cols):
+        categories = sorted(df_plot[column].unique(), key=lambda v: int(v))
+
+        sns.scatterplot(
+            data=df_plot,
+            x=x_axis,
+            y=y_axis,
+            hue=column,
+            style=column,
+            palette="dark",
+            s=100,
+            alpha=1,
+            edgecolor="grey",
+            hue_order=categories,
+            style_order=categories,
+            ax=ax,
+            legend="full",
+        )
+        ax.set_xlabel(x_axis.capitalize())
+        ax.set_ylabel(y_axis.capitalize())
+        ax.set_title(f"{column}")
+
+        _set_axis_bounds(ax, df_plot[x_axis], axis="x")
+        _set_axis_bounds(ax, df_plot[y_axis], axis="y")
+        if scale != 1.0:
+            x0, x1 = ax.get_xlim()
+            xm = (x0 + x1) / 2
+            width = (x1 - x0) / 2 * scale
+            ax.set_xlim(xm - width, xm + width)
+
+            y0, y1 = ax.get_ylim()
+            ym = (y0 + y1) / 2
+            height = (y1 - y0) / 2 * scale
+            ax.set_ylim(ym - height, ym + height)
+
+    for ax in axes.flat[n:]:
+        fig.delaxes(ax)
+
+    fig.tight_layout()
+    if save:
+        _save_fig(fig, output_path)
+
+    return fig
+
+
+def biplot(
     df: pd.DataFrame,
     loadings: pd.DataFrame,
     pve: pd.Series,
@@ -523,7 +683,7 @@ def pca_biplot(
     return fig
 
 
-def pca_biplot_3d(
+def biplot_3d(
     df: pd.DataFrame,
     loadings: pd.DataFrame,
     pve: pd.Series,
@@ -537,7 +697,7 @@ def pca_biplot_3d(
     show: bool = False,
 ) -> go.Figure:
     feature_cols = loadings.columns.tolist()
-    if len(feature_cols) < 3:
+    if len(feature_cols) != 3:
         raise ValueError("Need at least 3 features for a 3D plot.")
     if compute_scores:
         X = df[feature_cols].values
@@ -643,171 +803,5 @@ def pca_biplot_3d(
         fig.write_image(str(output_path))
     if show:
         fig.show()
-
-    return fig
-
-
-def cluster_scatter(
-    df: pd.DataFrame,
-    x_axis: str,
-    y_axis: str,
-    output_path: Path,
-    scale: float = 1.0,
-    label_column: str = "cluster",
-    save: bool = True,
-    ax: plt.Axes | None = None,
-) -> plt.Axes:
-    df_plot = df.copy()
-    df_plot[label_column] = df_plot[label_column].astype(int)
-    df_plot[label_column] = (df_plot[label_column] + 1).astype(str)
-    categories = sorted(df_plot[label_column].unique(), key=lambda v: int(v))
-    if ax is None:
-        fig, ax = _init_fig()
-    else:
-        fig = ax.figure
-    sns.scatterplot(
-        data=df_plot,
-        x=x_axis,
-        y=y_axis,
-        style=label_column,
-        marker=True,
-        hue=label_column,
-        hue_order=categories,
-        style_order=categories,
-        palette="dark",
-        legend="full",
-    )
-
-    _set_axis_bounds(ax, df[x_axis], axis="x")
-    _set_axis_bounds(ax, df[y_axis], axis="y")
-
-    if scale != 1.0:
-        x0, x1 = ax.get_xlim()
-        x_mid = (x0 + x1) / 2
-        half_w = (x1 - x0) / 2 * scale
-        ax.set_xlim(x_mid - half_w, x_mid + half_w)
-
-        y0, y1 = ax.get_ylim()
-        y_mid = (y0 + y1) / 2
-        half_h = (y1 - y0) / 2 * scale
-        ax.set_ylim(y_mid - half_h, y_mid + half_h)
-
-    ax.set_title(f"{x_axis.capitalize()} vs. {y_axis.capitalize()} by {label_column}")
-    if save:
-        _save_fig(fig, output_path)
-    return ax
-
-
-def cluster_scatter_3d(
-    df: pd.DataFrame,
-    features: list[str],
-    label_column: str,
-    output_path: Path,
-    scale: float = 1.0,
-    save: bool = True,
-) -> px.scatter_3d:
-    df_plot = df.copy()
-    df_plot[label_column] = df_plot[label_column].astype(int) + 1
-    df_plot[label_column] = df_plot[label_column].astype(str)
-    if len(features) < 3:
-        raise ValueError("Need at least 3 features for a 3D plot.")
-    df_scaled = df_plot.copy()
-    for _, feat in enumerate(features):
-        df_scaled[feat] *= scale
-
-    df_scaled[label_column] = df_scaled[label_column].astype(str)
-    try:
-        order = sorted(df_scaled[label_column].unique(), key=int)
-    except ValueError:
-        order = list(df_scaled[label_column].unique())
-    fig = px.scatter_3d(
-        df_scaled,
-        x=features[0],
-        y=features[1],
-        z=features[2],
-        color=label_column,
-        category_orders={label_column: order},
-        title=f"3D Cluster Scatter (k={label_column.split('_')[-1]})",
-        width=1000,
-        height=1000,
-    )
-    if save:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.write_image(str(output_path))
-    return fig
-
-
-def plot_batch_clusters(
-    df: pd.DataFrame,
-    x_axis: str,
-    y_axis: str,
-    cluster_columns: list[str],
-    output_path: Path,
-    save: bool = True,
-    scale: float = 1.0,
-    columns_per_row: int = 3,
-    figsize_per_plot: tuple[int, int] = (12, 12),
-) -> plt.Figure:
-    """
-    Create a grid of 2D cluster-colored scatters for each column in cluster_columns,
-    ensuring each subplot uses its own cluster column.
-    """
-    n = len(cluster_columns)
-    cols = columns_per_row or n
-    rows = (n + cols - 1) // cols
-
-    df_plot = df.copy()
-    for col in cluster_columns:
-        df_plot[col] = df_plot[col].astype(int) + 1
-        df_plot[col] = df_plot[col].astype(str)
-
-    fig, axes = plt.subplots(
-        rows,
-        cols,
-        figsize=(cols * figsize_per_plot[0], rows * figsize_per_plot[1]),
-        squeeze=False,
-    )
-
-    for ax, column in zip(axes.flat, cluster_columns):
-        categories = sorted(df_plot[column].unique(), key=lambda v: int(v))
-
-        sns.scatterplot(
-            data=df_plot,
-            x=x_axis,
-            y=y_axis,
-            hue=column,
-            style=column,
-            palette="dark",
-            s=100,
-            alpha=1,
-            edgecolor="grey",
-            hue_order=categories,
-            style_order=categories,
-            ax=ax,
-            legend="full",
-        )
-        ax.set_xlabel(x_axis.capitalize())
-        ax.set_ylabel(y_axis.capitalize())
-        ax.set_title(f"{column}")
-
-        _set_axis_bounds(ax, df_plot[x_axis], axis="x")
-        _set_axis_bounds(ax, df_plot[y_axis], axis="y")
-        if scale != 1.0:
-            x0, x1 = ax.get_xlim()
-            xm = (x0 + x1) / 2
-            width = (x1 - x0) / 2 * scale
-            ax.set_xlim(xm - width, xm + width)
-
-            y0, y1 = ax.get_ylim()
-            ym = (y0 + y1) / 2
-            height = (y1 - y0) / 2 * scale
-            ax.set_ylim(ym - height, ym + height)
-
-    for ax in axes.flat[n:]:
-        fig.delaxes(ax)
-
-    fig.tight_layout()
-    if save:
-        _save_fig(fig, output_path)
 
     return fig

@@ -1,16 +1,15 @@
 from typing import Optional, List
+import sys
 import typer
 from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
+import pandas as pd
 import matplotlib.pyplot as plt
 from math import ceil
 
 
-from kmflow.config import DATA_DIR, FIGURES_DIR
-from kmflow.preprocessing_utils import load_data
 from kmflow.plots_utils import (
-    _save_fig,
     _apply_cubehelix_style,
     _ensure_unique_path,
     bar_plot,
@@ -18,14 +17,14 @@ from kmflow.plots_utils import (
     scatter_plot,
     box_plot,
     violin_plot,
-    correlation_matrix_heatmap,
+    corr_heatmap,
     qq_plot,
     inertia_plot,
     silhouette_plot,
     scree_plot,
-    cumulative_prop_var_plot,
-    pca_biplot,
-    pca_biplot_3d,
+    cumulative_var_plot,
+    biplot,
+    biplot_3d,
     cluster_scatter,
     cluster_scatter_3d,
     plot_batch_clusters,
@@ -38,731 +37,782 @@ app = typer.Typer()
 
 @app.command("barplot")
 def barplt(
-    input_file: str = typer.Argument(..., help="csv filename."),
-    input_dir: Path = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
+    input_file: Path = typer.Argument(..., help="Path to CSV file, or '-' to read from stdin."),
+    category_col: str = typer.Argument(..., help="Categorical column (x-axis when vertical)."),
+    numeric_col: str = typer.Argument(..., help="Numeric column to plot."),
+    orient: str = typer.Option("v", "--orient", "-a", help="Orientation: 'v' or 'h'."),
+    save: bool = typer.Option(
+        True,
+        "--no-save",
+        "-n",
+        help="Save to file (default) or display only.",
     ),
-    cat_col: str = typer.Argument(
-        ..., help="Categorical column (x-axis when vertical orientation)."
-    ),
-    val_col: str = typer.Argument(..., help="Numeric column to plot."),
-    orient: str = typer.Option("v", "--orient", "-a", help="Orientation of the plot: 'v' or 'h'."),
-    output_dir: Path = typer.Option(
-        FIGURES_DIR,
-        "--output-dir:",
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
         "-o",
-        dir_okay=True,
-        file_okay=False,
-    ),
-    no_save: bool = typer.Option(
-        False, "--no-save", "-n", help="Generate plot, but don't write to disk."
+        help="Path for the PNG output; use '-' to write image to stdout.",
     ),
 ):
-    input_path = DATA_DIR / input_dir / input_file
-    df = load_data(input_path)
-    stem = Path(input_file).stem
-    file_name = f"{stem}_{cat_col}_by_{val_col}_barplot.png"
-    output_path = output_dir / file_name
-    output_path = _ensure_unique_path(output_path)
-
-    steps = tqdm(total=1, desc="Barplot")
+    """
+    Bar plot of <numeric_col> by <category_col>, with stdin/stdout or file I/O.
+    """
+    if input_file == Path("-"):
+        df = pd.read_csv(sys.stdin)
+    else:
+        df = pd.read_csv(input_file)
     bar_plot(
         df=df,
-        cat_col=cat_col,
-        val_col=val_col,
-        output_path=output_path,
+        numeric_col=numeric_col,
+        category_col=category_col,
+        output_path=Path("dummy_path.png"),
         orient=orient,
-        save=not no_save,
+        save=save,
     )
-    steps.update(1)
-    steps.close()
-    if no_save:
-        logger.success("Bar plot generated (not saved to disk).")
+    fig = plt.gcf()
+    if output_file is None:
+        output_file = Path.cwd() / f"{category_col}_by_{numeric_col}_barplot.png"
+    if output_file == Path("-"):
+        fig.savefig(sys.stdout.buffer, format="png")
+        logger.success("Bar plot PNG written to stdout.")
+    elif save:
+        out_path = _ensure_unique_path(output_file)
+        fig.savefig(out_path)
+        plt.close(fig)
+        logger.success(f"Bar plot saved to {out_path!r}")
     else:
-        logger.success(f"Bar plot saved to {output_path!r}")
+        plt.show()
+        plt.close(fig)
+        logger.success("Bar plot displayed (not saved).")
 
 
 @app.command("hist")
 def hist(
-    input_file: str = typer.Argument("csv filename."),
-    dir_label: str = typer.Argument("Sub-folder under data/"),
+    input_file: Path = typer.Argument(..., help="Path to CSV file, or '-' to read from stdin."),
     x_axis: str = typer.Argument(..., help="Column to histogram."),
     num_bins: int = typer.Option(10, "--bins", "-b", help="Number of bins."),
-    output_dir: Path = typer.Option(
-        FIGURES_DIR,
-        "--output-dir",
-        "-o",
-        dir_okay=True,
-        file_okay=False,
-        help="Where to save the .png plot.",
-    ),
-    no_save: bool = typer.Option(
-        False,
+    save: bool = typer.Option(
+        True,
         "--no-save",
         "-n",
-        help="Generate plot, but don't write to disk.",
+        help="Save to file (default) or display only.",
+    ),
+    output_file: Path = typer.Option(
+        None,
+        "--output-file",
+        "-o",
+        help="Path for the PNG output; use '-' to write image to stdout.",
     ),
 ):
-    input_path = DATA_DIR / dir_label / input_file
-    df = load_data(input_path)
-    output_path = output_dir / f"{Path(input_file).stem}_{x_axis}_hist.png"
-    output_path = _ensure_unique_path(output_path)
-    steps = tqdm(total=1, desc="Histogram", ncols=100)
-    histogram(df, x_axis, num_bins, output_path, save=not no_save)
-    steps.update(1)
-    steps.close()
-    if not no_save:
-        logger.success(f"Histogram saved to {output_path}")
+    """
+    Histogram of <x_axis> with optional stdin/stdout and save/display control.
+    """
+    if input_file == Path("-"):
+        df = pd.read_csv(sys.stdin)
     else:
-        logger.success("Histogram generated (not saved to disk).")
+        df = pd.read_csv(input_file)
+    histogram(
+        df=df,
+        num_bins=num_bins,
+        x_axis=x_axis,
+        output_path=Path("dummy_path.png"),
+        save=save,
+    )
+    fig = plt.gcf()
+    if output_file is None:
+        default_name = f"{x_axis}_hist.png"
+        output_file = Path.cwd() / default_name
+    if output_file == Path("-"):
+        fig.savefig(sys.stdout.buffer, format="png")
+        logger.success("Histogram PNG written to stdout.")
+    elif save:
+        out_path = _ensure_unique_path(output_file)
+        fig.savefig(out_path)
+        plt.close(fig)
+        logger.success(f"Histogram saved to {out_path!r}")
+    else:
+        plt.show()
+        plt.close(fig)
+        logger.success("Histogram displayed (not saved).")
 
 
 @app.command("scatter")
-def scatter(
-    input_file: str = typer.Argument(..., help="csv filename."),
-    dir_label: str = typer.Argument("Sub-folder under data/"),
+def scatter_cmd(
+    input_file: Path = typer.Argument(..., help="Path to CSV file, or '-' for stdin."),
     x_axis: str = typer.Argument(..., help="X-axis column."),
     y_axis: str = typer.Argument(..., help="Y-axis column."),
-    output_dir: Path = typer.Option(
-        FIGURES_DIR,
-        "--output-dir",
-        "-o",
-        dir_okay=True,
-        file_okay=False,
-    ),
     scale: float = typer.Option(1.0, "--scale", "-s", help="Multiplier for x and y axes ranges."),
-    no_save: bool = typer.Option(
-        False, "--no-save", "-n", help="Generate plot, but don't write to disk."
+    save: bool = typer.Option(
+        True, "--no-save", "-n", help="Save to file (default) or display only."
+    ),
+    output_file: Path = typer.Option(
+        None,
+        "--output-file",
+        "-o",
+        help="Path for the PNG output; use '-' to write image to stdout.",
     ),
 ):
-    input_path = DATA_DIR / dir_label / input_file
-    df = load_data(input_path)
-    output_path = output_dir / f"{Path(input_file).stem}_{x_axis}_vs._{y_axis}_scatter.png"
-    output_path = _ensure_unique_path(output_path)
-    steps = tqdm(total=1, desc="Scatter", ncols=100)
-    scatter_plot(df, x_axis, y_axis, output_path, scale, save=not no_save)
-    steps.update(1)
-    steps.close()
-    if not no_save:
-        logger.success(f"Scatter plot saved to {output_path}")
+    """
+    Scatter plot of x vs y, with optional stdin/stdout and save/display control.
+    """
+    if input_file == Path("-"):
+        df = pd.read_csv(sys.stdin)
     else:
-        logger.success("Scatter plot generated (not saved to disk).")
+        df = pd.read_csv(input_file)
+    scatter_plot(
+        df=df,
+        x_axis=x_axis,
+        y_axis=y_axis,
+        output_path=Path("dummy_path.png"),
+        scale=scale,
+        save=save,
+    )
+    fig = plt.gcf()
+    if output_file is None:
+        default_name = f"{x_axis}_vs_{y_axis}_scatter.png"
+        output_file = Path.cwd() / default_name
+    if output_file == Path("-"):
+        fig.savefig(sys.stdout.buffer, format="png")
+        logger.success("Scatter plot PNG written to stdout.")
+    elif save:
+        out_path = _ensure_unique_path(output_file)
+        fig.savefig(out_path)
+        plt.close(fig)
+        logger.success(f"Scatter plot saved to {out_path!r}")
+    else:
+        plt.show()
+        plt.close(fig)
+        logger.success("Scatter plot displayed (not saved).")
 
 
 @app.command("boxplot")
 def boxplt(
-    input_file: str = typer.Argument(..., help="CSV filename."),
-    dir_label: str = typer.Argument("Sub-folder under data/"),
-    numeric_col: str = typer.Argument(..., help="Y-axis column."),
+    input_file: Path = typer.Argument(..., help="Path to CSV file, or '-' to read from stdin."),
+    numeric_col: str = typer.Argument(..., help="Numeric column for the box plot."),
     category_col: Optional[str] = typer.Option(
         None, "--category-col", "-c", help="Column to group by (one box per category)."
     ),
     patterns: Optional[List[str]] = typer.Option(
         None, "--pattern", "-p", help="Comma-separated regex pattern(s) to filter categories."
     ),
-    orient: str = typer.Option("v", "--orient", "-a", help="Orientation of the plot."),
-    output_dir: Path = typer.Option(
-        FIGURES_DIR, "--output-dir", "-o", dir_okay=True, file_okay=False
+    orient: str = typer.Option("v", "--orient", "-a", help="Orientation: 'v' or 'h'."),
+    save: bool = typer.Option(
+        True, "--no-save", "-n", help="Save to file (default) or display only."
     ),
-    no_save: bool = typer.Option(False, "--no-save", "-n", help="Generate plot but don't save."),
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
+        "-o",
+        help="Path for the PNG output; use '-' to write image to stdout.",
+    ),
 ):
     """
-    Box plot of Y, optionally grouped by a category column and filtered by regex patterns.
+    Box plot of `numeric_col`, optionally grouped by `category_col` and filtered by `patterns`.
     """
-    input_path = DATA_DIR / dir_label / input_file
-    df = load_data(input_path)
-
-    # Determine mode for filename
-    stem = Path(input_file).stem
-    if category_col is None:
-        mode = "all"
-    elif patterns:
-        mode = f"filtered_{category_col}"
+    if input_file == Path("-"):
+        df = pd.read_csv(sys.stdin)
     else:
-        mode = f"by_{category_col}"
-
-    file_name = f"{stem}_{mode}_{numeric_col}_boxplot.png"
-    output_path = output_dir / file_name
-    output_path = _ensure_unique_path(output_path)
-
-    with tqdm(total=1, desc="Boxplot") as pbar:
-        box_plot(
-            df=df,
-            numeric_col=numeric_col,
-            output_path=output_path,
-            category_col=category_col,
-            patterns=patterns[0].split(", ") if patterns else None,
-            orient=orient,
-            save=not no_save,
-        )
-        pbar.update(1)
-
-    if no_save:
-        logger.success("Box plot generated (not saved).")
+        df = pd.read_csv(input_file)
+        if category_col is None:
+            mode = "all"
+        elif patterns:
+            mode = f"filtered_{category_col}"
+        else:
+            mode = f"by_{category_col}"
+        default_name = f"{mode}_{numeric_col}_boxplot.png"
+        output_file = Path.cwd() / default_name
+    output_file = _ensure_unique_path(output_file)
+    box_plot(
+        df=df,
+        numeric_col=numeric_col,
+        output_path=output_file,
+        category_col=category_col,
+        patterns=patterns[0].split(", ") if patterns else None,
+        orient=orient,
+        save=save,
+    )
+    fig = plt.gcf()
+    if output_file == Path("-"):
+        fig.savefig(sys.stdout.buffer, format="png")
+        logger.success("Box plot PNG written to stdout.")
+    elif save:
+        fig.savefig(output_file)
+        plt.close(fig)
+        logger.success(f"Box plot saved to {output_file!r}")
     else:
-        logger.success(f"Box plot saved to {output_path!r}")
+        plt.show()
+        plt.close(fig)
+        logger.success("Box plot displayed (not saved).")
 
 
 @app.command("violin")
 def violinplt(
-    input_file: str = typer.Argument(..., help="CSV filename."),
-    dir_label: str = typer.Argument("Sub-folder under data/"),
-    numeric_col: str = typer.Argument(..., help="Y-axis column."),
+    input_file: Path = typer.Argument(..., help="Path to CSV file, or '-' to read from stdin."),
+    numeric_col: str = typer.Argument(..., help="Numeric column for the violin plot."),
     category_col: Optional[str] = typer.Option(
         None, "--category-col", "-c", help="Column to group by (one violin per category)."
     ),
     patterns: Optional[List[str]] = typer.Option(
         None, "--pattern", "-p", help="Comma-separated regex pattern(s) to filter categories."
     ),
-    orient: str = typer.Option("v", "--orient", "-a", help="Orientation of the plot."),
+    orient: str = typer.Option("v", "--orient", "-a", help="Orientation: 'v' or 'h'."),
     inner: str = typer.Option(
         "box", "--inner", "-i", help="Interior representation inside the violins."
     ),
-    output_dir: Path = typer.Option(
-        FIGURES_DIR, "--output-dir", "-o", dir_okay=True, file_okay=False
+    save: bool = typer.Option(
+        True, "--no-save", "-n", help="Save to file (default) or display only."
     ),
-    no_save: bool = typer.Option(False, "--no-save", "-n", help="Generate plot but don't save."),
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
+        "-o",
+        help="Path for the PNG output; use '-' to write image to stdout.",
+    ),
 ):
     """
-    Violin plot of Y, optionally grouped by a category column and filtered by regex patterns.
+    Violin plot of `numeric_col`, optionally grouped by `category_col` and filtered by `patterns`.
     """
-    input_path = DATA_DIR / dir_label / input_file
-    df = load_data(input_path)
-
-    # Determine mode for filename
-    stem = Path(input_file).stem
-    if category_col is None:
-        mode = "all"
-    elif patterns:
-        mode = f"filtered_{category_col}"
+    if input_file == Path("-"):
+        df = pd.read_csv(sys.stdin)
     else:
-        mode = f"by_{category_col}"
-
-    file_name = f"{stem}_{mode}_{numeric_col}_violin.png"
-    output_path = output_dir / file_name
-    output_path = _ensure_unique_path(output_path)
-
-    with tqdm(total=1, desc="Violin") as pbar:
-        violin_plot(
-            df=df,
-            numeric_col=numeric_col,
-            output_path=output_path,
-            category_col=category_col,
-            patterns=patterns[0].split(", ") if patterns else None,
-            orient=orient,
-            inner=inner,
-            save=not no_save,
-        )
-        pbar.update(1)
-
-    if no_save:
-        logger.success("Violin plot generated (not saved).")
+        df = pd.read_csv(input_file)
+        if category_col is None:
+            mode = "all"
+        elif patterns:
+            mode = f"filtered_{category_col}"
+        else:
+            mode = f"by_{category_col}"
+        default_name = f"{mode}_{numeric_col}_violin.png"
+        output_file = Path.cwd() / default_name
+    output_file = _ensure_unique_path(output_file)
+    violin_plot(
+        df=df,
+        numeric_col=numeric_col,
+        output_path=output_file,
+        category_col=category_col,
+        patterns=patterns[0].split(", ") if patterns else None,
+        orient=orient,
+        inner=inner,
+        save=save,
+    )
+    fig = plt.gcf()
+    if output_file == Path("-"):
+        fig.savefig(sys.stdout.buffer, format="png")
+        logger.success("Violin plot PNG written to stdout.")
+    elif save:
+        fig.savefig(output_file)
+        plt.close(fig)
+        logger.success(f"Violin plot saved to {output_file!r}")
     else:
-        logger.success(f"Violin plot saved to {output_path!r}")
+        plt.show()
+        plt.close(fig)
+        logger.success("Violin plot displayed (not saved).")
 
 
 @app.command("heatmap")
 def corr_heat(
-    input_file: str = typer.Argument("csv filename."),
-    dir_label: str = typer.Argument("Sub-folder under data/"),
-    output_dir: Path = typer.Option(
-        FIGURES_DIR,
-        "--output-dir",
-        "-o",
-        dir_okay=True,
-        file_okay=False,
-        help="Where to save the .png plot.",
+    input_file: Path = typer.Argument(..., help="Path to CSV file, or '-' to read from stdin."),
+    save: bool = typer.Option(
+        True, "--no-save", "-n", help="Save to file (default) or display only."
     ),
-    no_save: bool = typer.Option(
-        False,
-        "--no-save",
-        "-n",
-        help="Generate plot, but don't write to disk.",
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
+        "-o",
+        help="Path for the PNG output; use '-' to write image to stdout.",
     ),
 ):
-    input_path = DATA_DIR / dir_label / input_file
-    df = load_data(input_path)
-    output_path = output_dir / f"{Path(input_file).stem}_heatmap.png"
-    output_path = _ensure_unique_path(output_path)
-    steps = tqdm(total=1, desc="Heatmap", ncols=100)
-    correlation_matrix_heatmap(df, output_path, save=not no_save)
-    steps.update(1)
-    steps.close()
-    if not no_save:
-        logger.success(f"Heatmap saved to {output_path}")
+    """
+    Correlation matrix heatmap for all numeric features in the data.
+    """
+    if input_file == Path("-"):
+        df = pd.read_csv(sys.stdin)
     else:
-        logger.success("Heatmap generated (not saved to disk).")
+        df = pd.read_csv(input_file)
+    if output_file is None:
+        default_name = "heatmap.png"
+        output_file = Path.cwd() / default_name
+    output_file = _ensure_unique_path(output_file)
+    corr_heatmap(df=df, output_path=output_file, save=save)
+    fig = plt.gcf()
+    if output_file == Path("-"):
+        fig.savefig(sys.stdout.buffer, format="png")
+        logger.success("Heatmap PNG written to stdout.")
+    elif save:
+        fig.savefig(output_file)
+        plt.close(fig)
+        logger.success(f"Heatmap saved to {output_file!r}")
+    else:
+        plt.show()
+        plt.close(fig)
+        logger.success("Heatmap displayed (not saved).")
 
 
 @app.command("qq")
-def qq(
-    input_file: str = typer.Argument(..., help="csv filename under the data subfolder."),
-    dir_label: str = typer.Argument(..., help="Sub-folder under data/"),
-    column: list[str] = typer.Option([], "--column", "-c", help="Column to plot."),
+def qq_cmd(
+    input_file: Path = typer.Argument(..., help="CSV file path or '-' to read from stdin."),
+    numeric_col: Optional[str] = typer.Argument(None, help="Numeric column for Q-Q plot."),
     all_cols: bool = typer.Option(
-        False,
-        "--all",
-        "-a",
-        help="Plot Q-Q for all numeric columns.",
+        False, "--all", "-a", help="Generate Q-Q plots for all numeric columns."
     ),
-    output_dir: Path = typer.Option(
-        FIGURES_DIR,
-        "--output-dir",
+    save: bool = typer.Option(
+        True, "--no-save", "-n", help="Save to file (default) or display only."
+    ),
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
         "-o",
-        help="Where to save plot(s).",
-    ),
-    no_save: bool = typer.Option(
-        False,
-        "--no-save",
-        "-n",
-        help="Generate plots, but don't write to disk.",
+        help="Path for PNG output; use '-' for stdout.",
     ),
 ):
-    df = load_data(DATA_DIR / dir_label / input_file)
-    stem = Path(input_file).stem
-    if column and not all_cols:
-        for col in tqdm(column, desc="Q-Q Plot"):
-            file_name = f"{stem}_{col}_qq.png"
-            output_path = output_dir / file_name
-            output_path = _ensure_unique_path(output_path)
-            qq_plot(df=df, column=col, output_path=output_path, save=not no_save)
-            if not no_save:
-                logger.success(f"Saved Q-Q Plot for '{col}' -> {output_path!r}")
-    elif all_cols:
+    """
+    Generate a Q-Q plot for one numeric column or all numeric columns.
+    """
+    if input_file == Path("-"):
+        df = pd.read_csv(sys.stdin)
+    else:
+        df = pd.read_csv(input_file)
+    if all_cols:
         cols = df.select_dtypes(include="number").columns.tolist()
+        if not cols:
+            raise typer.BadParameter("No numeric columns found.")
         n = len(cols)
         ncols = 3
         nrows = ceil(n / ncols)
         _apply_cubehelix_style()
-        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(4 * ncols, 4 * nrows))
+        fig, axes = plt.subplots(nrows, ncols, figsize=(4 * ncols, 4 * nrows))
         axes_flat = axes.flatten()
         for i, col in enumerate(tqdm(cols, desc="Q-Q Plots")):
-            ax = axes_flat[i]
-            qq_plot(df=df, column=col, output_path=None, save=False, ax=ax)
-            ax.set_title(col.capitalize())
+            qq_plot(df, col, output_path=None, save=save, ax=axes_flat[i])
+            axes_flat[i].set_title(col)
         for ax in axes_flat[n:]:
             ax.set_visible(False)
-        fig.suptitle(f"Q-Q Plots: {stem} Data")
+        fig.suptitle("Q-Q Plots")
         fig.tight_layout()
-        file_name = f"{stem}_qq_all.png"
-        output_path = output_dir / file_name
-        output_path = _ensure_unique_path(output_path)
-        if not no_save:
-            _save_fig(fig, output_path)
-            logger.success(f"Saved Combined Q-Q Plots -> {output_path!r}")
-        else:
-            fig.show()
+        default_name = "qq_all.png"
+        out = Path.cwd() / default_name if output_file is None else output_file
     else:
-        raise typer.BadParameter("Specify one or more --column or use --all.")
+        if not numeric_col:
+            raise typer.BadParameter("Specify a column via argument or use --all.")
+        if numeric_col not in df.select_dtypes(include="number"):
+            raise typer.BadParameter(f"Column {numeric_col!r} is not numeric.")
+        qq_plot(df, numeric_col, output_path=None, save=save)
+        fig = plt.gcf()
+        default_name = f"{numeric_col}_qq.png"
+        out = Path.cwd() / default_name if output_file is None else output_file
+    out = _ensure_unique_path(out)
+    if out == Path("-"):
+        fig.savefig(sys.stdout.buffer, format="png")
+        logger.success("Q-Q plot PNG written to stdout.")
+    elif save:
+        fig.savefig(out)
+        plt.close(fig)
+        logger.success(f"Q-Q plot saved to {out!r}")
+    else:
+        plt.show()
+        plt.close(fig)
+        logger.success("Q-Q plot displayed (not saved).")
 
 
 @app.command("inertia")
-def elbow_plot(
-    input_file: str = typer.Argument(..., help="csv from `inertia` command."),
-    input_dir: str = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
+def inertia(
+    input_file: Path = typer.Argument(
+        ..., help="CSV file of inertia vs k, or '-' to read from stdin."
     ),
-    output_dir: Path = typer.Option(
-        FIGURES_DIR,
-        "--output-dir",
+    save: bool = typer.Option(
+        True,
+        "--no-save",
+        "-n",
+        help="Save to file (default) or display only.",
+    ),
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
         "-o",
-        dir_okay=True,
-        file_okay=False,
-        help="Save the inertia plot PNG to the 'figures' directory.",
+        help="Output PNG path; use '-' to write image to stdout.",
     ),
-    no_save: bool = typer.Option(False, "--no-save", "-n", help="Show plot, but don't save."),
 ):
-    df = load_data(DATA_DIR / input_dir / input_file)
-    stem = Path(input_file).stem
-    output_path = output_dir / f"{stem}.png"
-    output_path = _ensure_unique_path(output_path)
-    fig = inertia_plot(
-        df,
-        output_path,
-        save=no_save,
-    )
-    if not no_save:
-        _save_fig(fig, output_path)
-        logger.success(f"Elbow Plot saved to {output_path!r}")
+    """
+    Elbow plot of K-Means inertia versus number of clusters.
+    """
+    if input_file == Path("-"):
+        df = pd.read_csv(sys.stdin)
     else:
-        fig.show()
+        df = pd.read_csv(input_file)
+    if output_file is None:
+        output_file = Path.cwd() / "inertia.png"
+    output_file = _ensure_unique_path(output_file)
+    fig = inertia_plot(
+        inertia_df=df,
+        output_path=output_file,
+        save=save,
+    )
+    if output_file == Path("-"):
+        fig.savefig(sys.stdout.buffer, format="png")
+        logger.success("Elbow plot PNG written to stdout.")
+    elif save:
+        fig.savefig(output_file)
+        plt.close(fig)
+        logger.success(f"Elbow plot saved to {output_file!r}")
+    else:
+        plt.show()
+        plt.close(fig)
+        logger.success("Elbow plot displayed (not saved).")
 
 
 @app.command("silhouette")
-def plot_silhouette(
-    input_file: str = typer.Argument(..., help="CSV from `silhouette` command."),
-    input_dir: str = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
+def silhouette(
+    input_file: Path = typer.Argument(
+        ..., help="CSV file of silhouette scores or '-' to read from stdin."
     ),
-    output_dir: Path = typer.Option(
-        FIGURES_DIR,
-        "--output-dir",
+    save: bool = typer.Option(
+        True, "--no-save", "-n", help="Save to file (default) or display only."
+    ),
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
         "-o",
-        dir_okay=True,
-        file_okay=False,
-        help="Save the silhouette plot PNG to the 'figures' directory.",
+        help="Output PNG path; use '-' to write image to stdout.",
     ),
-    no_save: bool = typer.Option(False, "--no-save", "-n", help="Show plot but don’t save."),
 ):
-    df = load_data(DATA_DIR / input_dir / input_file)
-    stem = Path(input_file).stem
-    output_path = output_dir / f"{stem}.png"
-    output_path = _ensure_unique_path(output_path)
-    fig = silhouette_plot(df, output_path, save=not no_save)
-    if not no_save:
-        _save_fig(fig, output_path)
-        logger.success(f"Silhouette Plot saved to {output_path!r}")
+    """
+    Plot silhouette score versus number of clusters.
+    """
+    if input_file == Path("-"):
+        df = pd.read_csv(sys.stdin)
     else:
-        fig.show()
+        df = pd.read_csv(input_file)
+    if output_file is None:
+        output_file = Path.cwd() / "silhouette.png"
+    output_file = _ensure_unique_path(output_file)
+    fig = silhouette_plot(silhouette_df=df, output_path=output_file, save=save)
+    if output_file == Path("-"):
+        fig.savefig(sys.stdout.buffer, format="png")
+        logger.success("Silhouette plot PNG written to stdout.")
+    elif save:
+        fig.savefig(output_file)
+        plt.close(fig)
+        logger.success(f"Silhouette plot saved to {output_file!r}")
+    else:
+        plt.show()
+        plt.close(fig)
+        logger.success("Silhouette plot displayed (not saved).")
+
+
+@app.command("scree")
+def scree(
+    input_file: Path = typer.Argument(
+        ..., help="CSV file of PCA variance or '-' to read from stdin."
+    ),
+    save: bool = typer.Option(
+        True, "--no-save", "-n", help="Save to file (default) or display only."
+    ),
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
+        "-o",
+        help="Path for the PNG output; use '-' for stdout.",
+    ),
+):
+    """
+    Scree plot of proportion variance explained by each principal component.
+    """
+    if input_file == Path("-"):
+        df = pd.read_csv(sys.stdin)
+    else:
+        df = pd.read_csv(input_file)
+    if output_file is None:
+        output_file = Path.cwd() / "scree.png"
+    output_file = _ensure_unique_path(output_file)
+    fig = scree_plot(
+        df=df,
+        output_path=output_file,
+        save=save,
+    )
+    if output_file == Path("-"):
+        fig.savefig(sys.stdout.buffer, format="png")
+        logger.success("Scree plot PNG written to stdout.")
+    elif save:
+        fig.savefig(output_file)
+        plt.close(fig)
+        logger.success(f"Scree plot saved to {output_file!r}")
+    else:
+        plt.show()
+        plt.close(fig)
+        logger.success("Scree plot displayed (not saved).")
+
+
+@app.command("cpv")
+def cpv(
+    input_file: Path = typer.Argument(
+        ..., help="CSV file of PCA cumulative variance or '-' to read from stdin."
+    ),
+    save: bool = typer.Option(
+        True, "--no-save", "-n", help="Save to file (default) or display only."
+    ),
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
+        "-o",
+        help="Path for the PNG output; use '-' to write image to stdout.",
+    ),
+):
+    """
+    Plot cumulative proportion of variance explained by principal components.
+    """
+    df = pd.read_csv(sys.stdin) if input_file == Path("-") else pd.read_csv(input_file)
+    if output_file is None:
+        output_file = Path.cwd() / "cumulative_prop_var.png"
+    output_file = _ensure_unique_path(output_file)
+    fig = cumulative_var_plot(df=df, output_path=output_file, save=save)
+    if output_file == Path("-"):
+        fig.savefig(sys.stdout.buffer, format="png")
+        logger.success("Cumulative variance plot PNG written to stdout.")
+    elif save:
+        fig.savefig(output_file)
+        plt.close(fig)
+        logger.success(f"Cumulative variance plot saved to {output_file!r}")
+    else:
+        plt.show()
+        plt.close(fig)
+        logger.success("Cumulative variance plot displayed (not saved).")
 
 
 @app.command("cluster")
-def cluster_plot(
-    input_file: str = typer.Argument(..., help="csv filename under data subfolder."),
-    input_dir: str = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
+def cluster(
+    input_file: Path = typer.Argument(
+        ...,
+        help="CSV of clustered data or '-' to read from stdin.",
     ),
-    x_axis: Optional[str] = typer.Option(
+    x_axis: Optional[str] = typer.Argument(..., help="Feature for X axis."),
+    y_axis: Optional[str] = typer.Argument(..., help="Feature for Y axis."),
+    cluster_col: str = typer.Argument(..., help="Column with cluster labels."),
+    scale: float = typer.Option(1.0, "--scale", "-s", help="Multiplier for x/y axes ranges."),
+    save: bool = typer.Option(
+        True, "--no-save", "-n", help="Save to file (default) or display only."
+    ),
+    output_file: Optional[Path] = typer.Option(
         None,
-        "--x-axis",
-        "-x",
-        help="Feature for X axis.",
-    ),
-    y_axis: Optional[str] = typer.Option(None, "--y-axis", "-y", help="Feature for Y axis."),
-    label_column: str = typer.Option(
-        "cluster_",
-        "--label-column",
-        "-l",
-        help="Column with cluster labels.",
-    ),
-    scale: float = typer.Option(1.0, "--scale", "-s", help="Mutliplier for x/y axis ranges."),
-    output_dir: Path = typer.Option(
-        FIGURES_DIR,
-        "--output-dir",
+        "--output-file",
         "-o",
-        help="Where to save the plot.",
-    ),
-    no_save: bool = typer.Option(
-        False,
-        "--no-save",
-        "-n",
-        help="Don't write to disk.",
+        help="Output PNG path; use '-' for stdout.",
     ),
 ):
-    df = load_data(DATA_DIR / input_dir / input_file)
+    """
+    Scatter plot of X vs. Y colored by cluster labels.
+    """
+    if input_file == Path("-"):
+        df = pd.read_csv(sys.stdin)
+    else:
+        df = pd.read_csv(input_file)
     numeric_columns = df.select_dtypes(include="number").columns.tolist()
     x_col = x_axis or numeric_columns[0]
     y_col = y_axis or (numeric_columns[1] if len(numeric_columns) > 1 else numeric_columns[0])
-    with tqdm(total=1, desc="Generating Cluster Scatter") as pbar:
-        output_path = output_dir / f"{Path(input_file).stem}_{x_col}_vs_{y_col}_cluster.png"
-        output_path = _ensure_unique_path(output_path)
-        (
-            cluster_scatter(
-                df=df,
-                x_axis=x_col,
-                y_axis=y_col,
-                label_column=label_column,
-                output_path=output_path,
-                scale=scale,
-                save=not no_save,
-            ),
-        )
-        pbar.update(1)
-    if not no_save:
-        logger.success(f"Cluster Scatter saved to {output_path!r}")
+    if output_file is None:
+        output_file = Path.cwd() / f"{x_col}_vs_{y_col}_cluster.png"
+    output_file = _ensure_unique_path(output_file)
+    ax = cluster_scatter(
+        df=df,
+        x_axis=x_col,
+        y_axis=y_col,
+        cluster_col=cluster_col,
+        output_path=output_file,
+        scale=scale,
+        save=save,
+    )
+    fig = ax.figure
+    if output_file == Path("-"):
+        fig.savefig(sys.stdout.buffer, format="png")
+        logger.success("Cluster scatter PNG written to stdout.")
+    elif save:
+        fig.savefig(output_file)
+        plt.close(fig)
+        logger.success(f"Cluster scatter saved to {output_file!r}")
     else:
-        logger.success("Cluster Scatter generated (not saved to disk).")
+        plt.show()
+        plt.close(fig)
+        logger.success("Cluster scatter displayed (not saved).")
 
 
 @app.command("cluster-3d")
-def cluster_3d_plot(
-    input_file: str = typer.Argument(..., help="Clustered csv filename"),
-    input_dir: str = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw).",
+def cluster3d(
+    input_file: Path = typer.Argument(..., help="Clustered CSV file, or '-' to read from stdin."),
+    numeric_cols: Optional[List[str]] = typer.Argument(
+        ...,
+        help="Exactly three numeric columns (e.g. 'weight' 'height' 'width'); defaults to the first three numeric columns if omitted.",
     ),
-    features: list[str] = typer.Option(
-        None,
-        "--feature",
-        "-f",
-        help="Exactly three numeric columns; defaults to first three.",
-    ),
-    label_column: str = typer.Option(
-        "cluster_",
-        "--label-column",
-        "-l",
-        help="Name of the cluster label column (e.g. cluster_5).",
-    ),
+    cluster_col: str = typer.Argument(..., help="Column with cluster labels."),
     scale: float = typer.Option(
-        1.0,
-        "--scale",
-        "-s",
-        help="Multiplier for x/y/z axis ranges.",
+        1.0, "--scale", "-s", help="Multiplier for x, y, and z axis ranges."
     ),
-    output_dir: Path = typer.Option(
-        FIGURES_DIR,
-        "--output-dir",
-        "-o",
-        dir_okay=True,
-        file_okay=False,
-        help="Where to save the static PNG.",
-    ),
-    no_save: bool = typer.Option(
-        False,
+    save: bool = typer.Option(
+        True,
         "--no-save",
         "-n",
-        help="Skip writing PNG and open interactive plot.",
+        help="Save to file (default) or display only.",
+    ),
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
+        "-o",
+        help="Where to save the PNG; use '-' to write image to stdout.",
     ),
 ):
-    with tqdm(total=3, desc="Cluster-3D") as progress_bar:
-        df = load_data(DATA_DIR / input_dir / input_file)
-        progress_bar.update(1)
-        num_cols = df.select_dtypes(include="number").columns.tolist()
-        chosen = features or num_cols[:3]
-        if len(chosen) != 3:
-            raise typer.BadParameter("Must specify exactly three features for 3D.")
-        progress_bar.update(1)
-        stem = Path(input_file).stem
-        png_path = output_dir / f"{stem}_3d.png"
-        output_path = _ensure_unique_path(png_path)
-        fig = cluster_scatter_3d(
-            df=df,
-            features=chosen,
-            label_column=label_column,
-            scale=scale,
-            output_path=output_path,
-            save=not no_save,
-        )
-        fig.update_traces(marker=dict(size=5, opacity=1))
-        fig.update_layout(
-            legend_title_text="Cluster",
-            scene=dict(
-                xaxis_title=chosen[0],
-                yaxis_title=chosen[1],
-                zaxis_title=chosen[2],
-            ),
-        )
-        progress_bar.update(1)
-        if not no_save:
-            logger.success(f"Static PNG saved to {png_path!r}")
-        else:
-            fig.show(renderer="browser")
+    """
+    3D scatter of three features colored by cluster labels.
+    """
+    if input_file == Path("-"):
+        df = pd.read_csv(sys.stdin)
+    else:
+        df = pd.read_csv(input_file)
+    cols = numeric_cols or df.select_dtypes(include="number").columns[:3].tolist()
+    if len(cols) != 3:
+        raise typer.BadParameter("Must specify exactly three numeric columns for 3D.")
+    if output_file is None:
+        output_file = Path.cwd() / "cluster_3d.png"
+    output_file = _ensure_unique_path(output_file)
+    fig = cluster_scatter_3d(
+        df=df,
+        numeric_cols=cols,
+        cluster_col=cluster_col,
+        scale=scale,
+        output_path=output_file,
+        save=save,
+    )
+    fig.update_traces(marker=dict(size=5, opacity=1))
+    fig.update_layout(
+        legend_title_text="Cluster",
+        scene=dict(
+            xaxis_title=cols[0],
+            yaxis_title=cols[1],
+            zaxis_title=cols[2],
+        ),
+    )
+    if output_file == Path("-"):
+        fig.write_image(sys.stdout.buffer, format="png")
+        logger.success("3D cluster scatter PNG written to stdout.")
+    elif save:
+        fig.write_image(str(output_file))
+        logger.success(f"3D cluster scatter saved to {output_file!r}")
+    else:
+        fig.show(renderer="browser")
+        logger.success("3D cluster scatter opened in browser (not saved).")
 
 
 @app.command("cluster-subplot")
 def batch_cluster_plot(
-    input_file: str = typer.Argument(..., help="csv filename under data subfolder"),
-    input_dir: str = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
-    ),
-    x_axis: Optional[str] = typer.Option(
-        None,
-        "--x-axis",
-        "-x",
+    input_file: Path = typer.Argument(..., help="Clustered CSV file, or '-' to read from stdin."),
+    x_axis: Optional[str] = typer.Argument(
+        ...,
         help="Feature for X axis (defaults to first numeric column).",
     ),
-    y_axis: Optional[str] = typer.Option(
-        None,
-        "--y-axis",
-        "-y",
+    y_axis: Optional[str] = typer.Argument(
+        ...,
         help="Feature for Y axis (defaults to second numeric column).",
     ),
-    label_column: str = typer.Option(
+    cluster_col: str = typer.Option(
         "cluster_",
-        "--label",
-        "-l",
-        help="Name of the column containing clusters in DataFrame from `input_file`",
+        "--cluster-col",
+        "-cluster-col",
+        help="Name of the column containing clusters in DataFrame from input_file",
     ),
-    scale: float = typer.Option(1.0, "--scale", "-s", help="Multiplier for x/y axis ranges."),
-    output_dir: Path = typer.Option(
-        FIGURES_DIR,
-        "--output-dir",
+    scale: float = typer.Option(1.0, "--scale", "-s", help="Multiplier for x and y axis ranges."),
+    save: bool = typer.Option(
+        True,
+        "--no-save",
+        "-n",
+        help="Save to file (default) or display only.",
+    ),
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
         "-o",
-        dir_okay=True,
-        file_okay=False,
-        help="Where to save the batch-cluster plot.",
+        help="Where to save the PNG; use '-' to write image to stdout.",
     ),
 ):
-    df = load_data(DATA_DIR / input_dir / input_file)
+    if input_file == Path("-"):
+        df = pd.read_csv(sys.stdin)
+    else:
+        df = pd.read_csv(input_file)
     numeric_columns = df.select_dtypes(include="number").columns.tolist()
     if not numeric_columns:
         raise typer.BadParameter("No numeric columns found in your data.")
+    if output_file is None:
+        output_file = Path.cwd() / "cluster_3d.png"
+    output_file = _ensure_unique_path(output_file)
     x_col = x_axis or numeric_columns[0]
     y_col = y_axis or (numeric_columns[1] if len(numeric_columns) > 1 else numeric_columns[0])
-    cluster_columns = sorted(
-        (column for column in df.columns if column.startswith(label_column)),
-        key=lambda c: int(c.replace(label_column, "")),
+    sorted_cluster_col = sorted(
+        (column for column in df.columns if column.startswith(cluster_col)),
+        key=lambda c: int(c.replace(cluster_col, "")),
     )
-    if not cluster_columns:
-        raise typer.BadParameter(f"No columns found with prefix {label_column!r}")
-    output_path = output_dir / f"{Path(input_file).stem}_{x_col}_vs_{y_col}_batch.png"
-    output_path = _ensure_unique_path(output_path)
-    with tqdm(total=1, desc="Generating Batch Subplots") as progress_bar:
-        plot_batch_clusters(
-            df,
-            x_axis=x_col,
-            y_axis=y_col,
-            cluster_columns=cluster_columns,
-            output_path=output_path,
-            save=True,
-            scale=scale,
-        )
-        progress_bar.update(1)
-    logger.success(f"Saved batch-cluster plot for {cluster_columns} -> {output_path!r}")
-
-
-@app.command("scree")
-def plot_scree(
-    input_file: str = typer.Argument(..., help="csv file."),
-    input_dir: Path = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
-    ),
-    output_dir: Path = typer.Option(
-        FIGURES_DIR,
-        "--output-dir",
-        "-o",
-        dir_okay=True,
-        file_okay=False,
-        help="Where to save the elbow plot png.",
-    ),
-    no_save: bool = typer.Option(
-        False,
-        "--no-save",
-        "-n",
-        help="Show plot, but don't save.",
-    ),
-):
-    df = load_data(DATA_DIR / input_dir / input_file)
-    stem = Path(input_file).stem
-    output_path = output_dir / f"{stem}_scree.png"
-    output_path = _ensure_unique_path(output_path)
-    fig = scree_plot(
+    if not sorted_cluster_col:
+        raise typer.BadParameter(f"No columns found with prefix {cluster_col!r}")
+    if output_file is None:
+        output_file = Path.cwd() / f"{x_col}_vs_{y_col}_batch.png"
+    output_file = _ensure_unique_path(output_file)
+    fig = plot_batch_clusters(
         df,
-        output_path,
-        save=no_save,
+        x_axis=x_col,
+        y_axis=y_col,
+        cluster_cols=sorted_cluster_col,
+        output_path=output_file,
+        save=False,
+        scale=scale,
     )
-    if not no_save:
-        _save_fig(fig, output_path)
-        logger.success(f"Scree Plot saved to {output_path!r}")
+    if output_file == Path("-"):
+        fig.savefig(sys.stdout.buffer, format="png")
+        logger.success("Cluster subplot PNG written to stdout.")
+    elif save:
+        fig.savefig(str(output_file))
+        logger.success(f"Cluster subplot saved to {output_file!r}")
     else:
-        fig.show()
-
-
-@app.command("cumulative-prop-var")
-def plot_cumulative_prop_var(
-    input_file: str = typer.Argument(..., help="csv file."),
-    input_dir: Path = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
-    ),
-    output_dir: Path = typer.Option(
-        FIGURES_DIR,
-        "--output-dir",
-        "-o",
-        dir_okay=True,
-        file_okay=False,
-        help="Where to save the elbow plot png.",
-    ),
-    no_save: bool = typer.Option(
-        False,
-        "--no-save",
-        "-n",
-        help="Show plot, but don't save.",
-    ),
-):
-    df = load_data(DATA_DIR / input_dir / input_file)
-    stem = Path(input_file).stem
-    output_path = output_dir / f"{stem}_cumulative_prop_var.png"
-    output_path = _ensure_unique_path(output_path)
-    fig = cumulative_prop_var_plot(
-        df,
-        output_path,
-        save=no_save,
-    )
-    if not no_save:
-        _save_fig(fig, output_path)
-        logger.success(f"Cumulative Prop. Variance Plot saved to {output_path!r}")
-    else:
-        fig.show()
+        plt.show()
+        plt.close(fig)
+        logger.success("Cluster subplot displayed (not saved).")
 
 
 @app.command("pca-biplot")
 def plot_pca_biplot(
-    input_file: str = typer.Argument(..., help="CSV filename under data subfolder."),
-    input_dir: Path = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
-    ),
-    feature_columns: list[str] = typer.Option(
-        None,
-        "-f",
-        "--feature-column",
+    input_file: Path = typer.Argument(..., help="CSV file to read (use '-' to read from stdin)."),
+    numeric_cols: list[str] = typer.Argument(
+        ...,
         help="Numeric column(s) to include; repeat flag to add more. Defaults to all.",
     ),
     compute_scores: bool = typer.Option(
         True,
-        "--compute-scores",
-        "--skip-compute-scores",
-        help="By default, compute PC scores from raw features; if --skip-compute-scores is given, assume df already contains PC columns.",
+        "--compute-scores/--skip-compute-scores",
+        help="By default, compute PC scores from raw features; if skipped, assume df already contains PC columns.",
     ),
-    pc_x: int = typer.Option(
-        0, "--pc-x", "-x", help="Principal component for x-axis (0-indexed)."
-    ),
-    pc_y: int = typer.Option(
-        1, "--pc-y", "-y", help="Principal component for y-axis (0-indexed)."
-    ),
+    pc_x: int = typer.Argument(..., help="Principal component for x-axis."),
+    pc_y: int = typer.Argument(..., help="Principal component for y-axis."),
     scale: float = typer.Option(1.0, "--scale", help="Arrow length multiplier for loadings."),
-    figsize: tuple[float, float] = typer.Option(
-        (20, 14), "--figsize", help="Figure size (width height)."
+    hue_column: Optional[str] = typer.Argument(
+        ...,
+        help="Column name for coloring samples (will be excluded from biplot).",
     ),
-    hue_column: Optional[str] = typer.Option(
+    save: bool = typer.Option(
+        True,
+        "--no-save",
+        "-n",
+        help="Save static PNG (default) or just display it.",
+    ),
+    output_file: Optional[Path] = typer.Option(
         None,
-        "--hue",
-        help="Column name for coloring samples (Will be excluded from PCA summary helper).",
-    ),
-    output_dir: Path = typer.Option(
-        FIGURES_DIR,
+        "--output-file",
         "-o",
-        "--output-dir",
-        exists=True,
-        dir_okay=True,
-        file_okay=False,
-        help="Directory to save the biplot PNG.",
+        help="Where to save the PNG; use '-' to write image to stdout.",
     ),
 ):
-    df = load_data(DATA_DIR / input_dir / input_file)
-
-    summary = compute_pca_summary(df=df, feature_columns=feature_columns, hue_column=hue_column)
+    if input_file == Path("-"):
+        df = pd.read_csv(sys.stdin)
+    else:
+        df = pd.read_csv(input_file)
+    summary = compute_pca_summary(df=df, numeric_cols=numeric_cols, hue_column=hue_column)
     loadings = summary["loadings"]
     pve = summary["pve"]
-
     hue = df[hue_column] if hue_column else None
-
-    fig = pca_biplot(
+    fig = biplot(
         df=df,
         loadings=loadings,
         pve=pve,
@@ -770,83 +820,66 @@ def plot_pca_biplot(
         pc_x=pc_x,
         pc_y=pc_y,
         scale=scale,
-        figsize=figsize,
         hue=hue,
-        save=False,
-        output_path=None,
+        save=save,
+        output_path=output_file,
     )
-
-    stem = Path(input_file).stem
-    out_file = f"{stem}_pca_biplot_PC{pc_x + 1}_{pc_y + 1}.png"
-    output_path = output_dir / out_file
-    output_path = _ensure_unique_path(output_path)
-    _save_fig(fig, output_path)
-    logger.success(f"Saved PCA biplot → {output_path!r}")
+    if output_file is None:
+        output_file = Path(f"biplot_PC{pc_x + 1}_{pc_y + 1}.png")
+    output_file = _ensure_unique_path(output_file)
+    if output_file == Path("-"):
+        fig.savefig(sys.stdout.buffer, format="png")
+        logger.success("Biplot PNG written to stdout.")
+    elif save:
+        fig.savefig(str(output_file))
+        logger.success(f"Biplot saved to {output_file!r}")
+    else:
+        plt.show()
+        plt.close()
+        logger.success("Biplot displayed (not saved).")
 
 
 @app.command("pca-biplot-3d")
 def plot_3d_pca_biplot(
-    input_file: str = typer.Argument(..., help="CSV filename under data subfolder."),
-    input_dir: Path = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
-    ),
-    feature_columns: list[str] = typer.Option(
-        None,
-        "-f",
-        "--feature-column",
+    input_file: Path = typer.Argument(..., help="CSV file to read (use '-' to read from stdin)."),
+    numeric_cols: list[str] = typer.Argument(
+        ...,
         help="Numeric column(s) to include; repeat flag to add more. Defaults to all.",
     ),
     compute_scores: bool = typer.Option(
         True,
-        "--compute-scores",
-        "--skip-compute-scores",
-        help="By default, compute PC scores from raw features; if --skip-compute-scores is given, assume df already contains PC columns.",
+        "--compute-scores/--skip-compute-scores",
+        help="By default, compute PC scores from raw features; if skipped, assume df already contains PC columns.",
     ),
-    pc_x: int = typer.Option(
-        0, "--pc-x", "-x", help="Principal component for x-axis (0-indexed)."
-    ),
-    pc_y: int = typer.Option(
-        1, "--pc-y", "-y", help="Principal component for y-axis (0-indexed)."
-    ),
-    pc_z: int = typer.Option(
-        2, "--pc-z", "-z", help="Principal component for z-axis (0-indexed)."
-    ),
+    pc_x: int = typer.Argument(..., help="Principal component for x-axis."),
+    pc_y: int = typer.Argument(..., help="Principal component for y-axis."),
+    pc_z: int = typer.Argument(..., help="Principal component for z-axis."),
     scale: float = typer.Option(1.0, "--scale", help="Arrow length multiplier for loadings."),
-    hue_column: Optional[str] = typer.Option(
-        None,
-        "--hue",
-        help="Column name for coloring samples (Will be excluded from PCA summary helper).",
+    hue_column: Optional[str] = typer.Argument(
+        ...,
+        help="Column name for coloring samples (will be excluded from PCA summary).",
     ),
-    output_dir: Path = typer.Option(
-        FIGURES_DIR,
-        "-o",
-        "--output-dir",
-        exists=True,
-        dir_okay=True,
-        file_okay=False,
-        help="Directory to save the biplot PNG.",
-    ),
-    no_save: bool = typer.Option(
-        False,
+    save: bool = typer.Option(
+        True,
         "--no-save",
         "-n",
-        help="Show plot, but don't save.",
+        help="Save static PNG (default) or just display it.",
+    ),
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
+        "-o",
+        help="Where to save the PNG; use '-' to write image to stdout.",
     ),
 ):
-    df = load_data(DATA_DIR / input_dir / input_file)
-
-    summary = compute_pca_summary(df=df, feature_columns=feature_columns, hue_column=hue_column)
+    if input_file == Path("-"):
+        df = pd.read_csv(sys.stdin)
+    else:
+        df = pd.read_csv(input_file)
+    summary = compute_pca_summary(df=df, numeric_cols=numeric_cols, hue_column=hue_column)
     loadings, pve = summary["loadings"], summary["pve"]
     hue = df[hue_column] if hue_column else None
-
-    stem = Path(input_file).stem
-    png_path = output_dir / f"{stem}_3d_pca_biplot.png"
-    output_path = _ensure_unique_path(png_path)
-
-    pca_biplot_3d(
+    fig = biplot_3d(
         df=df,
         loadings=loadings,
         pve=pve,
@@ -856,14 +889,23 @@ def plot_3d_pca_biplot(
         pc_z=pc_z,
         scale=scale,
         hue=hue,
-        output_path=None if no_save else output_path,
-        show=no_save,
+        output_path=output_file,
+        save=save,
     )
-
-    if not no_save:
-        logger.success(f"Saved 3D Biplot -> {png_path!r}")
+    if output_file is None:
+        output_file = Path("3d_pca_biplot.png")
+    output_file = _ensure_unique_path(output_file)
+    if output_file == Path("-"):
+        img_bytes = fig.to_image(format="png")
+        sys.stdout.buffer.write(img_bytes)
+        logger.success("3D PCA biplot PNG written to stdout.")
+    elif save:
+        fig.write_image(str(output_file))
+        logger.success(f"3D biplot saved to {output_file!r}")
     else:
-        logger.info("Displayed Interactive 3D PCA Biplot in browser.")
+        fig.show()
+        fig.close()
+        logger.success("Biplot displayed (not saved).")
 
 
 if __name__ == "__main__":
