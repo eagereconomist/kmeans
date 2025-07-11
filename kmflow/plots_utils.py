@@ -497,7 +497,7 @@ def cluster_scatter_3d(
 ) -> px.scatter_3d:
     if len(numeric_cols) != 3:
         raise ValueError(
-            "Need exactly three numeric features for 3D plotting;e.g. 'weight' 'height' 'width'"
+            "Need exactly three numeric features for 3D plotting; e.g. 'weight' 'height' 'width'"
         )
     missing = [column for column in numeric_cols if column not in df.columns]
     if missing:
@@ -509,7 +509,7 @@ def cluster_scatter_3d(
     df_plot = df.copy()
     df_plot[cluster_col] = df_plot[cluster_col].astype(int) + 1
     df_plot[cluster_col] = df_plot[cluster_col].astype(str)
-    if len(numeric_cols) < 3:
+    if len(numeric_cols) != 3:
         raise ValueError("Need at least 3 numeric_cols for a 3D plot.")
     df_scaled = df_plot.copy()
     for _, feat in enumerate(numeric_cols):
@@ -644,9 +644,7 @@ def biplot(
         cat_hue = pd.Categorical(hue)
         codes = cat_hue.codes
         categories = cat_hue.categories
-
         cmap = plt.get_cmap("tab10")
-
         norm = Normalize(vmin=0, vmax=len(categories) - 1)
 
         ax.scatter(scores[:, pc_x], scores[:, pc_y], c=codes, cmap=cmap, norm=norm, alpha=1)
@@ -660,22 +658,23 @@ def biplot(
 
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
-    ax.set_title(f"PCA Biplot (k={hue.name.split('_')[-1]})", pad=40, fontdict={"fontsize": 30})
+    ax.set_title(f"Biplot (k={hue.name.split('_')[-1]})", pad=40, fontdict={"fontsize": 30})
 
-    for k, feature in enumerate(feature_cols):
-        x_arr = loadings.iat[pc_x, k] * scale
-        y_arr = loadings.iat[pc_y, k] * scale
-        ax.arrow(
-            0,
-            0,
-            x_arr,
-            y_arr,
-            head_width=0.02 * scale,
-            head_length=0.02 * scale,
-            length_includes_head=True,
-            color="black",
-        )
-        ax.text(x_arr * 1.1, y_arr * 1.1, feature, fontsize=10)
+    if compute_scores:
+        for k, feature in enumerate(feature_cols):
+            x_arr = loadings.iat[pc_x, k] * scale
+            y_arr = loadings.iat[pc_y, k] * scale
+            ax.arrow(
+                0,
+                0,
+                x_arr,
+                y_arr,
+                head_width=0.02 * scale,
+                head_length=0.02 * scale,
+                length_includes_head=True,
+                color="black",
+            )
+            ax.text(x_arr * 1.1, y_arr * 1.1, feature, fontsize=10)
 
     if save and output_path is not None:
         _save_fig(fig, output_path)
@@ -687,49 +686,43 @@ def biplot_3d(
     df: pd.DataFrame,
     loadings: pd.DataFrame,
     pve: pd.Series,
+    output_path: Path,
     compute_scores: bool = True,
     pc_x: int = 0,
     pc_y: int = 1,
     pc_z: int = 2,
     scale: float = 1.0,
     hue: pd.Series | None = None,
-    output_path: Path | None = None,
-    show: bool = False,
+    save: bool = True,
 ) -> go.Figure:
     feature_cols = loadings.columns.tolist()
     if len(feature_cols) != 3:
-        raise ValueError("Need at least 3 features for a 3D plot.")
+        raise ValueError("Need exactly three features for a 3D plot.")
     if compute_scores:
         X = df[feature_cols].values
         scores = X.dot(loadings.values.T)
     else:
         scores = df.values
     x_vals, y_vals, z_vals = scores[:, pc_x], scores[:, pc_y], scores[:, pc_z]
-
     x_label = f"PC{pc_x + 1} ({pve.iloc[pc_x]:.1%})"
     y_label = f"PC{pc_y + 1} ({pve.iloc[pc_y]:.1%})"
     z_label = f"PC{pc_z + 1} ({pve.iloc[pc_z]:.1%})"
-
     plotly_df = pd.DataFrame(
         {
-            "PC_x": x_vals,
-            "PC_y": y_vals,
-            "PC_z": z_vals,
+            x_label: x_vals,
+            y_label: y_vals,
+            z_label: z_vals,
         }
     )
-    plotly_df.rename(columns={"PC_x": x_label, "PC_y": y_label, "PC_z": z_label}, inplace=True)
-
     if hue is not None:
         hue_str = hue.astype(str).rename("cluster")
         plotly_df["cluster"] = hue_str
-
         try:
             order = sorted(hue_str.unique(), key=int)
         except ValueError:
             order = list(hue_str.unique())
     else:
         order = None
-
     fig = px.scatter_3d(
         plotly_df,
         x=x_label,
@@ -738,70 +731,63 @@ def biplot_3d(
         color="cluster" if hue is not None else None,
         category_orders={"cluster": order} if order is not None else None,
         color_discrete_sequence=px.colors.qualitative.T10,
-        labels={"x": x_label, "y": y_label, "z": z_label},
-        title=f"3D PCA Biplot (k={hue.name.split('_')[-1]})",
+        labels={x_label: x_label, y_label: y_label, z_label: z_label},
+        title=f"3D Biplot (k={hue.name.split('_')[-1] if hue is not None else ''})",
         width=1000,
         height=1000,
     )
-
-    for i, feature in enumerate(feature_cols):
-        xi = loadings.iat[pc_x, i] * scale
-        yi = loadings.iat[pc_y, i] * scale
-        zi = loadings.iat[pc_z, i] * scale
-
-        fig.add_trace(
-            go.Scatter3d(
-                x=[0, xi],
-                y=[0, yi],
-                z=[0, zi],
-                mode="lines",
-                line=dict(color="black", width=4),
-                showlegend=False,
+    if compute_scores:
+        head_length = scale * 0.04
+        for i, feature in enumerate(feature_cols):
+            xi = loadings.iat[pc_x, i] * scale
+            yi = loadings.iat[pc_y, i] * scale
+            zi = loadings.iat[pc_z, i] * scale
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[0, xi],
+                    y=[0, yi],
+                    z=[0, zi],
+                    mode="lines",
+                    line=dict(color="black", width=4),
+                    showlegend=False,
+                )
             )
-        )
-        vec = np.array([xi, yi, zi])
-        length = np.linalg.norm(vec)
-        if length > 0:
-            head_length = scale * 0.04
-            direction = vec / length
-            ux, uy, uz = direction * head_length
-        else:
-            uz = uy = uz = 0
-
-        fig.add_trace(
-            go.Cone(
-                x=[xi],
-                y=[yi],
-                z=[zi],
-                u=[ux],
-                v=[uy],
-                w=[uz],
-                anchor="tip",
-                sizemode="absolute",
-                sizeref=head_length,
-                showscale=False,
-                colorscale=[[0, "black"], [1, "black"]],
-                showlegend=False,
+            vec = np.array([xi, yi, zi])
+            length = np.linalg.norm(vec)
+            if length > 0:
+                direction = vec / length
+                ux, uy, uz = direction * head_length
+            else:
+                ux = uy = uz = 0
+            fig.add_trace(
+                go.Cone(
+                    x=[xi],
+                    y=[yi],
+                    z=[zi],
+                    u=[ux],
+                    v=[uy],
+                    w=[uz],
+                    anchor="tip",
+                    sizemode="absolute",
+                    sizeref=head_length,
+                    showscale=False,
+                    colorscale=[[0, "black"], [1, "black"]],
+                    showlegend=False,
+                )
             )
-        )
-        fig.add_trace(
-            go.Scatter3d(
-                x=[xi],
-                y=[yi],
-                z=[zi],
-                mode="text",
-                text=[feature],
-                textposition="top center",
-                showlegend=False,
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[xi],
+                    y=[yi],
+                    z=[zi],
+                    mode="text",
+                    text=[feature],
+                    textposition="top center",
+                    showlegend=False,
+                )
             )
-        )
-    fig.update_layout(
-        legend=dict(title="Cluster", traceorder="normal"),
-    )
-
-    if output_path:
+        fig.update_layout(legend=dict(title="Cluster", traceorder="normal"))
+    if save and output_path != Path("-"):
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         fig.write_image(str(output_path))
-    if show:
-        fig.show()
-
     return fig

@@ -40,7 +40,7 @@ def barplt(
     input_file: Path = typer.Argument(..., help="Path to CSV file, or '-' to read from stdin."),
     category_col: str = typer.Argument(..., help="Categorical column (x-axis when vertical)."),
     numeric_col: str = typer.Argument(..., help="Numeric column to plot."),
-    orient: str = typer.Option("v", "--orient", "-a", help="Orientation: 'v' or 'h'."),
+    orientation: str = typer.Option("v", "--orientation", "-a", help="Orientation: 'v' or 'h'."),
     save: bool = typer.Option(
         True,
         "--no-save",
@@ -66,7 +66,7 @@ def barplt(
         numeric_col=numeric_col,
         category_col=category_col,
         output_path=Path("dummy_path.png"),
-        orient=orient,
+        orientation=orientation,
         save=save,
     )
     fig = plt.gcf()
@@ -195,7 +195,7 @@ def boxplt(
     patterns: Optional[List[str]] = typer.Option(
         None, "--pattern", "-p", help="Comma-separated regex pattern(s) to filter categories."
     ),
-    orient: str = typer.Option("v", "--orient", "-a", help="Orientation: 'v' or 'h'."),
+    orientation: str = typer.Option("v", "--orientation", "-a", help="Orientation: 'v' or 'h'."),
     save: bool = typer.Option(
         True, "--no-save", "-n", help="Save to file (default) or display only."
     ),
@@ -228,7 +228,7 @@ def boxplt(
         output_path=output_file,
         category_col=category_col,
         patterns=patterns[0].split(", ") if patterns else None,
-        orient=orient,
+        orientation=orientation,
         save=save,
     )
     fig = plt.gcf()
@@ -255,7 +255,7 @@ def violinplt(
     patterns: Optional[List[str]] = typer.Option(
         None, "--pattern", "-p", help="Comma-separated regex pattern(s) to filter categories."
     ),
-    orient: str = typer.Option("v", "--orient", "-a", help="Orientation: 'v' or 'h'."),
+    orientation: str = typer.Option("v", "--orientation", "-a", help="Orientation: 'v' or 'h'."),
     inner: str = typer.Option(
         "box", "--inner", "-i", help="Interior representation inside the violins."
     ),
@@ -291,7 +291,7 @@ def violinplt(
         output_path=output_file,
         category_col=category_col,
         patterns=patterns[0].split(", ") if patterns else None,
-        orient=orient,
+        orientation=orientation,
         inner=inner,
         save=save,
     )
@@ -634,7 +634,7 @@ def cluster(
         logger.success("Cluster scatter displayed (not saved).")
 
 
-@app.command("cluster-3d")
+@app.command("3d-cluster")
 def cluster3d(
     input_file: Path = typer.Argument(..., help="Clustered CSV file, or '-' to read from stdin."),
     numeric_cols: Optional[List[str]] = typer.Argument(
@@ -704,11 +704,11 @@ def batch_cluster_plot(
     input_file: Path = typer.Argument(..., help="Clustered CSV file, or '-' to read from stdin."),
     x_axis: Optional[str] = typer.Argument(
         ...,
-        help="Feature for X axis (defaults to first numeric column).",
+        help="Feature for X axis.",
     ),
     y_axis: Optional[str] = typer.Argument(
         ...,
-        help="Feature for Y axis (defaults to second numeric column).",
+        help="Feature for Y axis.",
     ),
     cluster_col: str = typer.Option(
         "cluster_",
@@ -738,7 +738,7 @@ def batch_cluster_plot(
     if not numeric_columns:
         raise typer.BadParameter("No numeric columns found in your data.")
     if output_file is None:
-        output_file = Path.cwd() / "cluster_3d.png"
+        output_file = Path.cwd() / "cluster_subplot.png"
     output_file = _ensure_unique_path(output_file)
     x_col = x_axis or numeric_columns[0]
     y_col = y_axis or (numeric_columns[1] if len(numeric_columns) > 1 else numeric_columns[0])
@@ -772,24 +772,35 @@ def batch_cluster_plot(
         logger.success("Cluster subplot displayed (not saved).")
 
 
-@app.command("pca-biplot")
+@app.command("biplot")
 def plot_pca_biplot(
     input_file: Path = typer.Argument(..., help="CSV file to read (use '-' to read from stdin)."),
-    numeric_cols: list[str] = typer.Argument(
-        ...,
-        help="Numeric column(s) to include; repeat flag to add more. Defaults to all.",
+    numeric_cols: List[str] = typer.Option(
+        None,
+        "--numeric-cols",
+        "-numeric-cols",
+        help="Defaults to all numeric columns if omitted. Option to pick the numeric columns (e.g. 'weight' 'height' 'width', etc.).",
     ),
     compute_scores: bool = typer.Option(
         True,
-        "--compute-scores/--skip-compute-scores",
+        "--skip-scores",
+        "-skip-scores",
         help="By default, compute PC scores from raw features; if skipped, assume df already contains PC columns.",
     ),
-    pc_x: int = typer.Argument(..., help="Principal component for x-axis."),
-    pc_y: int = typer.Argument(..., help="Principal component for y-axis."),
-    scale: float = typer.Option(1.0, "--scale", help="Arrow length multiplier for loadings."),
-    hue_column: Optional[str] = typer.Argument(
-        ...,
-        help="Column name for coloring samples (will be excluded from biplot).",
+    pc_x: int = typer.Option(
+        0, "--pc-x", "-x", help="Principal component for x-axis (0-indexed)."
+    ),
+    pc_y: int = typer.Option(
+        1, "--pc-y", "-y", help="Principal component for y-axis (0-indexed)."
+    ),
+    scale: float = typer.Option(
+        1.0, "--scale", "-s", help="Arrow length multiplier for loadings."
+    ),
+    hue_column: Optional[str] = typer.Option(
+        None,
+        "--hue-column",
+        "-hue",
+        help="Column name for coloring samples (will be excluded loading vectors).",
     ),
     save: bool = typer.Option(
         True,
@@ -808,7 +819,7 @@ def plot_pca_biplot(
         df = pd.read_csv(sys.stdin)
     else:
         df = pd.read_csv(input_file)
-    summary = compute_pca_summary(df=df, numeric_cols=numeric_cols, hue_column=hue_column)
+    summary = compute_pca_summary(df=df, feature_columns=numeric_cols, hue_column=hue_column)
     loadings = summary["loadings"]
     pve = summary["pve"]
     hue = df[hue_column] if hue_column else None
@@ -825,7 +836,7 @@ def plot_pca_biplot(
         output_path=output_file,
     )
     if output_file is None:
-        output_file = Path(f"biplot_PC{pc_x + 1}_{pc_y + 1}.png")
+        output_file = Path("biplot.png")
     output_file = _ensure_unique_path(output_file)
     if output_file == Path("-"):
         fig.savefig(sys.stdout.buffer, format="png")
@@ -839,46 +850,79 @@ def plot_pca_biplot(
         logger.success("Biplot displayed (not saved).")
 
 
-@app.command("pca-biplot-3d")
-def plot_3d_pca_biplot(
+@app.command("3d-biplot")
+def plot_3d_biplot(
     input_file: Path = typer.Argument(..., help="CSV file to read (use '-' to read from stdin)."),
-    numeric_cols: list[str] = typer.Argument(
-        ...,
-        help="Numeric column(s) to include; repeat flag to add more. Defaults to all.",
+    numeric_cols: Optional[List[str]] = typer.Argument(
+        None,
+        help="Exactly three numeric columns (e.g. 'weight' 'height' 'width'); defaults to all numeric columns if omitted.",
+    ),
+    hue_column: Optional[str] = typer.Option(
+        None,
+        "--hue-column",
+        "-h",
+        help="Column name for coloring samples (excluded from loadings).",
     ),
     compute_scores: bool = typer.Option(
         True,
-        "--compute-scores/--skip-compute-scores",
-        help="By default, compute PC scores from raw features; if skipped, assume df already contains PC columns.",
+        "--skip-scores",
+        "-skip-scores",
+        help="If set, skip recomputing PC scores (assume df already has PC columns).",
     ),
-    pc_x: int = typer.Argument(..., help="Principal component for x-axis."),
-    pc_y: int = typer.Argument(..., help="Principal component for y-axis."),
-    pc_z: int = typer.Argument(..., help="Principal component for z-axis."),
-    scale: float = typer.Option(1.0, "--scale", help="Arrow length multiplier for loadings."),
-    hue_column: Optional[str] = typer.Argument(
-        ...,
-        help="Column name for coloring samples (will be excluded from PCA summary).",
+    pc_x: int = typer.Option(
+        0,
+        "--pc-x",
+        "-x",
+        help="Index of principal component for X axis (0-based).",
+    ),
+    pc_y: int = typer.Option(
+        1,
+        "--pc-y",
+        "-y",
+        help="Index of principal component for Y axis (0-based).",
+    ),
+    pc_z: int = typer.Option(
+        2,
+        "--pc-z",
+        "-z",
+        help="Index of principal component for Z axis (0-based).",
+    ),
+    scale: float = typer.Option(
+        1.0,
+        "--scale",
+        "-s",
+        help="Multiplier for loading arrow lengths.",
     ),
     save: bool = typer.Option(
         True,
         "--no-save",
         "-n",
-        help="Save static PNG (default) or just display it.",
+        help="Save static PNG (default) or display interactive plot.",
     ),
     output_file: Optional[Path] = typer.Option(
         None,
         "--output-file",
         "-o",
-        help="Where to save the PNG; use '-' to write image to stdout.",
+        help="Where to save the PNG; use '-' to write image bytes to stdout.",
     ),
 ):
+    """
+    3D PCA biplot: scores + loading vectors in three dimensions.
+    """
     if input_file == Path("-"):
         df = pd.read_csv(sys.stdin)
     else:
         df = pd.read_csv(input_file)
-    summary = compute_pca_summary(df=df, numeric_cols=numeric_cols, hue_column=hue_column)
+    summary = compute_pca_summary(
+        df=df,
+        feature_columns=numeric_cols,
+        hue_column=hue_column,
+    )
     loadings, pve = summary["loadings"], summary["pve"]
     hue = df[hue_column] if hue_column else None
+    if output_file is None:
+        output_file = Path.cwd() / "3d_biplot.png"
+    output_file = _ensure_unique_path(output_file)
     fig = biplot_3d(
         df=df,
         loadings=loadings,
@@ -892,20 +936,15 @@ def plot_3d_pca_biplot(
         output_path=output_file,
         save=save,
     )
-    if output_file is None:
-        output_file = Path("3d_pca_biplot.png")
-    output_file = _ensure_unique_path(output_file)
     if output_file == Path("-"):
-        img_bytes = fig.to_image(format="png")
-        sys.stdout.buffer.write(img_bytes)
-        logger.success("3D PCA biplot PNG written to stdout.")
+        fig.write_image(sys.stdout.buffer, format="png")
+        logger.success("3D biplot PNG written to stdout.")
     elif save:
         fig.write_image(str(output_file))
         logger.success(f"3D biplot saved to {output_file!r}")
     else:
-        fig.show()
-        fig.close()
-        logger.success("Biplot displayed (not saved).")
+        fig.show(renderer="browser")
+        logger.success("3D biplot opened in browser (not saved).")
 
 
 if __name__ == "__main__":
