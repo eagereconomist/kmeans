@@ -5,8 +5,8 @@ from typing import List
 from tqdm import tqdm
 
 from kmflow.config import DATA_DIR
-from kmflow.preprocessing_utils import load_data
-from kmflow.processing_utils import write_csv
+from kmflow.preprocess_utils import load_data
+from kmflow.process_utils import write_csv
 from kmflow.evaluation_utils import (
     compute_inertia_scores,
     compute_silhouette_scores,

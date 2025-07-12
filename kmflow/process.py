@@ -4,7 +4,7 @@ from tqdm import tqdm
 import typer
 
 from kmflow.config import INTERIM_DATA_DIR, PROCESSED_DATA_DIR
-from kmflow.processing_utils import (
+from kmflow.process_utils import (
     load_data,
     write_csv,
     apply_normalizer,
