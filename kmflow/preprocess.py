@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import sys
 from pathlib import Path
 
@@ -82,8 +81,10 @@ def preprocess(
     # ─── 1) read ───────────────────────────────────────────────────────
     if input_file == Path("-"):
         df = pd.read_csv(sys.stdin)
+        stem = "stdin"
     else:
         df = pd.read_csv(input_file)
+        stem = input_file.stem
 
     # ─── 2) build transform steps ────────────────────────────────────
     steps: list[tuple[str, callable, list]] = []
@@ -112,8 +113,10 @@ def preprocess(
             )
             if export_outliers:
                 # always write to fixed filename
-                write_csv(out_df, prefix="iqr", suffix="outliers", output_dir=INTERIM_DATA_DIR)
-                logger.success(f"Outliers written to {INTERIM_DATA_DIR / 'iqr_outliers.csv'!r}")
+                write_csv(out_df, prefix=stem, suffix="iqr_outliers", output_dir=INTERIM_DATA_DIR)
+                logger.success(
+                    f"Outliers written to {INTERIM_DATA_DIR / f'{stem}_iqr_outliers.csv'!r}"
+                )
             else:
                 typer.echo("\nDetected IQR outliers:")
                 typer.echo(out_df)
@@ -132,7 +135,7 @@ def preprocess(
 
     # ─── 6) write out ────────────────────────────────────────────────
     if output_file is None:
-        output_file = INTERIM_DATA_DIR / "preprocessed.csv"
+        output_file = INTERIM_DATA_DIR / f"{stem}_preprocessed.csv"
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     if output_file == Path("-"):
@@ -151,7 +154,7 @@ def pca_summary(
         ...,
         help="CSV file to read (use '-' to read from stdin).",
     ),
-    feature_columns: list[str] = typer.Option(
+    numeric_cols: list[str] = typer.Option(
         None,
         "--numeric-cols",
         "-numeric-cols",
@@ -164,7 +167,7 @@ def pca_summary(
         help="Number of PCs to compute (defaults to all).",
     ),
     random_state: int = typer.Option(
-        4572, "--seed", "-s", help="Random seed for reproducibility."
+        4572, "--seed", "-seed", help="Random seed for reproducibility."
     ),
     output_dir: Path = typer.Option(
         PROCESSED_DATA_DIR,
@@ -186,13 +189,15 @@ def pca_summary(
     # ─── read ─────────────────────────────────────────────────────────
     if input_file == Path("-"):
         df = pd.read_csv(sys.stdin)
+        stem = "stdin"
     else:
         df = pd.read_csv(input_file)
+        stem = input_file.stem
 
     # ─── compute ───────────────────────────────────────────────────────
     summary = compute_pca_summary(
         df=df,
-        feature_columns=feature_columns,
+        numeric_cols=numeric_cols,
         n_components=n_components,
         random_state=random_state,
     )
@@ -200,25 +205,29 @@ def pca_summary(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # ─── write loadings ───────────────────────────────────────────────
-    ld = summary["loadings"].reset_index().rename(columns={"index": "component"})
-    p1 = write_csv(ld, suffix="pca_loadings", output_dir=output_dir)
-    logger.success(f"Saved PCA Loadings -> {p1!r}")
+    loadings_df = summary["loadings"].reset_index().rename(columns={"index": "component"})
+    loadings_path = write_csv(
+        loadings_df, prefix=stem, suffix="pca_loadings", output_dir=output_dir
+    )
+    logger.success(f"Saved PCA Loadings -> {loadings_path!r}")
 
     # ─── write scores ────────────────────────────────────────────────
-    sc = summary["scores"]
-    suffix2 = f"pca_scores_{sc.shape[1]}pc" if n_components else "pca_scores"
-    p2 = write_csv(sc.reset_index(drop=True), suffix=suffix2, output_dir=output_dir)
-    logger.success(f"Saved PCA Scores -> {p2!r}")
+    scores_df = summary["scores"]
+    scores_suffix = f"pca_scores_{scores_df.shape[1]}pc" if n_components else "pca_scores"
+    scores_path = write_csv(
+        scores_df.reset_index(drop=True), prefix=stem, suffix=scores_suffix, output_dir=output_dir
+    )
+    logger.success(f"Saved PCA Scores -> {scores_path!r}")
 
     # ─── write explained var ──────────────────────────────────────────
-    pv = summary["pve"].reset_index().rename(columns={"index": "component"})
-    p3 = write_csv(pv, suffix="pca_proportion_var", output_dir=output_dir)
-    logger.success(f"Saved Explained Variance -> {p3!r}")
+    pve_df = summary["pve"].reset_index().rename(columns={"index": "component"})
+    pve_path = write_csv(pve_df, prefix=stem, suffix="pca_proportion_var", output_dir=output_dir)
+    logger.success(f"Saved Explained Variance -> {pve_path!r}")
 
     # ─── write cumulative var ─────────────────────────────────────────
-    cv = summary["cpve"].reset_index().rename(columns={"index": "component"})
-    p4 = write_csv(cv, suffix="pca_cumulative_var", output_dir=output_dir)
-    logger.success(f"Saved Cumulative Variance -> {p4!r}")
+    cpve_df = summary["cpve"].reset_index().rename(columns={"index": "component"})
+    cpve_path = write_csv(cpve_df, prefix=stem, suffix="pca_cumulative_var", output_dir=output_dir)
+    logger.success(f"Saved Cumulative Variance -> {cpve_path!r}")
 
 
 if __name__ == "__main__":
