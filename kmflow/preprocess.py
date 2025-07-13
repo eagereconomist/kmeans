@@ -163,7 +163,7 @@ def pca_summary(
     n_components: int = typer.Option(
         None,
         "--n-components",
-        "-n",
+        "-components",
         help="Number of PCs to compute (defaults to all).",
     ),
     random_state: int = typer.Option(
