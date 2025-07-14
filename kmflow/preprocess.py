@@ -1,11 +1,11 @@
 import sys
 from pathlib import Path
 
-import pandas as pd
 from loguru import logger
 from tqdm import tqdm
 import typer
 
+from kmflow.cli_utils import read_df
 from kmflow.preprocess_utils import (
     find_iqr_outliers,
     compute_pca_summary,
@@ -53,7 +53,7 @@ def preprocess(
         False,
         "--export-outliers",
         "-eo",
-        help="Write detected outliers to interim/iqr_outliers.csv",
+        help="Write detected outliers to interim/iqr_outliers.csv or stdout",
     ),
     remove_outliers: bool = typer.Option(
         False,
@@ -78,13 +78,9 @@ def preprocess(
     Apply column/row drops, dotless renaming, and optional IQR outlier handling
     to a raw CSV. Outputs a cleaned CSV.
     """
-    # ─── 1) read ───────────────────────────────────────────────────────
-    if input_file == Path("-"):
-        df = pd.read_csv(sys.stdin)
-        stem = "stdin"
-    else:
-        df = pd.read_csv(input_file)
-        stem = input_file.stem
+    # ─── 1) read input & define stem ──────────────────────────────────────
+    df = read_df(input_file)
+    stem = input_file.stem if input_file != Path("-") else "stdin"
 
     # ─── 2) build transform steps ────────────────────────────────────
     steps: list[tuple[str, callable, list]] = []
@@ -186,13 +182,9 @@ def pca_summary(
       3) pca_proportion_var.csv
       4) pca_cumulative_var.csv
     """
-    # ─── read ─────────────────────────────────────────────────────────
-    if input_file == Path("-"):
-        df = pd.read_csv(sys.stdin)
-        stem = "stdin"
-    else:
-        df = pd.read_csv(input_file)
-        stem = input_file.stem
+    # ─── read input & define stem ──────────────────────────────────────
+    df = read_df(input_file)
+    stem = input_file.stem if input_file != Path("-") else "stdin"
 
     # ─── compute ───────────────────────────────────────────────────────
     summary = compute_pca_summary(
