@@ -1,6 +1,7 @@
 import sys
-from pathlib import Path
 from loguru import logger
+
+from pathlib import Path
 import pandas as pd
 from typing import Callable
 import numpy as np
@@ -11,7 +12,9 @@ from cli_utils import read_df
 
 
 def _write_df(df: pd.DataFrame, output_file: Path) -> None:
-    """Write df to output_file or stdout if '-' is given."""
+    """
+    Write df to output_file, or to stdout if output_file == Path('-').
+    """
     if output_file == Path("-"):
         df.to_csv(sys.stdout.buffer, index=False)
         logger.success("CSV written to stdout.")

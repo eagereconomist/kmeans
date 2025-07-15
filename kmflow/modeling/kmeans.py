@@ -2,8 +2,6 @@ import typer
 from pathlib import Path
 from typing import List, Optional
 
-from loguru import logger
-
 from kmflow.cli_utils import read_df, _write_df
 from kmflow.modeling.kmeans_utils import fit_kmeans, batch_kmeans
 
@@ -20,8 +18,8 @@ def fit_km_cli(
     init: str = typer.Option("k-means++", "--init", "-init", help="Init method."),
     numeric_cols: Optional[List[str]] = typer.Option(
         None,
-        "--feature-col",
-        "-f",
+        "--numeric-cols",
+        "-numeric-cols",
         help="Numeric cols to use; repeat for multiple.",
     ),
     output_file: Optional[Path] = typer.Option(
@@ -59,8 +57,8 @@ def batch_km_cli(
     init: str = typer.Option("k-means++", "--init", "-init", help="Init method."),
     numeric_cols: Optional[List[str]] = typer.Option(
         None,
-        "--feature-col",
-        "-f",
+        "--numeric-cols",
+        "-numeric-cols",
         help="Numeric cols to use; repeat for multiple.",
     ),
     output_file: Optional[Path] = typer.Option(
