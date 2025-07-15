@@ -1,133 +1,91 @@
 import typer
-from loguru import logger
 from pathlib import Path
-from typing import List
-from tqdm import tqdm
+from typing import List, Optional
 
-from kmflow.config import DATA_DIR
-from kmflow.preprocess_utils import load_data
-from kmflow.modeling.kmeans_utils import (
-    fit_kmeans,
-    batch_kmeans,
-)
-from kmflow.process_utils import write_csv
+from loguru import logger
 
-app = typer.Typer()
+from kmflow.cli_utils import read_df, _write_df
+from kmflow.modeling.kmeans_utils import fit_kmeans, batch_kmeans
+
+app = typer.Typer(help="K-means clustering commands.")
 
 
-@app.command("fit-kmeans")
-def km_cluster(
-    input_file: str = typer.Argument(..., help="csv filename under processed data/"),
-    input_dir: str = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
-    ),
-    k: int = typer.Option(
-        ...,
-        "--k",
-        "-k",
-        help="Number of clusters to fit",
-    ),
-    random_state: int = typer.Option(4572, "--seed", help="Random seed for reproducibility."),
-    n_init: int = typer.Option(
-        50, "--n-init", "-n", help="Number of times kmeans is run with differnet centroid seeds."
-    ),
-    algorithm: str = typer.Option(
-        "lloyd", "--algorithm", "-a", help="KMeans algorithm: 'lloyd' or 'elkan'."
-    ),
-    init: str = typer.Option(
-        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'"
-    ),
-    feature_columns: List[str] = typer.Option(
+@app.command("fit-km")
+def fit_km_cli(
+    input_file: Path = typer.Argument(..., help="CSV to read (use '-' for stdin)."),
+    k: int = typer.Option(..., "--k", "-k", help="Number of clusters to fit."),
+    random_state: int = typer.Option(4572, "--seed", "-seed", help="Random seed."),
+    n_init: int = typer.Option(50, "--n-init", "-n-init", help="Runs with different seeds."),
+    algorithm: str = typer.Option("lloyd", "--algorithm", "-algo", help="'lloyd' or 'elkan'."),
+    init: str = typer.Option("k-means++", "--init", "-init", help="Init method."),
+    numeric_cols: Optional[List[str]] = typer.Option(
         None,
-        "--feature-column",
+        "--feature-col",
         "-f",
-        help="Which numeric columns to use; repeat to supply mulitple. Defaults to all numeric.",
+        help="Numeric cols to use; repeat for multiple.",
     ),
-    output_dir: str = typer.Option(
-        "processed",
-        "--output-dir",
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
         "-o",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the file will be output.",
+        help="Where to save; use '-' for stdout. Defaults to ./<stem>_clustered_<k>.csv",
     ),
 ):
-    input_path = DATA_DIR / input_dir / input_file
-    df = load_data(input_path)
-    output_path = DATA_DIR / output_dir
-    steps = tqdm(total=2, desc="Clustering")
-    df_labeled = fit_kmeans(
-        df,
+    df = read_df(input_file)
+    df_out = fit_kmeans(
+        df=df,
         k=k,
-        feature_columns=feature_columns,
-        random_state=random_state,
-        n_init=n_init,
-        algorithm=algorithm,
+        numeric_cols=numeric_cols,
         init=init,
-        label_column="cluster",
+        n_init=n_init,
+        random_state=random_state,
+        algorithm=algorithm,
+        cluster_col="cluster",
     )
-    steps.update(1)
-    stem = Path(input_file).stem
-    write_csv(df_labeled, prefix=stem, suffix=f"clustered_{k}", output_dir=output_path)
-    steps.update(1)
-    steps.close()
-    logger.success(f"Saved Clustered Data -> {(output_dir / output_path)!r}")
+
+    stem = input_file.stem if input_file != Path("-") else "stdin"
+    out = output_file or Path.cwd() / f"{stem}_clustered_{k}.csv"
+    _write_df(df_out, out)
 
 
-@app.command("batch-kmeans")
-def batch_kmeans_export(
-    input_file: str = typer.Argument(..., help="csv filename under data subfolder."),
-    input_dir: str = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
+@app.command("batch-km")
+def batch_km_cli(
+    input_file: Path = typer.Argument(..., help="CSV to read (use '-' for stdin)."),
+    start: int = typer.Option(1, "--start", "-start", help="Minimum k."),
+    stop: int = typer.Option(10, "--stop", "-stop", help="Maximum k."),
+    random_state: int = typer.Option(4572, "--seed", "-seed", help="Random seed."),
+    n_init: int = typer.Option(50, "--n-init", "-n-init", help="Runs per k."),
+    algorithm: str = typer.Option("lloyd", "--algorithm", "-algo", help="'lloyd' or 'elkan'."),
+    init: str = typer.Option("k-means++", "--init", "-init", help="Init method."),
+    numeric_cols: Optional[List[str]] = typer.Option(
+        None,
+        "--feature-col",
+        "-f",
+        help="Numeric cols to use; repeat for multiple.",
     ),
-    start: int = typer.Option(
-        1,
-        "--start",
-        "-s",
-        help="Minimum k (inclusive).",
-    ),
-    stop: int = typer.Option(
-        10,
-        "--stop",
-        "-e",
-        help="Maximum k (inclusive).",
-    ),
-    random_state: int = typer.Option(4572, "--seed", help="Random seed for reproducibility."),
-    n_init: int = typer.Option(
-        50, "--n-init", "-n", help="Number of times kmeans is run with differnet centroid seeds."
-    ),
-    algorithm: str = typer.Option(
-        "lloyd", "--algorithm", "-a", help="KMeans algorithm: 'lloyd' or 'elkan'."
-    ),
-    init: str = typer.Option(
-        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'"
-    ),
-    output_dir: str = typer.Option(
-        "processed",
-        "--output-dir",
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
         "-o",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the file will be output.",
+        help="Where to save; use '-' for stdout. Defaults to ./<stem>_batch_<start>-<stop>.csv",
     ),
 ):
-    df = load_data(DATA_DIR / input_dir / input_file)
-    output_path = DATA_DIR / output_dir
-    progress_bar = tqdm(range(start, stop + 1), desc="Batch Clustering")
-    df_labeled = batch_kmeans(
-        df,
-        k_range=progress_bar,
+    df = read_df(input_file)
+    df_out = batch_kmeans(
+        df=df,
+        k_range=range(start, stop + 1),
+        numeric_cols=numeric_cols,
         init=init,
         n_init=n_init,
         random_state=random_state,
         algorithm=algorithm,
+        cluster_col="cluster",
     )
-    prefix = Path(input_file).stem
-    suffix = "".join(f"{start}-{stop}")
-    write_csv(df_labeled, prefix=prefix, suffix=suffix, output_dir=output_path)
-    logger.success(f"Saved Batch Clusters for k={start}-{stop} -> {output_path!r}")
+
+    stem = input_file.stem if input_file != Path("-") else "stdin"
+    suffix = f"{start}-{stop}"
+    out = output_file or Path.cwd() / f"{stem}_batch_{suffix}.csv"
+    _write_df(df_out, out)
 
 
 if __name__ == "__main__":
