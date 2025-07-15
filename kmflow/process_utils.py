@@ -1,19 +1,41 @@
-import pandas as pd
-import numpy as np
+import sys
 from pathlib import Path
+from loguru import logger
+import pandas as pd
+from typing import Callable
+import numpy as np
 from sklearn import preprocessing
 from sklearn.preprocessing import Normalizer, StandardScaler, MinMaxScaler
 
+from cli_utils import read_df
 
-def write_csv(dataframe: pd.DataFrame, prefix: str, suffix: str, output_dir: Path) -> Path:
+
+def _write_df(df: pd.DataFrame, output_file: Path) -> None:
+    """Write df to output_file or stdout if '-' is given."""
+    if output_file == Path("-"):
+        df.to_csv(sys.stdout.buffer, index=False)
+        logger.success("CSV written to stdout.")
+    else:
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(output_file, index=False)
+        logger.success(f"CSV saved to {output_file!r}")
+
+
+def _run_scaler(
+    scaler_fn: Callable[[pd.DataFrame], pd.DataFrame],
+    input_file: Path,
+    output_file: Path | None,
+    suffix: str,
+) -> None:
     """
-    Write `dataframe` to {output_dir}/{prefix}_{suffix}.csv,
-    returns the Path to the file.
-    """
-    output_dir.mkdir(parents=True, exist_ok=True)
-    file_path = output_dir / f"{prefix}_{suffix}.csv"
-    dataframe.to_csv(file_path, index=False)
-    return file_path
+    Read with read_df, apply scaler_fn, write with _write_df.
+    If output_file is None, defaults to cwd / f"{stem}_{suffix}.csv"."""
+    df = read_df(input_file)
+    df_out = scaler_fn(df.copy())
+    if output_file is None:
+        stem = input_file.stem if input_file != Path("-") else "stdin"
+        output_file = Path.cwd() / f"{stem}_{suffix}.csv"
+    _write_df(df_out, output_file)
 
 
 def apply_normalizer(df: pd.DataFrame) -> pd.DataFrame:
@@ -37,13 +59,13 @@ def apply_minmax(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def log1p_transform(df: pd.DataFrame) -> pd.DataFrame:
+def apply_log1p(df: pd.DataFrame) -> pd.DataFrame:
     num_cols = df.select_dtypes(include=np.number).columns
     df[num_cols] = np.log1p(df[num_cols])
     return df
 
 
-def yeo_johnson(df: pd.DataFrame) -> pd.DataFrame:
+def apply_yeo_johnson(df: pd.DataFrame) -> pd.DataFrame:
     num_cols = df.select_dtypes(include=np.number).columns
     scaler = preprocessing.PowerTransformer(method="yeo-johnson").fit(df[num_cols])
     df[num_cols] = scaler.transform(df[num_cols])
