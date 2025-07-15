@@ -1,6 +1,3 @@
-import sys
-from loguru import logger
-
 from pathlib import Path
 import pandas as pd
 from typing import Callable
@@ -8,20 +5,16 @@ import numpy as np
 from sklearn import preprocessing
 from sklearn.preprocessing import Normalizer, StandardScaler, MinMaxScaler
 
-from cli_utils import read_df
+from cli_utils import read_df, _write_df
 
-
-def _write_df(df: pd.DataFrame, output_file: Path) -> None:
-    """
-    Write df to output_file, or to stdout if output_file == Path('-').
-    """
-    if output_file == Path("-"):
-        df.to_csv(sys.stdout.buffer, index=False)
-        logger.success("CSV written to stdout.")
-    else:
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(output_file, index=False)
-        logger.success(f"CSV saved to {output_file!r}")
+__all__ = [
+    "_run_scaler",
+    "apply_normalizer",
+    "apply_standardization",
+    "apply_minmax",
+    "apply_log1p",
+    "apply_yeo_johnson",
+]
 
 
 def _run_scaler(
