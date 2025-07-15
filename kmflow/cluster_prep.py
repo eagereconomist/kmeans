@@ -1,8 +1,9 @@
-import typer
 from pathlib import Path
-from loguru import logger
-from kmflow.config import DATA_DIR, EXTERNAL_DATA_DIR
-from kmflow.preprocess_utils import load_data
+from typing import Optional, Dict
+
+import typer
+
+from kmflow.cli_utils import read_df, _write_df
 from kmflow.cluster_prep_utils import (
     merge_cluster_labels,
     clusters_to_labels,
@@ -10,109 +11,93 @@ from kmflow.cluster_prep_utils import (
     get_cluster_profiles,
 )
 
-app = typer.Typer()
+app = typer.Typer(help="Profile and label K-Means clusters.")
 
 
 @app.command("cluster-profiles")
 def cluster_profiles(
-    raw_input_file: str = typer.Argument(..., help="csv filename."),
-    raw_input_dir: Path = typer.Option(
-        "raw",
-        "--input-dir",
-        "-raw",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
-    ),
-    cluster_input_file: str = typer.Argument(
-        ...,
-        help="csv filename.",
-    ),
-    cluster_input_dir: Path = typer.Option(
-        "processed",
-        "--input-dir",
-        "-cluster",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
-    ),
-    cluster_col: str = typer.Option(
-        ...,
-        "--cluster-col",
-        "-c",
-        help="Name of the column with your integer clusters (e.g. cluster_7).",
-    ),
-    key_column_name: str = typer.Option(
+    raw_file: Path = typer.Argument(..., help="Raw CSV (use '-' for stdin)."),
+    cluster_file: Path = typer.Argument(..., help="Clustered CSV (use '-' for stdin)."),
+    cluster_col: str = typer.Argument(..., help="Column with cluster labels."),
+    key_col: Optional[str] = typer.Option(
         None,
         "--key-col",
         "-k",
-        help="(Optional) If both files share an ID column, merge on this instead of row order.",
+        help="If present, merge on this column instead of by row order.",
+    ),
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
+        "-o",
+        help="Where to write profiles CSV; use '-' for stdout (default).",
     ),
 ):
-    raw_input_path = DATA_DIR / raw_input_dir / raw_input_file
-    raw_df = load_data(raw_input_path)
-    cluster_input_path = DATA_DIR / cluster_input_dir / cluster_input_file
-    cluster_df = load_data(cluster_input_path)
-    if key_column_name:
+    """
+    Generate per-cluster summary profiles.
+    """
+    # 1) read both tables
+    raw_df = read_df(raw_file)
+    cluster_df = read_df(cluster_file)
+
+    # 2) merge
+    if key_col:
         merged = raw_df.merge(
-            cluster_df[[key_column_name, cluster_col]],
-            on=key_column_name,
+            cluster_df[[key_col, cluster_col]],
+            on=key_col,
+            how="inner",
         )
     else:
-        merged = merge_cluster_labels(
-            raw_df,
-            cluster_df=cluster_df,
-            cluster_col=cluster_col,
-        )
-    cluster_profiles_df = get_cluster_profiles(
-        df=merged,
-        cluster_col=cluster_col,
-    )
-    raw_stem = Path(raw_input_file).stem
-    output_file = f"{raw_stem}_{cluster_col}_profiles.csv"
-    output_path = EXTERNAL_DATA_DIR / output_file
-    cluster_profiles_df.to_csv(output_path, index=False)
-    logger.success(f"Saved profiles to {output_path!r}")
+        merged = merge_cluster_labels(raw_df, cluster_df, cluster_col)
+
+    # 3) compute profiles
+    profiles = get_cluster_profiles(merged, cluster_col)
+
+    # 4) write out
+    if output_file is None:
+        stem = raw_file.stem if raw_file != Path("-") else "stdin"
+        output_file = Path.cwd() / f"{stem}_{cluster_col}_profiles.csv"
+    _write_df(profiles, output_file)
 
 
 @app.command("map-clusters")
 def map_clusters(
-    cluster_results_file: str = typer.Argument(
-        ..., help="csv with cluster IDs from k-means model."
-    ),
-    input_dir: Path = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
-    ),
-    cluster_col: str = typer.Option(
-        ..., "--cluster-col", "-c", help="Name of the raw cluster colum."
-    ),
-    output_dir: Path = typer.Option(
-        EXTERNAL_DATA_DIR,
-        "--output-dir:",
+    cluster_file: Path = typer.Argument(..., help="Clustered CSV (use '-' for stdin)."),
+    cluster_col: str = typer.Argument(..., help="Column with cluster labels."),
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
         "-o",
-        dir_okay=True,
-        file_okay=False,
+        help="Where to write counts CSV; use '-' for stdout (default).",
     ),
 ):
-    input_path = DATA_DIR / input_dir / cluster_results_file
-    df_cluster = load_data(input_path)
-    unique_ids = sorted(df_cluster[cluster_col].unique())
-    mapping: dict[int, str] = {}
-    for cluster_id in unique_ids:
-        mapping[cluster_id] = typer.prompt(f"Label for cluster {cluster_id}")
-    label_series = clusters_to_labels(
-        df_cluster[cluster_col],
-        mapping,
-    )
-    counts_df = count_labels(label_series, label_col="cluster_label")
-    typer.echo("\nCluster ID -> Label Mapping:")
-    for cluster_id, cluster_label in mapping.items():
-        typer.echo(f"  {cluster_id} -> {cluster_label}")
+    """
+    Prompt for human labels per cluster ID, then count.
+    """
+    df = read_df(cluster_file)
+    unique_ids = sorted(df[cluster_col].unique())
+
+    # 1) interactively build mapping
+    mapping: Dict[int, str] = {}
+    for cid in unique_ids:
+        mapping[cid] = typer.prompt(f"Label for cluster {cid}")
+
+    # 2) apply mapping & count
+    labels = clusters_to_labels(df[cluster_col], mapping)
+    counts = count_labels(labels, label_col="cluster_label")
+
+    # 3) echo mapping & counts
+    typer.echo("\nCluster -> Label mapping:")
+    for cid, lab in mapping.items():
+        typer.echo(f"  {cid} -> {lab}")
+
     typer.echo("\nCounts per label:")
-    typer.echo(counts_df.to_markdown(index=False))
-    stem = Path(cluster_results_file).stem
-    output_path = output_dir / f"{stem}_counts.csv"
-    counts_df.to_csv(output_path, index=False)
-    logger.success(f"Saved counts to {output_path!r}")
+    typer.echo(counts.to_markdown(index=False))
+
+    # 4) write out
+    if output_file is None:
+        stem = cluster_file.stem if cluster_file != Path("-") else "stdin"
+        output_file = Path.cwd() / f"{stem}_cluster_counts.csv"
+    _write_df(counts, output_file)
 
 
 if __name__ == "__main__":
