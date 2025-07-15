@@ -94,7 +94,7 @@ def merge_benchmarks(
 def compute_inertia_scores(
     df: pd.DataFrame,
     k_range: Union[Tuple[int, int], range] = (1, 20),
-    feature_columns: Optional[Sequence[str]] = None,
+    numeric_cols: Optional[Sequence[str]] = None,
     init: str = "k-means++",
     n_init: int = 50,
     random_state: int = 4572,
@@ -102,8 +102,8 @@ def compute_inertia_scores(
 ) -> pd.DataFrame:
     X = (
         df.select_dtypes(include=np.number).values
-        if feature_columns is None
-        else df[list(feature_columns)].values
+        if numeric_cols is None
+        else df[list(numeric_cols)].values
     )
     if isinstance(k_range, tuple):
         k_start, k_end = k_range
@@ -126,7 +126,7 @@ def compute_inertia_scores(
 
 def compute_silhouette_scores(
     df: pd.DataFrame,
-    feature_columns: Optional[Sequence[str]] = None,
+    numeric_cols: Optional[Sequence[str]] = None,
     init: str = "k-means++",
     n_init: int = 50,
     random_state: int = 4572,
@@ -135,8 +135,8 @@ def compute_silhouette_scores(
 ) -> pd.DataFrame:
     X = (
         df.select_dtypes(include=np.number).values
-        if feature_columns is None
-        else df[list(feature_columns)].values
+        if numeric_cols is None
+        else df[list(numeric_cols)].values
     )
     n_samples = X.shape[0]
     ks = k_values if k_values is not None else range(2, n_samples)
@@ -153,7 +153,7 @@ def compute_silhouette_scores(
 
 def compute_calinski_scores(
     df: pd.DataFrame,
-    feature_columns: Optional[Sequence[str]] = None,
+    numeric_cols: Optional[Sequence[str]] = None,
     init: str = "k-means++",
     n_init: int = 50,
     random_state: int = 4572,
@@ -162,8 +162,8 @@ def compute_calinski_scores(
 ) -> pd.DataFrame:
     X = (
         df.select_dtypes(include=np.number).values
-        if feature_columns is None
-        else df[list(feature_columns)].values
+        if numeric_cols is None
+        else df[list(numeric_cols)].values
     )
     n_samples = X.shape[0]
     ks = k_values if k_values is not None else range(2, n_samples)
@@ -184,7 +184,7 @@ def compute_calinski_scores(
 
 def compute_davies_scores(
     df: pd.DataFrame,
-    feature_columns: Optional[Sequence[str]] = None,
+    numeric_cols: Optional[Sequence[str]] = None,
     init: str = "k-means++",
     n_init: int = 50,
     random_state: int = 4572,
@@ -193,8 +193,8 @@ def compute_davies_scores(
 ) -> pd.DataFrame:
     X = (
         df.select_dtypes(include=np.number).values
-        if feature_columns is None
-        else df[list(feature_columns)].values
+        if numeric_cols is None
+        else df[list(numeric_cols)].values
     )
     n_samples = X.shape[0]
     ks = k_values if k_values is not None else range(2, n_samples)

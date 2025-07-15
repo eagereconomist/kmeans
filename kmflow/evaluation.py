@@ -1,262 +1,277 @@
+import sys
+from pathlib import Path
+from typing import List, Optional
+
 import typer
 from loguru import logger
-from pathlib import Path
-from typing import List
 from tqdm import tqdm
 
+from kmflow.cli_utils import read_df, _write_df
 from kmflow.config import DATA_DIR
-from kmflow.preprocess_utils import load_data
-from kmflow.process_utils import write_csv
 from kmflow.evaluation_utils import (
+    load_calinski_results,
+    load_davies_results,
+    merge_benchmarks,
     compute_inertia_scores,
     compute_silhouette_scores,
     compute_calinski_scores,
     compute_davies_scores,
-    load_calinski_results,
-    load_davies_results,
-    merge_benchmarks,
 )
 
-app = typer.Typer()
+app = typer.Typer(help="K-Means evaluation metrics CLI.")
 
 
 @app.command("benchmark")
 def benchmark(
-    input_dir: Path = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
+    input_dir: Path = typer.Argument(
+        ...,
+        help="Processed-data root under data/ (e.g. 'processed').",
     ),
-    output_file: Path = typer.Option(
+    output_file: Optional[Path] = typer.Option(
         None,
         "--output-file",
         "-o",
-        writable=True,
-        dir_okay=False,
-        help="Optional path to write the benchmark table as csv",
+        help="Where to write the merged benchmark CSV; use '-' for stdout (default).",
     ),
     decimals: int = typer.Option(
-        3,
-        "--decimals",
-        "-d",
-        help="Number of decimal places to round metric values to",
+        3, "--decimals", "-d", help="Decimal places to round metric values to."
     ),
 ):
+    """
+    Load all calinski & davies CSVs under data/<input_dir>/… and merge into one table.
+    """
     processed_root = DATA_DIR / input_dir
+
+    # gather
     calinski_df = load_calinski_results(processed_root)
     davies_df = load_davies_results(processed_root)
 
-    df = merge_benchmarks(calinski_df, davies_df)
-    for col in ("calinski", "davies"):
-        df[col] = df[col].round(decimals)
+    # merge & round
+    merged = merge_benchmarks(calinski_df, davies_df)
+    merged["calinski"] = merged["calinski"].round(decimals)
+    merged["davies"] = merged["davies"].round(decimals)
 
-    if output_file:
-        df.to_csv(output_file, index=False)
-        typer.echo(f"Benchmark table saved to {output_file}")
+    # write out
+    if output_file is None or output_file == Path("-"):
+        merged.to_csv(sys.stdout.buffer, index=False)
+        logger.success("Benchmark table written to stdout.")
+    else:
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        merged.to_csv(output_file, index=False)
+        logger.success(f"Benchmark table saved to {output_file!r}")
 
 
 @app.command("inertia")
-def km_inertia(
-    input_file: str = typer.Argument(..., help="csv filename under the data subfolder."),
-    input_dir: str = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
-    ),
+def inertia(
+    input_file: Path = typer.Argument(..., help="CSV to read (use '-' for stdin)."),
     start: int = typer.Option(1, "--start", "-s", help="Minimum k (inclusive)."),
     stop: int = typer.Option(20, "--stop", "-e", help="Maximum k (inclusive)."),
-    random_state: int = typer.Option(4572, "--seed", help="Random seed for reproducibility."),
-    n_init: int = typer.Option(
-        50, "--n-init", "-n", help="Number of times kmeans is run with differnet centroid seeds."
+    random_state: int = typer.Option(
+        4572, "--seed", "-r", help="Random seed for reproducibility."
     ),
+    n_init: int = typer.Option(50, "--n-init", "-n", help="Number of initializations per k."),
     algorithm: str = typer.Option(
         "lloyd", "--algorithm", "-a", help="KMeans algorithm: 'lloyd' or 'elkan'."
     ),
     init: str = typer.Option(
-        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'"
+        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'."
     ),
-    feature_columns: List[str] = typer.Option(
+    numeric_cols: Optional[List[str]] = typer.Option(
         None,
-        "--feature-column",
-        "-f",
-        help="Name of numeric column to include; repeat flag to add more."
-        "Defaults to all numeric columns.",
+        "--numeric-cols",
+        "-numeric-cols",
+        help="Numeric column to include; repeat flag to add more.",
     ),
-    output_dir: str = typer.Option(
-        "processed",
-        "--output-dir",
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
         "-o",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the file will be output.",
+        help="Where to write inertia CSV; use '-' for stdout (default).",
     ),
 ):
-    input_path = DATA_DIR / input_dir / input_file
-    output_path = DATA_DIR / output_dir
-    df = load_data(input_path)
-    progress_bar = tqdm(range(start, stop + 1), desc="Inertia")
+    """
+    Compute K-Means inertia over k=start…stop.
+    """
+    # 1) load
+    if input_file == Path("-"):
+        df = read_df(input_file)
+        stem = "stdin"
+    else:
+        df = read_df(DATA_DIR / "processed" / input_file)
+        stem = input_file.stem
+
+    # 2) compute
+    ks = tqdm(range(start, stop + 1), desc="Inertia")
     inertia_df = compute_inertia_scores(
         df=df,
-        feature_columns=feature_columns,
-        k_range=progress_bar,
+        k_range=ks,
+        numeric_cols=numeric_cols,
         random_state=random_state,
         n_init=n_init,
         algorithm=algorithm,
         init=init,
     )
-    stem = Path(input_file).stem
-    write_csv(inertia_df, prefix=stem, suffix="inertia", output_dir=output_path)
-    logger.success(f"Saved Inertia Scores -> {(output_dir / output_path)!r}")
+
+    # 3) write out
+    if output_file is None:
+        output_file = Path.cwd() / f"{stem}_inertia.csv"
+    _write_df(inertia_df, output_file)
 
 
 @app.command("silhouette")
-def km_silhouette(
-    input_file: str = typer.Argument(..., help="csv filename under the data subfolder."),
-    input_dir: str = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
+def silhouette(
+    input_file: Path = typer.Argument(..., help="CSV to read (use '-' for stdin)."),
+    random_state: int = typer.Option(
+        4572, "--seed", "-r", help="Random seed for reproducibility."
     ),
-    random_state: int = typer.Option(4572, "--seed", help="Random seed for reproducibility."),
-    n_init: int = typer.Option(
-        50, "--n-init", "-n", help="Number of times kmeans is run with differnet centroid seeds."
-    ),
+    n_init: int = typer.Option(50, "--n-init", "-n", help="Number of initializations per k."),
     algorithm: str = typer.Option(
         "lloyd", "--algorithm", "-a", help="KMeans algorithm: 'lloyd' or 'elkan'."
     ),
     init: str = typer.Option(
-        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'"
+        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'."
     ),
-    feature_columns: List[str] = typer.Option(
+    numeric_cols: Optional[List[str]] = typer.Option(
         None,
-        "--feature-column",
-        "-f",
-        help="Name of numeric column to include; repeat flag to add more."
-        "Defaults to all numeric columns.",
+        "--numeric-cols",
+        "-numeric-cols",
+        help="Numeric column to include; repeat flag to add more.",
     ),
-    output_dir: str = typer.Option(
-        "processed",
-        "--output-dir",
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
         "-o",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the file will be output.",
+        help="Where to write silhouette CSV; use '-' for stdout (default).",
     ),
 ):
-    df = load_data(DATA_DIR / input_dir / input_file)
-    output_path = DATA_DIR / output_dir
-    progress_bar = tqdm(range(2, 21), desc="Silhouette")
+    """
+    Compute K-Means silhouette score for k=2…n_samples-1.
+    """
+    if input_file == Path("-"):
+        df = read_df(input_file)
+        stem = "stdin"
+    else:
+        df = read_df(DATA_DIR / "processed" / input_file)
+        stem = input_file.stem
+
+    ks = tqdm(range(2, df.select_dtypes(include="number").shape[0]), desc="Silhouette")
     silhouette_df = compute_silhouette_scores(
         df=df,
-        feature_columns=feature_columns,
-        k_values=progress_bar,
+        numeric_cols=numeric_cols,
+        k_values=ks,
         random_state=random_state,
         n_init=n_init,
         algorithm=algorithm,
         init=init,
     )
-    stem = Path(input_file).stem
-    write_csv(silhouette_df, prefix=stem, suffix="silhouette", output_dir=output_path)
-    logger.success(f"Saved Silhouette Scores -> {(output_dir / output_path)!r}")
+
+    if output_file is None:
+        output_file = Path.cwd() / f"{stem}_silhouette.csv"
+    _write_df(silhouette_df, output_file)
 
 
 @app.command("calinski")
-def km_calinski(
-    input_file: str = typer.Argument(..., help="csv filename under the data subfolder."),
-    input_dir: str = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
+def calinski(
+    input_file: Path = typer.Argument(..., help="CSV to read (use '-' for stdin)."),
+    random_state: int = typer.Option(
+        4572, "--seed", "-r", help="Random seed for reproducibility."
     ),
-    random_state: int = typer.Option(4572, "--seed", help="Random seed for reproducibility."),
-    n_init: int = typer.Option(
-        50, "--n-init", "-n", help="Number of times kmeans is run with differnet centroid seeds."
-    ),
+    n_init: int = typer.Option(50, "--n-init", "-n", help="Number of initializations per k."),
     algorithm: str = typer.Option(
         "lloyd", "--algorithm", "-a", help="KMeans algorithm: 'lloyd' or 'elkan'."
     ),
     init: str = typer.Option(
-        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'"
+        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'."
     ),
-    feature_columns: List[str] = typer.Option(
+    numeric_cols: Optional[List[str]] = typer.Option(
         None,
-        "--feature-column",
-        "-f",
-        help="Name of numeric column to include; repeat flag to add more."
-        "Defaults to all numeric columns.",
+        "--numeric-cols",
+        "-numeric-cols",
+        help="Numeric column to include; repeat flag to add more.",
     ),
-    output_dir: str = typer.Option(
-        "processed",
-        "--output-dir",
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
         "-o",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the file will be output.",
+        help="Where to write Calinski-Harabasz CSV; use '-' for stdout (default).",
     ),
 ):
-    df = load_data(DATA_DIR / input_dir / input_file)
-    output_path = DATA_DIR / output_dir
-    progress_bar = tqdm(range(2, 21), desc="Calinski-Harabasz")
+    """
+    Compute K-Means Calinski-Harabasz score for k=2…n_samples-1.
+    """
+    if input_file == Path("-"):
+        df = read_df(input_file)
+        stem = "stdin"
+    else:
+        df = read_df(DATA_DIR / "processed" / input_file)
+        stem = input_file.stem
+
+    ks = tqdm(range(2, df.select_dtypes(include="number").shape[0]), desc="Calinski")
     calinski_df = compute_calinski_scores(
         df=df,
-        feature_columns=feature_columns,
-        k_values=progress_bar,
+        numeric_cols=numeric_cols,
+        k_values=ks,
         random_state=random_state,
         n_init=n_init,
         algorithm=algorithm,
         init=init,
     )
-    stem = Path(input_file).stem
-    write_csv(calinski_df, prefix=stem, suffix="calinski", output_dir=output_path)
-    logger.success(f"Saved Calinski-Harabasz Scores -> {(output_dir / output_path)!r}")
+
+    if output_file is None:
+        output_file = Path.cwd() / f"{stem}_calinski.csv"
+    _write_df(calinski_df, output_file)
 
 
 @app.command("davies")
-def km_davies(
-    input_file: str = typer.Argument(..., help="csv filename under the data subfolder."),
-    input_dir: str = typer.Option(
-        "processed",
-        "--input-dir",
-        "-d",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the input file lives.",
+def davies(
+    input_file: Path = typer.Argument(..., help="CSV to read (use '-' for stdin)."),
+    random_state: int = typer.Option(
+        4572, "--seed", "-r", help="Random seed for reproducibility."
     ),
-    random_state: int = typer.Option(4572, "--seed", help="Random seed for reproducibility."),
-    n_init: int = typer.Option(
-        50, "--n-init", "-n", help="Number of times kmeans is run with differnet centroid seeds."
-    ),
+    n_init: int = typer.Option(50, "--n-init", "-n", help="Number of initializations per k."),
     algorithm: str = typer.Option(
         "lloyd", "--algorithm", "-a", help="KMeans algorithm: 'lloyd' or 'elkan'."
     ),
     init: str = typer.Option(
-        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'"
+        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'."
     ),
-    feature_columns: List[str] = typer.Option(
+    numeric_cols: Optional[List[str]] = typer.Option(
         None,
-        "--feature-column",
-        "-f",
-        help="Name of numeric column to include; repeat flag to add more."
-        "Defaults to all numeric columns.",
+        "--numeric-cols",
+        "-numeric-cols",
+        help="Numeric column to include; repeat flag to add more.",
     ),
-    output_dir: str = typer.Option(
-        "processed",
-        "--output-dir",
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output-file",
         "-o",
-        help="Sub-folder under data/ (e.g. external, interim, processed, raw), where the file will be output.",
+        help="Where to write Davies-Bouldin CSV; use '-' for stdout (default).",
     ),
 ):
-    df = load_data(DATA_DIR / input_dir / input_file)
-    output_path = DATA_DIR / output_dir
-    progress_bar = tqdm(range(2, 21), desc="Davies-Bouldin")
+    """
+    Compute K-Means Davies-Bouldin score for k=2…n_samples-1.
+    """
+    if input_file == Path("-"):
+        df = read_df(input_file)
+        stem = "stdin"
+    else:
+        df = read_df(DATA_DIR / "processed" / input_file)
+        stem = input_file.stem
+
+    ks = tqdm(range(2, df.select_dtypes(include="number").shape[0]), desc="Davies")
     davies_df = compute_davies_scores(
         df=df,
-        feature_columns=feature_columns,
-        k_values=progress_bar,
+        numeric_cols=numeric_cols,
+        k_values=ks,
         random_state=random_state,
         n_init=n_init,
         algorithm=algorithm,
         init=init,
     )
-    stem = Path(input_file).stem
-    write_csv(davies_df, prefix=stem, suffix="davies", output_dir=output_path)
-    logger.success(f"Saved Davies-Bouldin Scores -> {(output_dir / output_path)!r}")
+
+    if output_file is None:
+        output_file = Path.cwd() / f"{stem}_davies.csv"
+    _write_df(davies_df, output_file)
 
 
 if __name__ == "__main__":
