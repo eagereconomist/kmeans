@@ -5,7 +5,7 @@ from loguru import logger
 from tqdm import tqdm
 import typer
 
-from kmflow.cli_utils import read_df
+from kmflow.cli_utils import read_df, comma_split, comma_split_int
 from kmflow.preprocess_utils import (
     find_iqr_outliers,
     compute_pca_summary,
@@ -14,52 +14,99 @@ from kmflow.preprocess_utils import (
     dotless_column,
 )
 from kmflow.process_utils import write_csv
-from kmflow.config import INTERIM_DATA_DIR, PROCESSED_DATA_DIR
+from kmflow.config import INTERIM_DATA_DIR
 
 app = typer.Typer(help="Data preprocessing and PCA-summary commands.")
+
+
+@app.command("outlier")
+def iqr_cli(
+    input_file: Path = typer.Argument(
+        ...,
+        help="CSV file to read (use '-' for stdin).",
+    ),
+    export_outliers: bool = typer.Option(
+        False,
+        "--export-outliers",
+        "-eo",
+        help="Write detected outliers to CSV.",
+    ),
+    remove_outliers: bool = typer.Option(
+        False,
+        "--remove-outliers",
+        "-ro",
+        help="Write cleaned CSV (with outliers removed).",
+    ),
+    output_dir: Path = typer.Option(
+        None,
+        "--output-dir",
+        "-o",
+        help="Directory in which to save output CSVs.",
+    ),
+):
+    """
+    Identify IQR-based outliers, report them, and optionally export or remove them.
+    """
+    df = read_df(input_file)
+    out = find_iqr_outliers(df)
+
+    if out.empty:
+        logger.info("No IQR-based outliers detected.")
+        return
+
+    out_df = out.reset_index().rename(
+        columns={"level_0": "row_index", "level_1": "column", 0: "outlier_value"}
+    )
+    typer.echo("\nDetected IQR outliers:")
+    typer.echo(out_df)
+
+    if export_outliers:
+        path = write_csv(
+            out_df,
+            prefix=input_file.stem,
+            suffix="iqr_outliers",
+            output_dir=output_dir,
+        )
+        logger.success(f"Outliers written to {path!r}")
+
+    if remove_outliers:
+        rows = out_df["row_index"].unique().tolist()
+        cleaned = drop_row(df, rows)
+        path = write_csv(
+            cleaned,
+            prefix=input_file.stem,
+            suffix="no_outliers",
+            output_dir=output_dir,
+        )
+        logger.success(f"Cleaned data written to {path!r}")
 
 
 @app.command("preprocess")
 def preprocess(
     input_file: Path = typer.Argument(
         ...,
-        help="Raw CSV file to read (use '-' to read from stdin).",
+        help="CSV to read (use '-' for stdin).",
     ),
     dropped_columns: list[str] = typer.Option(
         [],
         "--dropped-column",
         "-dc",
-        help="Name of column to drop; can be repeated.",
+        help="Columns to drop, comma-separated or repeatable.",
+        callback=lambda x: comma_split(x) if isinstance(x, str) else x,
     ),
     dotless_columns: list[str] = typer.Option(
         [],
         "--dotless-column",
         "-dot",
-        help="Name of column whose dots to remove; can be repeated.",
+        help="Columns whose dots to remove, comma-separated or repeatable.",
+        callback=lambda x: comma_split(x) if isinstance(x, str) else x,
     ),
     drop_rows: list[int] = typer.Option(
         [],
         "--dropped-row",
         "-dr",
-        help="Row indices to drop; can be repeated.",
-    ),
-    iqr_check: bool = typer.Option(
-        False,
-        "--iqr-check",
-        "-iqr",
-        help="Identify IQR-based outliers and report them.",
-    ),
-    export_outliers: bool = typer.Option(
-        False,
-        "--export-outliers",
-        "-eo",
-        help="Write detected outliers to interim/iqr_outliers.csv or stdout",
-    ),
-    remove_outliers: bool = typer.Option(
-        False,
-        "--remove-outliers",
-        "-ro",
-        help="Drop all rows containing IQR outliers.",
+        help="Row indices to drop, comma-separated or repeatable.",
+        callback=lambda x: comma_split_int(x) if isinstance(x, str) else x,
     ),
     preview: bool = typer.Option(
         False,
@@ -71,18 +118,15 @@ def preprocess(
         None,
         "--output-file",
         "-o",
-        help="Where to save the preprocessed CSV; use '-' for stdout.",
+        help="Where to save the cleaned CSV; use '-' for stdout.",
     ),
 ):
     """
-    Apply column/row drops, dotless renaming, and optional IQR outlier handling
-    to a raw CSV. Outputs a cleaned CSV.
+    Apply column/row drops and dotless renaming to a CSV. Does NOT handle IQR outliers.
     """
-    # ─── 1) read input & define stem ──────────────────────────────────────
     df = read_df(input_file)
     stem = input_file.stem if input_file != Path("-") else "stdin"
 
-    # ─── 2) build transform steps ────────────────────────────────────
     steps: list[tuple[str, callable, list]] = []
     for col in dropped_columns:
         steps.append(("drop_column", drop_column, [col]))
@@ -91,51 +135,19 @@ def preprocess(
     for idx in drop_rows:
         steps.append(("drop_row", drop_row, [[idx]]))
 
-    # ─── 3) apply them ────────────────────────────────────────────────
-    for name, func, args in tqdm(steps, desc="Data Preprocessing Steps", ncols=100):
+    for name, func, args in tqdm(steps, desc="Data Preprocessing Steps", colour="green"):
         logger.info(f"Applying {name}...")
         df = func(df, *args)
 
-    # ─── 4) optional IQR outlier reporting / removal ─────────────────
-    if iqr_check:
-        logger.info("Finding IQR outliers…")
-        out = find_iqr_outliers(df)
-
-        if out.empty:
-            logger.info("No IQR-based outliers detected.")
-        else:
-            out_df = out.reset_index().rename(
-                columns={"level_0": "row_index", "level_1": "column", 0: "outlier_value"}
-            )
-            if export_outliers:
-                # always write to fixed filename
-                write_csv(out_df, prefix=stem, suffix="iqr_outliers", output_dir=INTERIM_DATA_DIR)
-                logger.success(
-                    f"Outliers written to {INTERIM_DATA_DIR / f'{stem}_iqr_outliers.csv'!r}"
-                )
-            else:
-                typer.echo("\nDetected IQR outliers:")
-                typer.echo(out_df)
-
-            if remove_outliers:
-                rows = out_df["row_index"].unique().tolist()
-                before = df.shape[0]
-                df = drop_row(df, rows)
-                after = df.shape[0]
-                logger.success(f"Removed {len(rows)} outlier rows: {rows}")
-                logger.success(f"Row count: {before} -> {after}")
-
-    # ─── 5) preview if requested ─────────────────────────────────────
     if preview:
         typer.echo(df.head())
 
-    # ─── 6) write out ────────────────────────────────────────────────
     if output_file is None:
         output_file = INTERIM_DATA_DIR / f"{stem}_preprocessed.csv"
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     if output_file == Path("-"):
-        df.to_csv(sys.stdout, index=False)
+        df.to_csv(sys.stdout.buffer, index=False)
         logger.success("Preprocessed CSV written to stdout.")
     else:
         df.to_csv(output_file, index=False)
@@ -148,13 +160,14 @@ def preprocess(
 def pca_summary(
     input_file: Path = typer.Argument(
         ...,
-        help="CSV file to read (use '-' to read from stdin).",
+        help="CSV file to read (use '-' for stdin).",
     ),
     numeric_cols: list[str] = typer.Option(
-        None,
+        [],
         "--numeric-cols",
         "-numeric-cols",
-        help="Numeric column to include; can be repeated. Defaults to all numeric.",
+        help="Numeric columns to include; comma-separated or repeatable.",
+        callback=lambda x: comma_split(x) if isinstance(x, str) else x,
     ),
     n_components: int = typer.Option(
         None,
@@ -163,63 +176,67 @@ def pca_summary(
         help="Number of PCs to compute (defaults to all).",
     ),
     random_state: int = typer.Option(
-        4572, "--seed", "-seed", help="Random seed for reproducibility."
+        4572,
+        "--seed",
+        "-seed",
+        help="Random seed for reproducibility.",
     ),
     output_dir: Path = typer.Option(
-        PROCESSED_DATA_DIR,
+        None,
         "--output-dir",
         "-o",
         dir_okay=True,
         file_okay=False,
-        help="Where to save the PCA summary CSVs.",
+        help="Directory where PCA summary CSVs will be saved.",
     ),
 ):
     """
     Compute PCA loadings, scores, explained variance, and cumulative variance,
-    then write four CSVs:
-      1) pca_loadings.csv
-      2) pca_scores_<k>pc.csv
-      3) pca_proportion_var.csv
-      4) pca_cumulative_var.csv
+    then write four CSVs with a progress bar.
     """
-    # ─── read input & define stem ──────────────────────────────────────
     df = read_df(input_file)
     stem = input_file.stem if input_file != Path("-") else "stdin"
 
-    # ─── compute ───────────────────────────────────────────────────────
+    if not numeric_cols:
+        numeric_cols_arg = None
+    else:
+        numeric_cols_arg = numeric_cols
+
     summary = compute_pca_summary(
         df=df,
-        numeric_cols=numeric_cols,
+        numeric_cols=numeric_cols_arg,
         n_components=n_components,
         random_state=random_state,
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # ─── write loadings ───────────────────────────────────────────────
-    loadings_df = summary["loadings"].reset_index().rename(columns={"index": "component"})
-    loadings_path = write_csv(
-        loadings_df, prefix=stem, suffix="pca_loadings", output_dir=output_dir
-    )
-    logger.success(f"Saved PCA Loadings -> {loadings_path!r}")
+    tasks = [
+        (
+            "PCA Loadings",
+            summary["loadings"].reset_index().rename(columns={"index": "component"}),
+            "pca_loadings",
+        ),
+        (
+            "PCA Scores",
+            summary["scores"].reset_index(drop=True),
+            f"pca_scores_{summary['scores'].shape[1]}pc" if n_components else "pca_scores",
+        ),
+        (
+            "Proportion Variance",
+            summary["pve"].reset_index().rename(columns={"index": "component"}),
+            "pca_proportion_var",
+        ),
+        (
+            "Cumulative Variance",
+            summary["cpve"].reset_index().rename(columns={"index": "component"}),
+            "pca_cumulative_var",
+        ),
+    ]
 
-    # ─── write scores ────────────────────────────────────────────────
-    scores_df = summary["scores"]
-    scores_suffix = f"pca_scores_{scores_df.shape[1]}pc" if n_components else "pca_scores"
-    scores_path = write_csv(
-        scores_df.reset_index(drop=True), prefix=stem, suffix=scores_suffix, output_dir=output_dir
-    )
-    logger.success(f"Saved PCA Scores -> {scores_path!r}")
-
-    # ─── write explained var ──────────────────────────────────────────
-    pve_df = summary["pve"].reset_index().rename(columns={"index": "component"})
-    pve_path = write_csv(pve_df, prefix=stem, suffix="pca_proportion_var", output_dir=output_dir)
-    logger.success(f"Saved Explained Variance -> {pve_path!r}")
-
-    # ─── write cumulative var ─────────────────────────────────────────
-    cpve_df = summary["cpve"].reset_index().rename(columns={"index": "component"})
-    cpve_path = write_csv(cpve_df, prefix=stem, suffix="pca_cumulative_var", output_dir=output_dir)
-    logger.success(f"Saved Cumulative Variance -> {cpve_path!r}")
+    for desc, df_out, suffix in tqdm(tasks, desc="Writing PCA CSVs", colour="green"):
+        path = write_csv(df_out, prefix=stem, suffix=suffix, output_dir=output_dir)
+        logger.success(f"Saved {desc} -> {path!r}")
 
 
 if __name__ == "__main__":

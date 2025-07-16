@@ -17,6 +17,17 @@ __all__ = [
 ]
 
 
+def write_csv(dataframe: pd.DataFrame, prefix: str, suffix: str, output_dir: Path) -> Path:
+    """
+    Write `dataframe` to {output_dir}/{prefix}_{suffix}.csv,
+    returns the Path to the file.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    file_path = output_dir / f"{prefix}_{suffix}.csv"
+    dataframe.to_csv(file_path, index=False)
+    return file_path
+
+
 def _run_scaler(
     scaler_fn: Callable[[pd.DataFrame], pd.DataFrame],
     input_file: Path,
