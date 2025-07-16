@@ -3,7 +3,7 @@ from pathlib import Path
 import typer
 
 from kmflow.process_utils import (
-    _run_scaler,
+    _run_scaler_with_progress,
     apply_normalizer,
     apply_standardization,
     apply_minmax,
@@ -26,7 +26,9 @@ def normalize(
     ),
 ):
     """L2-normalize all numeric columns."""
-    _run_scaler(apply_normalizer, input_file, output_file, "norm")
+    _run_scaler_with_progress(
+        apply_normalizer, input_file, output_file, "norm", desc="Applying Normalize Scaler to Data"
+    )
 
 
 @app.command("std")
@@ -45,7 +47,13 @@ def standardize(
     """
     Z-score standardize all numeric columns.
     """
-    _run_scaler(apply_standardization, input_file, output_file, "standardized")
+    _run_scaler_with_progress(
+        apply_standardization,
+        input_file,
+        output_file,
+        "standardized",
+        desc="Applying Standardize Scaler to Data",
+    )
 
 
 @app.command("minmax")
@@ -64,7 +72,9 @@ def minmax(
     """
     Scale all numeric columns to [0,1].
     """
-    _run_scaler(apply_minmax, input_file, output_file, "minmax")
+    _run_scaler_with_progress(
+        apply_minmax, input_file, output_file, "minmax", desc="Applying MinMax Scaler to Data"
+    )
 
 
 @app.command("log1p")
@@ -83,7 +93,13 @@ def log_scale(
     """
     Apply log(1 + x) transform to all numeric columns.
     """
-    _run_scaler(apply_log1p, input_file, output_file, "log_scale")
+    _run_scaler_with_progress(
+        apply_log1p,
+        input_file,
+        output_file,
+        "log_scale",
+        desc="Applying log(1 + x) Scaler to Data",
+    )
 
 
 @app.command("yj")
@@ -102,7 +118,13 @@ def yeo_johnson_scale(
     """
     Apply Yeo-Johnson transform to all numeric columns.
     """
-    _run_scaler(apply_yeo_johnson, input_file, output_file, "yeo_johnson")
+    _run_scaler_with_progress(
+        apply_yeo_johnson,
+        input_file,
+        output_file,
+        "yeo_johnson",
+        desc="Applying Yeo-Johnson Scaler to Data",
+    )
 
 
 if __name__ == "__main__":

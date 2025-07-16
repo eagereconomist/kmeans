@@ -61,24 +61,32 @@ def iqr_cli(
     typer.echo(out_df)
 
     if export_outliers:
-        path = write_csv(
-            out_df,
-            prefix=input_file.stem,
-            suffix="iqr_outliers",
-            output_dir=output_dir,
-        )
-        logger.success(f"Outliers written to {path!r}")
+        if output_dir == Path("-"):
+            out_df.to_csv(sys.stdout.buffer, index=False)
+            logger.success("Outliers written to stdout.")
+        else:
+            path = write_csv(
+                out_df,
+                prefix=input_file.stem,
+                suffix="iqr_outliers",
+                output_dir=output_dir,
+            )
+            logger.success(f"Outliers written to {path!r}")
 
     if remove_outliers:
         rows = out_df["row_index"].unique().tolist()
         cleaned = drop_row(df, rows)
-        path = write_csv(
-            cleaned,
-            prefix=input_file.stem,
-            suffix="no_outliers",
-            output_dir=output_dir,
-        )
-        logger.success(f"Cleaned data written to {path!r}")
+        if output_dir == Path("-"):
+            cleaned.to_csv(sys.stdout.buffer, index=False)
+            logger.success("Cleaned data written to stdout.")
+        else:
+            path = write_csv(
+                cleaned,
+                prefix=input_file.stem,
+                suffix="no_outliers",
+                output_dir=output_dir,
+            )
+            logger.success(f"Cleaned data written to {path!r}")
 
 
 @app.command("preprocess")
@@ -144,12 +152,12 @@ def preprocess(
 
     if output_file is None:
         output_file = INTERIM_DATA_DIR / f"{stem}_preprocessed.csv"
-    output_file.parent.mkdir(parents=True, exist_ok=True)
 
     if output_file == Path("-"):
         df.to_csv(sys.stdout.buffer, index=False)
         logger.success("Preprocessed CSV written to stdout.")
     else:
+        output_file.parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(output_file, index=False)
         logger.success(f"Preprocessed CSV saved to {output_file!r}")
 
@@ -235,8 +243,12 @@ def pca_summary(
     ]
 
     for desc, df_out, suffix in tqdm(tasks, desc="Writing PCA CSVs", colour="green"):
-        path = write_csv(df_out, prefix=stem, suffix=suffix, output_dir=output_dir)
-        logger.success(f"Saved {desc} -> {path!r}")
+        if output_dir == Path("-"):
+            df_out.to_csv(sys.stdout.buffer, index=False)
+            logger.success(f"{desc} written to stdout.")
+        else:
+            path = write_csv(df_out, prefix=stem, suffix=suffix, output_dir=output_dir)
+            logger.success(f"Saved {desc} -> {path!r}")
 
 
 if __name__ == "__main__":

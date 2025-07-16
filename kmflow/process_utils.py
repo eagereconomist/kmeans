@@ -1,14 +1,19 @@
+import sys
 from pathlib import Path
+
 import pandas as pd
+from tqdm import tqdm
 from typing import Callable
 import numpy as np
+
+from loguru import logger
 from sklearn import preprocessing
 from sklearn.preprocessing import Normalizer, StandardScaler, MinMaxScaler
 
-from cli_utils import read_df, _write_df
+from cli_utils import read_df
 
 __all__ = [
-    "_run_scaler",
+    "_run_scaler_with_progress",
     "apply_normalizer",
     "apply_standardization",
     "apply_minmax",
@@ -28,21 +33,39 @@ def write_csv(dataframe: pd.DataFrame, prefix: str, suffix: str, output_dir: Pat
     return file_path
 
 
-def _run_scaler(
+def _run_scaler_with_progress(
     scaler_fn: Callable[[pd.DataFrame], pd.DataFrame],
     input_file: Path,
-    output_file: Path | None,
+    output_file: Path,
     suffix: str,
+    desc: str,
 ) -> None:
     """
-    Read with read_df, apply scaler_fn, write with _write_df.
-    If output_file is None, defaults to cwd / f"{stem}_{suffix}.csv"."""
-    df = read_df(input_file)
-    df_out = scaler_fn(df.copy())
-    if output_file is None:
-        stem = input_file.stem if input_file != Path("-") else "stdin"
-        output_file = Path.cwd() / f"{stem}_{suffix}.csv"
-    _write_df(df_out, output_file)
+    Read via read_df, apply scaler_fn, then write via write_csv—
+    all with a 3-step tqdm progress bar (read, transform, write).
+    If output_file == Path('-'), write the final CSV to stdout.
+    """
+    with tqdm(total=3, desc=desc, colour="green") as pbar:
+        # 1) Read
+        df = read_df(input_file)
+        pbar.update(1)
+
+        # 2) Transform
+        df_out = scaler_fn(df)
+        pbar.update(1)
+
+        # 3) Write
+        if output_file == Path("-"):
+            df_out.to_csv(sys.stdout.buffer, index=False)
+            logger.success("CSV written to stdout.")
+        else:
+            write_csv(
+                df_out,
+                prefix=input_file.stem,
+                suffix=suffix,
+                output_dir=output_file,
+            )
+        pbar.update(1)
 
 
 def apply_normalizer(df: pd.DataFrame) -> pd.DataFrame:
