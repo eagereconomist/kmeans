@@ -10,6 +10,7 @@ from math import ceil
 
 
 from kmflow.plots_utils import (
+    _run_plot_with_progress,
     _apply_cubehelix_style,
     _ensure_unique_path,
     bar_plot,
@@ -57,33 +58,19 @@ def barplt(
     """
     Bar plot of <numeric_col> by <category_col>, with stdin/stdout or file I/O.
     """
-    if input_file == Path("-"):
-        df = pd.read_csv(sys.stdin)
-    else:
-        df = pd.read_csv(input_file)
-    bar_plot(
-        df=df,
-        numeric_col=numeric_col,
-        category_col=category_col,
-        output_path=Path("dummy_path.png"),
-        orientation=orientation,
-        save=save,
+    default_name = f"{category_col.capitalize()}_by_{numeric_col.capitalize()}_barplot.png"
+    _run_plot_with_progress(
+        name="Barplot",
+        input_file=input_file,
+        plot_fn=bar_plot,
+        kwargs={
+            "numeric_col": numeric_col,
+            "category_col": category_col,
+            "orient": orientation,
+        },
+        output_file=output_file,
+        default_name=default_name,
     )
-    fig = plt.gcf()
-    if output_file is None:
-        output_file = Path.cwd() / f"{category_col}_by_{numeric_col}_barplot.png"
-    if output_file == Path("-"):
-        fig.savefig(sys.stdout.buffer, format="png")
-        logger.success("Bar plot PNG written to stdout.")
-    elif save:
-        out_path = _ensure_unique_path(output_file)
-        fig.savefig(out_path)
-        plt.close(fig)
-        logger.success(f"Bar plot saved to {out_path!r}")
-    else:
-        plt.show()
-        plt.close(fig)
-        logger.success("Bar plot displayed (not saved).")
 
 
 @app.command("hist")

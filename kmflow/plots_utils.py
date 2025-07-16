@@ -1,15 +1,30 @@
-import numpy as np
-import matplotlib.pyplot as plt
+import re
+import sys
 from pathlib import Path
 from typing import Optional, Sequence
-from matplotlib.lines import Line2D
-from matplotlib.colors import Normalize
+from typing import Callable
+from tqdm import tqdm
+
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import statsmodels.api as sm
-import re
+import matplotlib.pyplot as plt
 import plotly.express as px
 import plotly.graph_objects as go
+
+from matplotlib.colors import Normalize
+from matplotlib.lines import Line2D
+
+__all__ = [
+    "_run_plot_with_progress",
+    "_init_fig",
+    "_apply_cubehelix_style",
+    "_set_axis_bounds",
+    "_prepare_category",
+    "_ensure_unique_path",
+    "_save_fig",
+]
 
 
 sns.set_theme(
@@ -17,6 +32,41 @@ sns.set_theme(
     font_scale=1.2,
     rc={"axes.spines.right": False, "axes.spines.top": False},
 )
+
+
+def _run_plot_with_progress(
+    name: str,
+    input_file: Path,
+    plot_fn: Callable[..., plt.Figure],
+    kwargs: dict,
+    output_file: Path | None,
+    default_name: str,
+):
+    """
+    3-step progress:
+      1) load data
+      2) call plot_fn(df=…, **kwargs, output_path, save)
+      3) plot_fn writes or displays itself
+    """
+    with tqdm(total=3, desc=name, colour="green") as pbar:
+        # 1) load
+        df = pd.read_csv(sys.stdin) if input_file == Path("-") else pd.read_csv(input_file)
+        pbar.update(1)
+
+        # 2) decide the single output path
+        out_path = output_file if output_file is not None else Path.cwd() / default_name
+
+        # 3) call the plot util exactly once
+        plot_fn(
+            df=df,
+            **kwargs,
+            output_path=out_path,
+            save=(output_file != Path("-")),  # save=False if writing to stdout
+        )
+        pbar.update(1)
+
+        # 4) if writing to stdout, the plot util should have done fig.savefig(sys.stdout.buffer)
+        pbar.update(1)
 
 
 def _init_fig(figsize=(20, 14)):
