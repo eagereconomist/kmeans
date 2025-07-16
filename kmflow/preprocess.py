@@ -41,11 +41,11 @@ def iqr_cli(
         None,
         "--output-dir",
         "-o",
-        help="Directory in which to save output CSVs.",
+        help="Directory in which to save output CSVs; use '-' for stdout.",
     ),
 ):
     """
-    Identify IQR-based outliers, report them, and optionally export or remove them.
+    Identify IQR-based outliers, report count, and optionally export or remove them.
     """
     df = read_df(input_file)
     out = find_iqr_outliers(df)
@@ -57,8 +57,18 @@ def iqr_cli(
     out_df = out.reset_index().rename(
         columns={"level_0": "row_index", "level_1": "column", 0: "outlier_value"}
     )
-    typer.echo("\nDetected IQR outliers:")
-    typer.echo(out_df)
+
+    if output_dir is None:
+        output_dir = INTERIM_DATA_DIR
+
+    # If the user didn't ask to export or remove, just log a summary and exit
+    if not export_outliers and not remove_outliers:
+        count = out_df.shape[0]
+        logger.info(
+            f"{count} IQR outliers detected. "
+            "Use --export-outliers (Shorthand: -eo) to save them or --remove-outliers (Shorthand: -ro) to drop them."
+        )
+        return
 
     if export_outliers:
         if output_dir == Path("-"):
