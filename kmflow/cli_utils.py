@@ -3,6 +3,13 @@ from pathlib import Path
 import pandas as pd
 from loguru import logger
 
+__all__ = [
+    "_write_df",
+    "read_df",
+    "comma_split",
+    "comma_split_int",
+]
+
 
 # ─── Send all loguru output to stderr ─────────────────────────────────────────────────────
 logger.remove()
@@ -13,6 +20,14 @@ logger.add(
     "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - {message}",
     colorize=True,
 )
+
+
+def comma_split(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def comma_split_int(value: str) -> list[int]:
+    return [int(item.strip()) for item in value.split(",") if item.strip()]
 
 
 def _write_df(df: pd.DataFrame, output_file: Path) -> None:
