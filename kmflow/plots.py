@@ -150,12 +150,15 @@ def scatter_cmd(
 @app.command("boxplot")
 def boxplt(
     input_file: Path = typer.Argument(..., help="Path to CSV file, or '-' to read from stdin."),
-    numeric_col: str = typer.Argument(..., help="Numeric column for the box plot."),
-    category_col: Optional[str] = typer.Option(
-        None, "--category-col", "-c", help="Column to group by (one box per category)."
+    category_col: Optional[str] = typer.Argument(
+        ..., help="Column to group by (one box per category)."
     ),
+    numeric_col: str = typer.Argument(..., help="Numeric column for the box plot."),
     patterns: Optional[List[str]] = typer.Option(
-        None, "--pattern", "-p", help="Comma-separated regex pattern(s) to filter categories."
+        None,
+        "--pattern",
+        "-p",
+        help="Comma-separated regex pattern(s) to filter categories. For ex: 'Price, Quantity'",
     ),
     orientation: str = typer.Option("v", "--orientation", "-a", help="Orientation: 'v' or 'h'."),
     save: bool = typer.Option(
@@ -171,40 +174,22 @@ def boxplt(
     """
     Box plot of `numeric_col`, optionally grouped by `category_col` and filtered by `patterns`.
     """
-    if input_file == Path("-"):
-        df = pd.read_csv(sys.stdin)
-    else:
-        df = pd.read_csv(input_file)
-        if category_col is None:
-            mode = "all"
-        elif patterns:
-            mode = f"filtered_{category_col}"
-        else:
-            mode = f"by_{category_col}"
-        default_name = f"{mode}_{numeric_col}_boxplot.png"
-        output_file = Path.cwd() / default_name
-    output_file = _ensure_unique_path(output_file)
-    box_plot(
-        df=df,
-        numeric_col=numeric_col,
-        output_path=output_file,
-        category_col=category_col,
-        patterns=patterns[0].split(", ") if patterns else None,
-        orientation=orientation,
+    default_name = f"{(f'filtered_{category_col}' if patterns else (f'by_{category_col}' if category_col else 'all'))}_{numeric_col}_boxplot.png"  # new
+
+    _run_plot_with_progress(
+        name="Boxplot",
+        input_file=input_file,
+        plot_fn=box_plot,
+        kwargs={
+            "numeric_col": numeric_col,
+            "category_col": category_col,
+            "patterns": patterns[0].split(", ") if patterns else None,
+            "orient": orientation,
+        },
+        output_file=output_file,
+        default_name=default_name,
         save=save,
     )
-    fig = plt.gcf()
-    if output_file == Path("-"):
-        fig.savefig(sys.stdout.buffer, format="png")
-        logger.success("Box plot PNG written to stdout.")
-    elif save:
-        fig.savefig(output_file)
-        plt.close(fig)
-        logger.success(f"Box plot saved to {output_file!r}")
-    else:
-        plt.show()
-        plt.close(fig)
-        logger.success("Box plot displayed (not saved).")
 
 
 @app.command("violin")
