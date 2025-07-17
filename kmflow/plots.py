@@ -276,13 +276,13 @@ def corr_heatmap(
 
 
 @app.command("qq")
-def qq_cmd(
+def qq_plt(
     input_file: Path = typer.Argument(..., help="CSV file path or '-' to read from stdin."),
     numeric_col: Optional[str] = typer.Option(
         None,
         "--numeric-col",
         "-numeric-col",
-        help="Numeric column for single Q-Q plot only, (omit when using --all).",
+        help="Numeric column for Q-Q plot, ex: 'Price, Quantity', (omit when using --all).",
     ),
     all_cols: bool = typer.Option(
         False, "--all", "-a", help="Generate Q-Q plots for all numeric columns."
@@ -377,29 +377,21 @@ def inertia(
     """
     Elbow plot of K-Means inertia versus number of clusters.
     """
-    if input_file == Path("-"):
-        df = pd.read_csv(sys.stdin)
-    else:
-        df = pd.read_csv(input_file)
-    if output_file is None:
-        output_file = Path.cwd() / "inertia.png"
-    output_file = _ensure_unique_path(output_file)
-    fig = inertia_plot(
-        inertia_df=df,
-        output_path=output_file,
+    default_name = "inertia.png"
+
+    _run_plot_with_progress(
+        name="Inertia",
+        input_file=input_file,
+        plot_fn=lambda df, output_path, save: inertia_plot(
+            inertia_df=df,
+            output_path=output_path,
+            save=save,
+        ),
+        kwargs={},
+        output_file=output_file,
+        default_name=default_name,
         save=save,
     )
-    if output_file == Path("-"):
-        fig.savefig(sys.stdout.buffer, format="png")
-        logger.success("Elbow plot PNG written to stdout.")
-    elif save:
-        fig.savefig(output_file)
-        plt.close(fig)
-        logger.success(f"Elbow plot saved to {output_file!r}")
-    else:
-        plt.show()
-        plt.close(fig)
-        logger.success("Elbow plot displayed (not saved).")
 
 
 @app.command("silhouette")
