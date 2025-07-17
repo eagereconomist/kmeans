@@ -74,7 +74,7 @@ def barplot(
     )
 
 
-@app.command("hist")
+@app.command("histogram")
 def hist(
     input_file: Path = typer.Argument(..., help="Path to CSV file, or '-' to read from stdin."),
     x_axis: str = typer.Argument(..., help="Column to histogram."),
@@ -95,33 +95,20 @@ def hist(
     """
     Histogram of <x_axis> with optional stdin/stdout and save/display control.
     """
-    if input_file == Path("-"):
-        df = pd.read_csv(sys.stdin)
-    else:
-        df = pd.read_csv(input_file)
-    histogram(
-        df=df,
-        num_bins=num_bins,
-        x_axis=x_axis,
-        output_path=Path("dummy_path.png"),
+    default_name = f"{x_axis}_hist.png"
+
+    _run_plot_with_progress(
+        name="Histogram",
+        input_file=input_file,
+        plot_fn=histogram,
+        kwargs={
+            "num_bins": num_bins,
+            "x_axis": x_axis,
+        },
+        output_file=output_file,
+        default_name=default_name,
         save=save,
     )
-    fig = plt.gcf()
-    if output_file is None:
-        default_name = f"{x_axis}_hist.png"
-        output_file = Path.cwd() / default_name
-    if output_file == Path("-"):
-        fig.savefig(sys.stdout.buffer, format="png")
-        logger.success("Histogram PNG written to stdout.")
-    elif save:
-        out_path = _ensure_unique_path(output_file)
-        fig.savefig(out_path)
-        plt.close(fig)
-        logger.success(f"Histogram saved to {out_path!r}")
-    else:
-        plt.show()
-        plt.close(fig)
-        logger.success("Histogram displayed (not saved).")
 
 
 @app.command("scatter")
