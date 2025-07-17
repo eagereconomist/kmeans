@@ -439,35 +439,27 @@ def scree(
         None,
         "--output-file",
         "-o",
-        help="Path for the PNG output; use '-' for stdout.",
+        help="Path for the PNG output; use '-' to write image to stdout.",
     ),
 ):
     """
     Scree plot of proportion variance explained by each principal component.
     """
-    if input_file == Path("-"):
-        df = pd.read_csv(sys.stdin)
-    else:
-        df = pd.read_csv(input_file)
-    if output_file is None:
-        output_file = Path.cwd() / "scree.png"
-    output_file = _ensure_unique_path(output_file)
-    fig = scree_plot(
-        df=df,
-        output_path=output_file,
+    default_name = "scree.png"
+
+    _run_plot_with_progress(
+        name="Scree",
+        input_file=input_file,
+        plot_fn=lambda df, output_path, save: scree_plot(
+            df=df,
+            output_path=output_path,
+            save=save,
+        ),
+        kwargs={},
+        output_file=output_file,
+        default_name=default_name,
         save=save,
     )
-    if output_file == Path("-"):
-        fig.savefig(sys.stdout.buffer, format="png")
-        logger.success("Scree plot PNG written to stdout.")
-    elif save:
-        fig.savefig(output_file)
-        plt.close(fig)
-        logger.success(f"Scree plot saved to {output_file!r}")
-    else:
-        plt.show()
-        plt.close(fig)
-        logger.success("Scree plot displayed (not saved).")
 
 
 @app.command("cpv")
