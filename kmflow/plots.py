@@ -133,7 +133,7 @@ def scatterplot(
     default_name = f"{x_axis}_vs_{y_axis}_scatter.png"
 
     _run_plot_with_progress(
-        name="Scatter",
+        name="Scatter plot",
         input_file=input_file,
         plot_fn=scatter_plot,
         kwargs={
@@ -265,7 +265,7 @@ def corr_heatmap(
     default_name = "heatmap.png"
 
     _run_plot_with_progress(
-        name="Heatmap",
+        name="Correlation Heatmap",
         input_file=input_file,
         plot_fn=correlation_heatmap,
         kwargs={},
@@ -448,7 +448,7 @@ def scree(
     default_name = "scree.png"
 
     _run_plot_with_progress(
-        name="Scree",
+        name="Proportion of Variance (Scree)",
         input_file=input_file,
         plot_fn=lambda df, output_path, save: scree_plot(
             df=df,
@@ -480,22 +480,17 @@ def cpv(
     """
     Plot cumulative proportion of variance explained by principal components.
     """
-    df = pd.read_csv(sys.stdin) if input_file == Path("-") else pd.read_csv(input_file)
-    if output_file is None:
-        output_file = Path.cwd() / "cumulative_prop_var.png"
-    output_file = _ensure_unique_path(output_file)
-    fig = cumulative_var_plot(df=df, output_path=output_file, save=save)
-    if output_file == Path("-"):
-        fig.savefig(sys.stdout.buffer, format="png")
-        logger.success("Cumulative variance plot PNG written to stdout.")
-    elif save:
-        fig.savefig(output_file)
-        plt.close(fig)
-        logger.success(f"Cumulative variance plot saved to {output_file!r}")
-    else:
-        plt.show()
-        plt.close(fig)
-        logger.success("Cumulative variance plot displayed (not saved).")
+    default_name = "cumulative_prop_var.png"
+
+    _run_plot_with_progress(
+        name="Proportion of Cumulative Variance",
+        input_file=input_file,
+        plot_fn=cumulative_var_plot,
+        kwargs={},
+        output_file=output_file,
+        default_name=default_name,
+        save=save,
+    )
 
 
 @app.command("cluster")
