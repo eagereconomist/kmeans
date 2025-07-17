@@ -412,25 +412,19 @@ def silhouette(
     """
     Plot silhouette score versus number of clusters.
     """
-    if input_file == Path("-"):
-        df = pd.read_csv(sys.stdin)
-    else:
-        df = pd.read_csv(input_file)
-    if output_file is None:
-        output_file = Path.cwd() / "silhouette.png"
-    output_file = _ensure_unique_path(output_file)
-    fig = silhouette_plot(silhouette_df=df, output_path=output_file, save=save)
-    if output_file == Path("-"):
-        fig.savefig(sys.stdout.buffer, format="png")
-        logger.success("Silhouette plot PNG written to stdout.")
-    elif save:
-        fig.savefig(output_file)
-        plt.close(fig)
-        logger.success(f"Silhouette plot saved to {output_file!r}")
-    else:
-        plt.show()
-        plt.close(fig)
-        logger.success("Silhouette plot displayed (not saved).")
+    default_name = "silhouette.png"
+
+    _run_plot_with_progress(
+        name="Silhouette",
+        input_file=input_file,
+        plot_fn=lambda df, output_path, save: silhouette_plot(
+            silhouette_df=df, output_path=output_path, save=save
+        ),
+        kwargs={},
+        output_file=output_file,
+        default_name=default_name,
+        save=save,
+    )
 
 
 @app.command("scree")
