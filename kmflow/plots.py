@@ -1,9 +1,9 @@
 from typing import Optional, List
 import sys
 import typer
+from tqdm import tqdm
 from pathlib import Path
 from loguru import logger
-from tqdm import tqdm
 import pandas as pd
 import matplotlib.pyplot as plt
 from math import ceil
@@ -148,7 +148,7 @@ def scatterplot(
 
 
 @app.command("boxplot")
-def boxplt(
+def boxplot(
     input_file: Path = typer.Argument(..., help="Path to CSV file, or '-' to read from stdin."),
     category_col: Optional[str] = typer.Option(
         None, "--category-col", "-c", help="Column to group by (one box per category)."
@@ -193,14 +193,17 @@ def boxplt(
 
 
 @app.command("violin")
-def violinplt(
+def violinplot(
     input_file: Path = typer.Argument(..., help="Path to CSV file, or '-' to read from stdin."),
     category_col: Optional[str] = typer.Option(
         None, "--category-col", "-c", help="Column to group by (one violin per category)."
     ),
     numeric_col: str = typer.Argument(..., help="Numeric column for the violin plot."),
     patterns: Optional[List[str]] = typer.Option(
-        None, "--pattern", "-p", help="Comma-separated regex pattern(s) to filter categories."
+        None,
+        "--pattern",
+        "-p",
+        help="Comma-separated regex pattern(s) to filter categories. For ex: 'Price, Quantity'",
     ),
     orientation: str = typer.Option("v", "--orientation", "-a", help="Orientation: 'v' or 'h'."),
     inner: str = typer.Option(
@@ -244,7 +247,7 @@ def violinplt(
 
 
 @app.command("heatmap")
-def corr_heat(
+def corr_heatmap(
     input_file: Path = typer.Argument(..., help="Path to CSV file, or '-' to read from stdin."),
     save: bool = typer.Option(
         True, "--no-save", "-n", help="Save to file (default) or display only."
@@ -275,7 +278,12 @@ def corr_heat(
 @app.command("qq")
 def qq_cmd(
     input_file: Path = typer.Argument(..., help="CSV file path or '-' to read from stdin."),
-    numeric_col: Optional[str] = typer.Argument(None, help="Numeric column for Q-Q plot."),
+    numeric_col: Optional[str] = typer.Option(
+        None,
+        "--numeric-col",
+        "-numeric-col",
+        help="Numeric column for single Q-Q plot only, (omit when using --all).",
+    ),
     all_cols: bool = typer.Option(
         False, "--all", "-a", help="Generate Q-Q plots for all numeric columns."
     ),
@@ -283,59 +291,69 @@ def qq_cmd(
         True, "--no-save", "-n", help="Save to file (default) or display only."
     ),
     output_file: Optional[Path] = typer.Option(
-        None,
-        "--output-file",
-        "-o",
-        help="Path for PNG output; use '-' for stdout.",
+        None, "--output-file", "-o", help="Path for PNG output; use '-' for stdout."
     ),
 ):
     """
     Generate a Q-Q plot for one numeric column or all numeric columns.
     """
-    if input_file == Path("-"):
-        df = pd.read_csv(sys.stdin)
-    else:
-        df = pd.read_csv(input_file)
+    # ─── Multi-column mode ────────────────────────────────────────────────
     if all_cols:
+        df = pd.read_csv(sys.stdin) if input_file == Path("-") else pd.read_csv(input_file)
         cols = df.select_dtypes(include="number").columns.tolist()
         if not cols:
             raise typer.BadParameter("No numeric columns found.")
-        n = len(cols)
-        ncols = 3
-        nrows = ceil(n / ncols)
-        _apply_cubehelix_style()
-        fig, axes = plt.subplots(nrows, ncols, figsize=(4 * ncols, 4 * nrows))
-        axes_flat = axes.flatten()
-        for i, col in enumerate(tqdm(cols, desc="Q-Q Plots")):
-            qq_plot(df, col, output_path=None, save=save, ax=axes_flat[i])
-            axes_flat[i].set_title(col)
-        for ax in axes_flat[n:]:
-            ax.set_visible(False)
-        fig.suptitle("Q-Q Plots")
-        fig.tight_layout()
-        default_name = "qq_all.png"
-        out = Path.cwd() / default_name if output_file is None else output_file
-    else:
-        if not numeric_col:
-            raise typer.BadParameter("Specify a column via argument or use --all.")
-        if numeric_col not in df.select_dtypes(include="number"):
-            raise typer.BadParameter(f"Column {numeric_col!r} is not numeric.")
-        qq_plot(df, numeric_col, output_path=None, save=save)
-        fig = plt.gcf()
-        default_name = f"{numeric_col}_qq.png"
-        out = Path.cwd() / default_name if output_file is None else output_file
-    out = _ensure_unique_path(out)
-    if out == Path("-"):
-        fig.savefig(sys.stdout.buffer, format="png")
-        logger.success("Q-Q plot PNG written to stdout.")
-    elif save:
-        fig.savefig(out)
-        plt.close(fig)
-        logger.success(f"Q-Q plot saved to {out!r}")
-    else:
-        plt.show()
-        plt.close(fig)
-        logger.success("Q-Q plot displayed (not saved).")
+
+        with tqdm(total=2, desc="Q-Q Plots", colour="green") as pbar:
+            # 1) draw grid
+            _apply_cubehelix_style()
+            n = len(cols)
+            ncols = 3
+            nrows = ceil(n / ncols)
+            fig, axes = plt.subplots(nrows, ncols, figsize=(4 * ncols, 4 * nrows))
+            axes_flat = axes.flatten()
+            for i, col in enumerate(cols):
+                # draw but don't save yet
+                qq_plot(df, col, output_path=None, save=False, ax=axes_flat[i])
+                axes_flat[i].set_title(col)
+            for ax in axes_flat[n:]:
+                ax.set_visible(False)
+            fig.suptitle("Q-Q Plots")
+            fig.tight_layout()
+            pbar.update(1)
+
+            # 2) save/stream/show
+            default_name = "qq_all.png"
+            if output_file == Path("-"):
+                fig.savefig(sys.stdout.buffer, format="png")
+                logger.success("Q-Q plots PNG written to stdout.")
+            elif not save:
+                plt.show()
+                plt.close(fig)
+                logger.success("Q-Q plots displayed (not saved).")
+            else:
+                out = _ensure_unique_path(output_file or Path.cwd() / default_name)
+                fig.savefig(out)
+                plt.close(fig)
+                logger.success(f"Q-Q plots saved to {out!r}")
+            pbar.update(1)
+
+        return
+
+    # ─── Single-column mode ───────────────────────────────────────────────
+    if not numeric_col:
+        raise typer.BadParameter("Specify a column via argument or use --all.")
+
+    default_name = f"{numeric_col}_qq.png"
+    _run_plot_with_progress(
+        name=f"Q-Q Plot: {numeric_col}",
+        input_file=input_file,
+        plot_fn=qq_plot,
+        kwargs={"numeric_col": numeric_col},
+        output_file=output_file,
+        default_name=default_name,
+        save=save,
+    )
 
 
 @app.command("inertia")
