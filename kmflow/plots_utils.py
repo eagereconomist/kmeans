@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional, Sequence
 from typing import Callable
 from tqdm import tqdm
+from loguru import logger
 
 import numpy as np
 import pandas as pd
@@ -37,35 +38,56 @@ sns.set_theme(
 def _run_plot_with_progress(
     name: str,
     input_file: Path,
-    plot_fn: Callable[..., plt.Figure],
+    plot_fn: Callable[..., None],
     kwargs: dict,
     output_file: Path | None,
     default_name: str,
+    save: bool,  # new: accept save flag
 ):
     """
-    3-step progress:
-      1) load data
-      2) call plot_fn(df=…, **kwargs, output_path, save)
-      3) plot_fn writes or displays itself
+    1) load data
+    2) call plot_fn(df=..., output_path=..., save=..., **kwargs)
+    3) if output_file == '-', stream PNG to stdout;
+       elif save=False, show interactively;
+       else, save one file.
     """
     with tqdm(total=3, desc=name, colour="green") as pbar:
-        # 1) load
+        # ─── 1) load ─────────────────────────
         df = pd.read_csv(sys.stdin) if input_file == Path("-") else pd.read_csv(input_file)
         pbar.update(1)
 
-        # 2) decide the single output path
-        out_path = output_file if output_file is not None else Path.cwd() / default_name
+        # ─── 2) decide output path ─────────────
+        if output_file == Path("-"):
+            out_path = Path.cwd() / default_name
+            fn_save = False  # plot_fn shouldn’t attempt to save
+        else:
+            out_path = output_file or Path.cwd() / default_name
+            out_path = _ensure_unique_path(out_path)
+            fn_save = save  # let plot_fn save only if save=True
 
-        # 3) call the plot util exactly once
+        # ─── 3) draw (and maybe save) ──────────
         plot_fn(
             df=df,
-            **kwargs,
             output_path=out_path,
-            save=(output_file != Path("-")),  # save=False if writing to stdout
+            save=fn_save,
+            **kwargs,
         )
         pbar.update(1)
 
-        # 4) if writing to stdout, the plot util should have done fig.savefig(sys.stdout.buffer)
+        # ─── 4) post-process ───────────────────
+        fig = plt.gcf()
+        if output_file == Path("-"):
+            fig.savefig(sys.stdout.buffer, format="png")
+            plt.close(fig)
+            logger.success(f"{name} PNG written to stdout.")
+        elif not save:
+            # interactive display
+            plt.show()
+            plt.close(fig)
+            logger.success(f"{name} displayed (no file saved).")
+        else:
+            # already saved by plot_fn
+            logger.success(f"{name} saved to {out_path!r}")
         pbar.update(1)
 
 

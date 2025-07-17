@@ -37,7 +37,7 @@ app = typer.Typer()
 
 
 @app.command("barplot")
-def barplt(
+def barplot(
     input_file: Path = typer.Argument(..., help="Path to CSV file, or '-' to read from stdin."),
     category_col: str = typer.Argument(..., help="Categorical column (x-axis when vertical)."),
     numeric_col: str = typer.Argument(..., help="Numeric column to plot."),
@@ -70,6 +70,7 @@ def barplt(
         },
         output_file=output_file,
         default_name=default_name,
+        save=save,
     )
 
 
