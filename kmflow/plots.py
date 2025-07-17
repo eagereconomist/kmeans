@@ -18,7 +18,7 @@ from kmflow.plots_utils import (
     scatter_plot,
     box_plot,
     violin_plot,
-    corr_heatmap,
+    correlation_heatmap,
     qq_plot,
     inertia_plot,
     silhouette_plot,
@@ -112,7 +112,7 @@ def hist(
 
 
 @app.command("scatter")
-def scatter_cmd(
+def scatterplot(
     input_file: Path = typer.Argument(..., help="Path to CSV file, or '-' for stdin."),
     x_axis: str = typer.Argument(..., help="X-axis column."),
     y_axis: str = typer.Argument(..., help="Y-axis column."),
@@ -150,8 +150,8 @@ def scatter_cmd(
 @app.command("boxplot")
 def boxplt(
     input_file: Path = typer.Argument(..., help="Path to CSV file, or '-' to read from stdin."),
-    category_col: Optional[str] = typer.Argument(
-        ..., help="Column to group by (one box per category)."
+    category_col: Optional[str] = typer.Option(
+        None, "--category-col", "-c", help="Column to group by (one box per category)."
     ),
     numeric_col: str = typer.Argument(..., help="Numeric column for the box plot."),
     patterns: Optional[List[str]] = typer.Option(
@@ -195,10 +195,10 @@ def boxplt(
 @app.command("violin")
 def violinplt(
     input_file: Path = typer.Argument(..., help="Path to CSV file, or '-' to read from stdin."),
-    numeric_col: str = typer.Argument(..., help="Numeric column for the violin plot."),
     category_col: Optional[str] = typer.Option(
         None, "--category-col", "-c", help="Column to group by (one violin per category)."
     ),
+    numeric_col: str = typer.Argument(..., help="Numeric column for the violin plot."),
     patterns: Optional[List[str]] = typer.Option(
         None, "--pattern", "-p", help="Comma-separated regex pattern(s) to filter categories."
     ),
@@ -219,41 +219,28 @@ def violinplt(
     """
     Violin plot of `numeric_col`, optionally grouped by `category_col` and filtered by `patterns`.
     """
-    if input_file == Path("-"):
-        df = pd.read_csv(sys.stdin)
-    else:
-        df = pd.read_csv(input_file)
-        if category_col is None:
-            mode = "all"
-        elif patterns:
-            mode = f"filtered_{category_col}"
-        else:
-            mode = f"by_{category_col}"
-        default_name = f"{mode}_{numeric_col}_violin.png"
-        output_file = Path.cwd() / default_name
-    output_file = _ensure_unique_path(output_file)
-    violin_plot(
-        df=df,
-        numeric_col=numeric_col,
-        output_path=output_file,
-        category_col=category_col,
-        patterns=patterns[0].split(", ") if patterns else None,
-        orientation=orientation,
-        inner=inner,
+    # build default filename based on flags
+    default_name = (
+        f"{'filtered_' + category_col if patterns else ('by_' + category_col if category_col else 'all')}"
+        f"_{numeric_col}_violin.png"
+    )
+
+    # delegate to shared helper
+    _run_plot_with_progress(
+        name="Violin",
+        input_file=input_file,
+        plot_fn=violin_plot,
+        kwargs={
+            "numeric_col": numeric_col,
+            "category_col": category_col,
+            "patterns": patterns[0].split(", ") if patterns else None,
+            "orient": orientation,
+            "inner": inner,
+        },
+        output_file=output_file,
+        default_name=default_name,
         save=save,
     )
-    fig = plt.gcf()
-    if output_file == Path("-"):
-        fig.savefig(sys.stdout.buffer, format="png")
-        logger.success("Violin plot PNG written to stdout.")
-    elif save:
-        fig.savefig(output_file)
-        plt.close(fig)
-        logger.success(f"Violin plot saved to {output_file!r}")
-    else:
-        plt.show()
-        plt.close(fig)
-        logger.success("Violin plot displayed (not saved).")
 
 
 @app.command("heatmap")
@@ -280,7 +267,7 @@ def corr_heat(
         default_name = "heatmap.png"
         output_file = Path.cwd() / default_name
     output_file = _ensure_unique_path(output_file)
-    corr_heatmap(df=df, output_path=output_file, save=save)
+    correlation_heatmap(df=df, output_path=output_file, save=save)
     fig = plt.gcf()
     if output_file == Path("-"):
         fig.savefig(sys.stdout.buffer, format="png")

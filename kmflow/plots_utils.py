@@ -395,7 +395,7 @@ def violin_plot(
     return df_plot
 
 
-def corr_heatmap(
+def correlation_heatmap(
     df: pd.DataFrame,
     output_path: Path,
     save: bool = True,
