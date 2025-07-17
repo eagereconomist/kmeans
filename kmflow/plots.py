@@ -259,27 +259,17 @@ def corr_heat(
     """
     Correlation matrix heatmap for all numeric features in the data.
     """
-    if input_file == Path("-"):
-        df = pd.read_csv(sys.stdin)
-    else:
-        df = pd.read_csv(input_file)
-    if output_file is None:
-        default_name = "heatmap.png"
-        output_file = Path.cwd() / default_name
-    output_file = _ensure_unique_path(output_file)
-    correlation_heatmap(df=df, output_path=output_file, save=save)
-    fig = plt.gcf()
-    if output_file == Path("-"):
-        fig.savefig(sys.stdout.buffer, format="png")
-        logger.success("Heatmap PNG written to stdout.")
-    elif save:
-        fig.savefig(output_file)
-        plt.close(fig)
-        logger.success(f"Heatmap saved to {output_file!r}")
-    else:
-        plt.show()
-        plt.close(fig)
-        logger.success("Heatmap displayed (not saved).")
+    default_name = "heatmap.png"
+
+    _run_plot_with_progress(
+        name="Heatmap",
+        input_file=input_file,
+        plot_fn=correlation_heatmap,
+        kwargs={},
+        output_file=output_file,
+        default_name=default_name,
+        save=save,
+    )
 
 
 @app.command("qq")
