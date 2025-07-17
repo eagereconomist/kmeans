@@ -130,34 +130,21 @@ def scatter_cmd(
     """
     Scatter plot of x vs y, with optional stdin/stdout and save/display control.
     """
-    if input_file == Path("-"):
-        df = pd.read_csv(sys.stdin)
-    else:
-        df = pd.read_csv(input_file)
-    scatter_plot(
-        df=df,
-        x_axis=x_axis,
-        y_axis=y_axis,
-        output_path=Path("dummy_path.png"),
-        scale=scale,
+    default_name = f"{x_axis}_vs_{y_axis}_scatter.png"
+
+    _run_plot_with_progress(
+        name="Scatter",
+        input_file=input_file,
+        plot_fn=scatter_plot,
+        kwargs={
+            "x_axis": x_axis,
+            "y_axis": y_axis,
+            "scale": scale,
+        },
+        output_file=output_file,
+        default_name=default_name,
         save=save,
     )
-    fig = plt.gcf()
-    if output_file is None:
-        default_name = f"{x_axis}_vs_{y_axis}_scatter.png"
-        output_file = Path.cwd() / default_name
-    if output_file == Path("-"):
-        fig.savefig(sys.stdout.buffer, format="png")
-        logger.success("Scatter plot PNG written to stdout.")
-    elif save:
-        out_path = _ensure_unique_path(output_file)
-        fig.savefig(out_path)
-        plt.close(fig)
-        logger.success(f"Scatter plot saved to {out_path!r}")
-    else:
-        plt.show()
-        plt.close(fig)
-        logger.success("Scatter plot displayed (not saved).")
 
 
 @app.command("boxplot")
