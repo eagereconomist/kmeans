@@ -29,7 +29,7 @@ def fit_kmeans(
 
 def batch_kmeans(
     df: pd.DataFrame,
-    k_range: Union[Tuple[int, int], range] = (1, 10),
+    k_range: Union[Tuple[int, int], range] = (1, 20),
     numeric_cols: Optional[Sequence[str]] = None,
     init: str = "k-means++",
     n_init: int = 50,
