@@ -498,48 +498,73 @@ def cluster(
     input_file: Path = typer.Argument(
         ..., help="CSV of clustered data or '-' to read from stdin."
     ),
-    x_axis: Optional[str] = typer.Argument(..., help="Feature for X axis."),
-    y_axis: Optional[str] = typer.Argument(..., help="Feature for Y axis."),
+    x_axis: str = typer.Argument(..., help="Feature for X axis."),
+    y_axis: str = typer.Argument(..., help="Feature for Y axis."),
     cluster_col: str = typer.Argument(..., help="Column with cluster labels."),
     scale: float = typer.Option(1.0, "--scale", "-s", help="Multiplier for x/y axes ranges."),
     save: bool = typer.Option(
         True, "--no-save", "-n", help="Save to file (default) or display only."
     ),
-    output_file: Optional[Path] = typer.Option(
-        None,
-        "--output-file",
-        "-o",
-        help="Output PNG path; use '-' to write image to stdout.",
+    output_file: Path = typer.Option(
+        None, "--output-file", "-o", help="Path for the PNG output; use '-' for stdout."
     ),
 ):
     """
     Scatter plot of X vs. Y colored by cluster labels.
     """
-    # ─── 1) preload data to pick defaults ─────────────────────────────
+    # ─── 1) Load ─────────────────────────────────────────────────────────────────────────
     df = pd.read_csv(sys.stdin) if input_file == Path("-") else pd.read_csv(input_file)
-    numeric_columns = df.select_dtypes(include="number").columns.tolist()
-    x_col = x_axis or numeric_columns[0]
-    y_col = y_axis or (numeric_columns[1] if len(numeric_columns) > 1 else numeric_columns[0])
+    numeric = df.select_dtypes("number").columns.tolist()
+    x_col = x_axis or numeric[0]
+    y_col = y_axis or (numeric[1] if len(numeric) > 1 else numeric[0])
 
     default_name = f"{x_col}_vs_{y_col}_cluster.png"
 
-    _run_plot_with_progress(
-        name="Cluster Scatter",
-        input_file=input_file,
-        plot_fn=lambda df, output_path, save: cluster_scatter(
+    # ─── 2) Interactive only ───────────────────────────────────────────────
+    if not save:
+        ax = cluster_scatter(
             df=df,
             x_axis=x_col,
             y_axis=y_col,
             cluster_col=cluster_col,
             scale=scale,
-            output_path=output_path,
-            save=save,
-        ),
-        kwargs={},
-        output_file=output_file,
-        default_name=default_name,
-        save=save,
-    )
+            save=False,
+            output_path=Path("unused.png"),
+        )
+        plt.show()
+        plt.close(ax.figure)
+        logger.success("Cluster scatter displayed (not saved).")
+        return
+
+    # ─── 3) Determine output path ───────────────────────────────────────────
+    if output_file == Path("-"):
+        # stream PNG to stdout
+        ax = cluster_scatter(
+            df=df,
+            x_axis=x_col,
+            y_axis=y_col,
+            cluster_col=cluster_col,
+            scale=scale,
+            save=False,
+            output_path=Path("unused.png"),
+        )
+        fig = ax.figure
+        fig.savefig(sys.stdout.buffer, format="png")
+        logger.success("Cluster scatter PNG written to stdout.")
+    else:
+        # write to disk
+        out = output_file or (Path.cwd() / default_name)
+        out = _ensure_unique_path(out)
+        cluster_scatter(
+            df=df,
+            x_axis=x_col,
+            y_axis=y_col,
+            cluster_col=cluster_col,
+            scale=scale,
+            save=True,
+            output_path=out,
+        )
+        logger.success(f"Cluster scatter saved to {out!r}")
 
 
 @app.command("3d-cluster")
@@ -547,7 +572,8 @@ def cluster3d(
     input_file: Path = typer.Argument(..., help="Clustered CSV file, or '-' to read from stdin."),
     numeric_cols: Optional[List[str]] = typer.Argument(
         None,
-        help="Exactly three numeric columns; defaults to the first three numeric columns if omitted.",
+        help="Exactly three numeric columns (e.g. 'weight' 'height' 'width'); "
+        "if omitted, defaults to the first three numeric columns.",
     ),
     cluster_col: str = typer.Argument(..., help="Column with cluster labels."),
     scale: float = typer.Option(
@@ -560,42 +586,59 @@ def cluster3d(
         None,
         "--output-file",
         "-o",
-        help="Where to save the PNG; use '-' to write image to stdout.",
+        help="Where to save the PNG; use '-' to write image bytes to stdout.",
     ),
 ):
     """
     3D scatter of three features colored by cluster labels.
     """
-    # 1) read input & pick columns
+    # 1) Load the data so we can pick defaults
     df = pd.read_csv(sys.stdin) if input_file == Path("-") else pd.read_csv(input_file)
+
+    # 2) Determine exactly three numeric features
     cols = numeric_cols or df.select_dtypes(include="number").columns[:3].tolist()
     if len(cols) != 3:
         raise typer.BadParameter("Must specify exactly three numeric columns for 3D.")
-    default_name = "cluster_3d.png"
-    output_file = _ensure_unique_path(output_file or Path.cwd() / default_name)
 
-    # 2) draw + save with progress bar
-    with tqdm(total=2, desc="3D Cluster Scatter", colour="green") as pbar:
-        fig = cluster_scatter_3d(
-            df=df,
-            numeric_cols=cols,
-            cluster_col=cluster_col,
-            scale=scale,
-            output_path=output_file,
-            save=False,  # defer saving until after progress step
-        )
-        pbar.update(1)
+    # 3) Build a default output filename
+    default_name = f"3d_cluster_{cols[0]}_{cols[1]}_{cols[2]}.png"
+    if output_file is None:
+        output_file = Path.cwd() / default_name
+    output_file = _ensure_unique_path(output_file)
 
-        if output_file == Path("-"):
-            fig.write_image(sys.stdout.buffer, format="png")
-            logger.success("3D cluster scatter PNG written to stdout.")
-        elif not save:
-            fig.show(renderer="browser")
-            logger.success("3D cluster scatter opened in browser (not saved).")
-        else:
-            fig.write_image(str(output_file))
-            logger.success(f"3D cluster scatter saved to {output_file!r}")
-        pbar.update(1)
+    # 4) Generate the plot
+    fig = cluster_scatter_3d(
+        df=df,
+        numeric_cols=cols,
+        cluster_col=cluster_col,
+        scale=scale,
+        output_path=output_file,
+        save=save,
+    )
+    # tighten up marker and axes
+    fig.update_traces(marker=dict(size=5, opacity=1))
+    fig.update_layout(
+        legend_title_text="Cluster",
+        scene=dict(
+            xaxis_title=cols[0],
+            yaxis_title=cols[1],
+            zaxis_title=cols[2],
+        ),
+    )
+
+    # 5) Handle save vs display vs stdout
+    if output_file == Path("-"):
+        # stream png bytes
+        fig.write_image(sys.stdout.buffer, format="png")
+        logger.success("3D cluster scatter PNG written to stdout.")
+    elif save:
+        # write out to file
+        fig.write_image(str(output_file))
+        logger.success(f"3D cluster scatter saved to {output_file!r}")
+    else:
+        # open interactive plot
+        fig.show(renderer="browser")
+        logger.success("3D cluster scatter opened in browser (not saved).")
 
 
 @app.command("cluster-subplot")
@@ -614,24 +657,27 @@ def batch_cluster_plot(
         True, "--no-save", "-n", help="Save to file (default) or display only."
     ),
     output_file: Optional[Path] = typer.Option(
-        None, "--output-file", "-o", help="Where to save the PNG; use '-' for stdout."
+        None,
+        "--output-file",
+        "-o",
+        help="Where to save the PNG; use '-' to write image bytes to stdout.",
     ),
 ):
     """
     Create a grid of 2D cluster-colored scatter plots for each column
     starting with `cluster_prefix`.
     """
-    # ─── load once to infer defaults ───────────────────────────
+    # 1) Load the data so we can pick defaults
     df = pd.read_csv(sys.stdin) if input_file == Path("-") else pd.read_csv(input_file)
 
+    # 2) Infer x & y if omitted
     numeric_columns = df.select_dtypes(include="number").columns.tolist()
     if not numeric_columns:
         raise typer.BadParameter("No numeric columns found in the data.")
-
     x_col = x_axis or numeric_columns[0]
     y_col = y_axis or (numeric_columns[1] if len(numeric_columns) > 1 else numeric_columns[0])
 
-    # find all cluster_* columns
+    # 3) Find all cluster_* columns
     cluster_cols = sorted(
         [c for c in df.columns if c.startswith(cluster_prefix)],
         key=lambda c: int(c.replace(cluster_prefix, "")),
@@ -639,26 +685,40 @@ def batch_cluster_plot(
     if not cluster_cols:
         raise typer.BadParameter(f"No columns found with prefix {cluster_prefix!r}")
 
+    # 4) Build a default output filename
     default_name = f"{x_col}_vs_{y_col}_batch.png"
+    if output_file is None:
+        output_file = Path.cwd() / default_name
+    # only uniquify when not streaming to stdout
+    if output_file != Path("-"):
+        output_file = _ensure_unique_path(output_file)
 
-    # ─── draw + save/stream/show under progress bar ────────────
-    _run_plot_with_progress(
-        name="Cluster Subplot",
-        input_file=input_file,
-        plot_fn=lambda df, output_path, save_flag: plot_batch_clusters(
-            df=df,
-            x_axis=x_col,
-            y_axis=y_col,
-            cluster_cols=cluster_cols,
-            output_path=output_path,
-            save=save_flag,
-            scale=scale,
-        ),
-        kwargs={},
-        output_file=output_file,
-        default_name=default_name,
+    # 5) Generate the plot (helper does the heavy lifting)
+    fig = plot_batch_clusters(
+        df=df,
+        x_axis=x_col,
+        y_axis=y_col,
+        cluster_cols=cluster_cols,
+        output_path=output_file,
         save=save,
+        scale=scale,
     )
+
+    # 6) Handle save vs display vs stdout
+    if output_file == Path("-"):
+        # stream PNG bytes to stdout
+        fig.savefig(sys.stdout.buffer, format="png")
+        logger.success("Cluster subplot PNG written to stdout.")
+    elif save:
+        # write to file
+        fig.savefig(str(output_file))
+        plt.close(fig)
+        logger.success(f"Cluster subplot saved to {output_file!r}")
+    else:
+        # pop up interactive window
+        plt.show()
+        plt.close(fig)
+        logger.success("Cluster subplot displayed (not saved).")
 
 
 @app.command("biplot")
@@ -670,17 +730,17 @@ def plot_biplot(
         "-numeric-cols",
         help="Defaults to all numeric columns if omitted.",
     ),
-    compute_scores: bool = typer.Option(
+    skip_scores: bool = typer.Option(
         True,
         "--skip-scores",
-        "-skip-scores",
+        "-ss",
         help="Skip recomputing PC scores (assume df already has PC columns).",
     ),
     pc_x: int = typer.Option(0, "--pc-x", "-x", help="Index of PC for x-axis (0-based)."),
     pc_y: int = typer.Option(1, "--pc-y", "-y", help="Index of PC for y-axis (0-based)."),
     scale: float = typer.Option(1.0, "--scale", "-s", help="Arrow length multiplier."),
-    hue_column: Optional[str] = typer.Option(
-        None, "--hue-column", "-h", help="Column to color points by (optional)."
+    hue_column: Optional[str] = typer.Argument(
+        ..., help="Cluster column in DataFrame to color points by."
     ),
     save: bool = typer.Option(
         True, "--no-save", "-n", help="Save to file (default) or display only."
@@ -692,96 +752,120 @@ def plot_biplot(
     """
     2D Biplot: combines PC scores and loading vectors.
     """
-    # ─── 1) Read once to prevent consuming stdin twice ─────────────────
-    df = pd.read_csv(sys.stdin) if input_file == Path("-") else pd.read_csv(input_file)  # noqa: F841
+    # 1) Load data
+    df = pd.read_csv(sys.stdin) if input_file == Path("-") else pd.read_csv(input_file)
 
-    # ─── 2) Determine default filename ───────────────────────────────
-    default_name = f"biplot_pc{pc_x + 1}_{pc_y + 1}.png"
-
-    # ─── 3) Use shared helper with a small wrapper that computes PCA then calls biplot ───
-    def _plot(df_in: pd.DataFrame, out_path: Path, save_flag: bool):
-        summary = compute_pca_summary(
-            df=df_in, numeric_cols=numeric_cols, hue_column=hue_column, n_components=None
-        )
-        loadings = summary["loadings"]
-        pve = summary["pve"]
-        hue_series = df_in[hue_column] if hue_column else None
-
-        return biplot(
-            df=df_in,
-            loadings=loadings,
-            pve=pve,
-            compute_scores=compute_scores,
-            pc_x=pc_x,
-            pc_y=pc_y,
-            scale=scale,
-            hue=hue_series,
-            save=save_flag,
-            output_path=out_path,
-        )
-
-    _run_plot_with_progress(
-        name="Biplot",
-        input_file=input_file,
-        plot_fn=_plot,
-        kwargs={},
-        output_file=output_file,
-        default_name=default_name,
-        save=save,
+    # 2) Compute PCA summary
+    summary = compute_pca_summary(
+        df=df,
+        numeric_cols=numeric_cols,
+        hue_column=hue_column,
     )
+    loadings = summary["loadings"]
+    pve = summary["pve"]
+    hue_ser = df[hue_column] if hue_column else None
+
+    # 3) Default filename
+    default_name = f"biplot_pc{pc_x + 1}-{pc_y + 1}.png"
+    if output_file is None:
+        output_file = Path.cwd() / default_name
+    # if writing to disk
+    if output_file != Path("-"):
+        output_file = _ensure_unique_path(output_file)
+
+    # 4) Draw
+    fig = biplot(
+        df=df,
+        loadings=loadings,
+        pve=pve,
+        skip_scores=skip_scores,
+        pc_x=pc_x,
+        pc_y=pc_y,
+        scale=scale,
+        hue=hue_ser,
+        save=save,
+        output_path=output_file,
+    )
+
+    # 5) Handle save vs display vs stdout
+    if output_file == Path("-"):
+        logger.success("Biplot PNG written to stdout.")
+        fig.savefig(sys.stdout.buffer, format="png")
+        sys.stdout.buffer.flush()
+    elif save:
+        fig.savefig(str(output_file))
+        plt.close(fig)
+        logger.success(f"Biplot saved to {output_file!r}")
+    else:
+        plt.show()
+        plt.close(fig)
+        logger.success("Biplot displayed (not saved).")
 
 
 @app.command("3d-biplot")
 def plot_3d_biplot(
-    input_file: Path = typer.Argument(..., help="CSV file to read (use '-' to read from stdin)."),
-    numeric_cols: Optional[List[str]] = typer.Argument(
+    input_file: Path = typer.Argument(..., help="CSV file or '-' for stdin."),
+    numeric_cols: list[str] | None = typer.Argument(
         None,
-        help="Exactly three numeric columns (e.g. 'weight' 'height' 'width'); defaults to first three numeric columns if omitted.",
+        help="Exactly three features for PCA; if omitted, uses all numeric columns minus hue.",
     ),
-    hue_column: Optional[str] = typer.Option(
-        None, "--hue-column", "-h", help="Column for coloring samples (excluded from loadings)."
+    hue_column: str | None = typer.Option(
+        None, "--hue-column", "-h", help="Column to color points by (e.g. cluster)."
     ),
-    compute_scores: bool = typer.Option(
+    skip_scores: bool = typer.Option(
         True,
         "--skip-scores",
-        "-skip-scores",
-        help="If set, skip recomputing PC scores (assume df already has PC columns).",
+        "-ss",
+        help="If set, skip recomputing PC scores (assume input already has PC columns).",
     ),
-    pc_x: int = typer.Option(0, "--pc-x", "-x", help="Index of PC for X axis (0-based)."),
-    pc_y: int = typer.Option(1, "--pc-y", "-y", help="Index of PC for Y axis (0-based)."),
-    pc_z: int = typer.Option(2, "--pc-z", "-z", help="Index of PC for Z axis (0-based)."),
-    scale: float = typer.Option(
-        1.0, "--scale", "-s", help="Multiplier for loading arrow lengths."
-    ),
+    pc_x: int = typer.Option(0, "--pc-x", "-x", help="PC for X axis (0-based)."),
+    pc_y: int = typer.Option(1, "--pc-y", "-y", help="PC for Y axis (0-based)."),
+    pc_z: int = typer.Option(2, "--pc-z", "-z", help="PC for Z axis (0-based)."),
+    scale: float = typer.Option(1.0, "--scale", "-s", help="Loading arrow scale."),
     save: bool = typer.Option(
-        True, "--no-save", "-n", help="Save static PNG (default) or display interactive plot."
+        True, "--no-save", "-n", help="Save PNG (default) or open interactive plot."
     ),
-    output_file: Optional[Path] = typer.Option(
-        None, "--output-file", "-o", help="Where to save the PNG; use '-' to write to stdout."
+    output_file: Path | None = typer.Option(
+        None, "--output-file", "-o", help="Where to save PNG; use '-' for stdout."
     ),
 ):
     """
-    3D PCA biplot: scores + loading vectors in three dimensions.
+    3D PCA biplot: sample scores + loading vectors in three dimensions.
     """
     default_name = "3d_biplot.png"
-    # 1) load data  2) draw  3) save/show, all under a tqdm
-    with tqdm(total=3, desc="3D Biplot", colour="green") as pbar:
-        # ─── step 1: read DataFrame ─────────────────────────────
-        df = pd.read_csv(sys.stdin) if input_file == Path("-") else pd.read_csv(input_file)
-        pbar.update(1)
 
-        # ─── step 2: plot ───────────────────────────────────────
-        # determine output path
-        out_path = output_file or (Path.cwd() / default_name)
-        out_path = _ensure_unique_path(out_path)
+    # ─── 1) load DataFrame
+    df = pd.read_csv(sys.stdin) if input_file == Path("-") else pd.read_csv(input_file)
+
+    # ─── 2) pick numeric columns
+    if numeric_cols is None:
+        numerics = df.select_dtypes(include="number").columns.tolist()
+        if hue_column in numerics:
+            numerics.remove(hue_column)
+    else:
+        numerics = numeric_cols
+
+    if skip_scores and len(numerics) < 3:
+        raise typer.BadParameter("Need at least three numeric columns for PCA.")
+
+    # ─── 3) compute PCA once
+    summary = compute_pca_summary(df, numeric_cols=numerics, hue_column=hue_column)
+    loadings = summary["loadings"]
+    pve = summary["pve"]
+
+    # ─── 4) finalize output path
+    out_path = output_file or (Path.cwd() / default_name)
+    out_path = _ensure_unique_path(out_path)
+
+    # ─── 5) build under tqdm
+    with tqdm(total=3, desc="3D Biplot", colour="green") as pbar:
+        pbar.update(1)
         fig = biplot_3d(
             df=df,
-            loadings=compute_pca_summary(df, numeric_cols=numeric_cols, hue_column=hue_column)[
-                "loadings"
-            ],
-            pve=compute_pca_summary(df, numeric_cols=numeric_cols, hue_column=hue_column)["pve"],
+            loadings=loadings,
+            pve=pve,
             output_path=out_path,
-            compute_scores=compute_scores,
+            skip_scores=skip_scores,
             pc_x=pc_x,
             pc_y=pc_y,
             pc_z=pc_z,
@@ -791,7 +875,7 @@ def plot_3d_biplot(
         )
         pbar.update(1)
 
-        # ─── step 3: save or stream or display ──────────────────
+        # ─── 6) save / stdout / show
         if out_path == Path("-"):
             fig.write_image(sys.stdout.buffer, format="png")
             logger.success("3D biplot PNG written to stdout.")

@@ -603,7 +603,7 @@ def cluster_scatter_3d(
         width=1000,
         height=1000,
     )
-    if save:
+    if save and output_path != Path("-"):
         output_path.parent.mkdir(parents=True, exist_ok=True)
         fig.write_image(str(output_path))
     return fig
@@ -679,9 +679,8 @@ def plot_batch_clusters(
         fig.delaxes(ax)
 
     fig.tight_layout()
-    if save:
+    if save and (output_path != Path("-")):
         _save_fig(fig, output_path)
-
     return fig
 
 
@@ -689,33 +688,50 @@ def biplot(
     df: pd.DataFrame,
     loadings: pd.DataFrame,
     pve: pd.Series,
-    compute_scores: bool = True,
+    skip_scores: bool = True,
     pc_x: int = 0,
     pc_y: int = 1,
     scale: float = 1.0,
     figsize: tuple[float, float] = (20, 14),
-    hue: Optional[Sequence] = None,
+    hue: Optional[pd.Series] = None,
     save: bool = True,
     output_path: Optional[Path] = None,
 ) -> plt.Figure:
-    feature_cols = loadings.columns.tolist()
-    if compute_scores:
+    # ─── 1) figure out which columns are original features ───────────────────────
+    # If loadings.columns are integers, assume they came unlabeled, so infer them
+    if pd.api.types.is_integer_dtype(loadings.columns):
+        feature_cols = df.select_dtypes(include="number").columns.tolist()
+        # drop the hue/cluster column if present
+        if hue is not None and hasattr(hue, "name"):
+            feature_cols = [c for c in feature_cols if c != hue.name]
+    else:
+        feature_cols = loadings.columns.tolist()
+
+    # ─── 2) compute or grab scores ─────────────────────────────────────────────
+    if skip_scores:
         X = df[feature_cols].values
         scores = X.dot(loadings.values.T)
     else:
+        # assume df itself is PCA-score matrix
         scores = df.values
+
+    # ─── 3) set up axes labels ────────────────────────────────────────────────
     var_x, var_y = pve.iloc[pc_x], pve.iloc[pc_y]
     x_label = f"PC{pc_x + 1} ({var_x:.1%})"
     y_label = f"PC{pc_y + 1} ({var_y:.1%})"
-
     fig, ax = _init_fig(figsize=figsize)
 
+    # ─── 4) plot the points, shifting your clusters up by 1 ────────────────────
     if hue is None:
         ax.scatter(scores[:, pc_x], scores[:, pc_y], alpha=1)
     else:
-        cat_hue = pd.Categorical(hue)
+        # shift from 0-based to 1-based
+        hue_int = pd.to_numeric(hue)
+        hue_one = (hue_int + 1).astype(int)
+        cat_hue = pd.Categorical(hue_one)
         codes = cat_hue.codes
         categories = cat_hue.categories
+
         cmap = plt.get_cmap("tab10")
         norm = Normalize(vmin=0, vmax=len(categories) - 1)
 
@@ -728,11 +744,12 @@ def biplot(
         labels = [str(cat) for cat in categories]
         ax.legend(handles, labels, title="Cluster", loc="best")
 
+    # ─── 5) finish styling ────────────────────────────────────────────────────
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
     ax.set_title(f"Biplot (k={hue.name.split('_')[-1]})", pad=40, fontdict={"fontsize": 30})
 
-    if compute_scores:
+    if skip_scores:
         for k, feature in enumerate(feature_cols):
             x_arr = loadings.iat[pc_x, k] * scale
             y_arr = loadings.iat[pc_y, k] * scale
@@ -748,7 +765,8 @@ def biplot(
             )
             ax.text(x_arr * 1.1, y_arr * 1.1, feature, fontsize=10)
 
-    if save and output_path is not None:
+    # ─── 6) save if requested ─────────────────────────────────────────────────
+    if save and output_path is not None and output_path != Path("-"):
         _save_fig(fig, output_path)
 
     return fig
@@ -759,7 +777,7 @@ def biplot_3d(
     loadings: pd.DataFrame,
     pve: pd.Series,
     output_path: Path,
-    compute_scores: bool = True,
+    skip_scores: bool = True,
     pc_x: int = 0,
     pc_y: int = 1,
     pc_z: int = 2,
@@ -768,26 +786,31 @@ def biplot_3d(
     save: bool = True,
 ) -> go.Figure:
     feature_cols = loadings.columns.tolist()
-    if len(feature_cols) != 3:
-        raise ValueError("Need exactly three features for a 3D plot.")
-    if compute_scores:
+
+    # 1) compute or assume scores
+    if skip_scores:
         X = df[feature_cols].values
         scores = X.dot(loadings.values.T)
     else:
         scores = df.values
-    x_vals, y_vals, z_vals = scores[:, pc_x], scores[:, pc_y], scores[:, pc_z]
-    x_label = f"PC{pc_x + 1} ({pve.iloc[pc_x]:.1%})"
-    y_label = f"PC{pc_y + 1} ({pve.iloc[pc_y]:.1%})"
-    z_label = f"PC{pc_z + 1} ({pve.iloc[pc_z]:.1%})"
+
+    # 2) build plotly DataFrame
+    x_lab = f"PC{pc_x + 1} ({pve.iloc[pc_x]:.1%})"
+    y_lab = f"PC{pc_y + 1} ({pve.iloc[pc_y]:.1%})"
+    z_lab = f"PC{pc_z + 1} ({pve.iloc[pc_z]:.1%})"
+
     plotly_df = pd.DataFrame(
         {
-            x_label: x_vals,
-            y_label: y_vals,
-            z_label: z_vals,
+            x_lab: scores[:, pc_x],
+            y_lab: scores[:, pc_y],
+            z_lab: scores[:, pc_z],
         }
     )
+
     if hue is not None:
-        hue_str = hue.astype(str).rename("cluster")
+        hue_int = pd.to_numeric(hue, errors="raise")
+        hue_shift = (hue_int + 1).astype(int)
+        hue_str = hue_shift.astype(str).rename("cluster")
         plotly_df["cluster"] = hue_str
         try:
             order = sorted(hue_str.unique(), key=int)
@@ -795,25 +818,35 @@ def biplot_3d(
             order = list(hue_str.unique())
     else:
         order = None
+
+    # 3) build figure
+    title = "3D Biplot"
+    if hue is not None and hue.name:
+        title += f" (k={hue.name.split('_')[-1]})"
+
     fig = px.scatter_3d(
         plotly_df,
-        x=x_label,
-        y=y_label,
-        z=z_label,
+        x=x_lab,
+        y=y_lab,
+        z=z_lab,
         color="cluster" if hue is not None else None,
-        category_orders={"cluster": order} if order is not None else None,
+        category_orders={"cluster": order} if order else None,
         color_discrete_sequence=px.colors.qualitative.T10,
-        labels={x_label: x_label, y_label: y_label, z_label: z_label},
-        title=f"3D Biplot (k={hue.name.split('_')[-1] if hue is not None else ''})",
+        labels={x_lab: x_lab, y_lab: y_lab, z_lab: z_lab},
+        title=title,
         width=1000,
         height=1000,
     )
-    if compute_scores:
-        head_length = scale * 0.04
-        for i, feature in enumerate(feature_cols):
+
+    # 4) add loading vectors + arrowheads + labels
+    if skip_scores:
+        head = scale * 0.04
+        for i, feat in enumerate(feature_cols):
             xi = loadings.iat[pc_x, i] * scale
             yi = loadings.iat[pc_y, i] * scale
             zi = loadings.iat[pc_z, i] * scale
+
+            # vector line
             fig.add_trace(
                 go.Scatter3d(
                     x=[0, xi],
@@ -824,42 +857,44 @@ def biplot_3d(
                     showlegend=False,
                 )
             )
+            # arrowhead
             vec = np.array([xi, yi, zi])
-            length = np.linalg.norm(vec)
-            if length > 0:
-                direction = vec / length
-                ux, uy, uz = direction * head_length
-            else:
-                ux = uy = uz = 0
+            norm = np.linalg.norm(vec)
+            direction = (vec / norm * head) if norm else np.zeros(3)
             fig.add_trace(
                 go.Cone(
                     x=[xi],
                     y=[yi],
                     z=[zi],
-                    u=[ux],
-                    v=[uy],
-                    w=[uz],
+                    u=[direction[0]],
+                    v=[direction[1]],
+                    w=[direction[2]],
                     anchor="tip",
                     sizemode="absolute",
-                    sizeref=head_length,
+                    sizeref=head,
                     showscale=False,
                     colorscale=[[0, "black"], [1, "black"]],
                     showlegend=False,
                 )
             )
+            # label
             fig.add_trace(
                 go.Scatter3d(
                     x=[xi],
                     y=[yi],
                     z=[zi],
                     mode="text",
-                    text=[feature],
+                    text=[feat],
                     textposition="top center",
                     showlegend=False,
                 )
             )
+
         fig.update_layout(legend=dict(title="Cluster", traceorder="normal"))
+
+    # 5) save if requested
     if save and output_path != Path("-"):
         output_path.parent.mkdir(parents=True, exist_ok=True)
         fig.write_image(str(output_path))
+
     return fig
