@@ -34,7 +34,10 @@ def benchmark(
         help="Where to write the merged benchmark CSV; use '-' for stdout (default).",
     ),
     decimals: int = typer.Option(
-        3, "--decimals", "-d", help="Decimal places to round metric values to."
+        3,
+        "--decimals",
+        "-d",
+        help="Decimal places to round metric values to, default is to the nearest thousandths place.",
     ),
 ):
     """
@@ -42,23 +45,30 @@ def benchmark(
     """
     processed_root = DATA_DIR / input_dir
 
-    # gather
-    calinski_df = load_calinski_results(processed_root)
-    davies_df = load_davies_results(processed_root)
+    with tqdm(total=4, desc="Benchmark", colour="green") as pbar:
+        # 1) load calinski
+        calinski_df = load_calinski_results(processed_root)
+        pbar.update(1)
 
-    # merge & round
-    merged = merge_benchmarks(calinski_df, davies_df)
-    merged["calinski"] = merged["calinski"].round(decimals)
-    merged["davies"] = merged["davies"].round(decimals)
+        # 2) load davies
+        davies_df = load_davies_results(processed_root)
+        pbar.update(1)
 
-    # write out
-    if output_file is None or output_file == Path("-"):
-        merged.to_csv(sys.stdout.buffer, index=False)
-        logger.success("Benchmark table written to stdout.")
-    else:
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-        merged.to_csv(output_file, index=False)
-        logger.success(f"Benchmark table saved to {output_file!r}")
+        # 3) merge & round
+        merged = merge_benchmarks(calinski_df, davies_df)
+        merged["calinski"] = merged["calinski"].round(decimals)
+        merged["davies"] = merged["davies"].round(decimals)
+        pbar.update(1)
+
+        # 4) write out
+        if output_file is None or output_file == Path("-"):
+            merged.to_csv(sys.stdout.buffer, index=False)
+            logger.success("Benchmark table written to stdout.")
+        else:
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+            merged.to_csv(output_file, index=False)
+            logger.success(f"Benchmark table saved to {output_file!r}")
+        pbar.update(1)
 
 
 @app.command("inertia")
@@ -101,7 +111,7 @@ def inertia(
         stem = input_file.stem
 
     # 2) compute
-    ks = tqdm(range(start, stop + 1), desc="Inertia")
+    ks = tqdm(range(start, stop + 1), desc="Inertia", colour="green")
     inertia_df = compute_inertia_scores(
         df=df,
         k_range=ks,
@@ -154,7 +164,9 @@ def silhouette(
         df = read_df(DATA_DIR / "processed" / input_file)
         stem = input_file.stem
 
-    ks = tqdm(range(2, df.select_dtypes(include="number").shape[0]), desc="Silhouette")
+    ks = tqdm(
+        range(2, df.select_dtypes(include="number").shape[0]), desc="Silhouette", colour="green"
+    )
     silhouette_df = compute_silhouette_scores(
         df=df,
         numeric_cols=numeric_cols,
@@ -206,7 +218,9 @@ def calinski(
         df = read_df(DATA_DIR / "processed" / input_file)
         stem = input_file.stem
 
-    ks = tqdm(range(2, df.select_dtypes(include="number").shape[0]), desc="Calinski")
+    ks = tqdm(
+        range(2, df.select_dtypes(include="number").shape[0]), desc="Calinski", colour="green"
+    )
     calinski_df = compute_calinski_scores(
         df=df,
         numeric_cols=numeric_cols,
@@ -258,7 +272,7 @@ def davies(
         df = read_df(DATA_DIR / "processed" / input_file)
         stem = input_file.stem
 
-    ks = tqdm(range(2, df.select_dtypes(include="number").shape[0]), desc="Davies")
+    ks = tqdm(range(2, df.select_dtypes(include="number").shape[0]), desc="Davies", colour="green")
     davies_df = compute_davies_scores(
         df=df,
         numeric_cols=numeric_cols,
