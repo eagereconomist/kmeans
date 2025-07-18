@@ -77,7 +77,7 @@ def inertia(
     start: int = typer.Option(1, "--start", "-s", help="Minimum k (inclusive)."),
     stop: int = typer.Option(20, "--stop", "-e", help="Maximum k (inclusive)."),
     random_state: int = typer.Option(
-        4572, "--seed", "-r", help="Random seed for reproducibility."
+        4572, "--seed", "-seed", help="Random seed for reproducibility."
     ),
     n_init: int = typer.Option(50, "--n-init", "-n", help="Number of initializations per k."),
     algorithm: str = typer.Option(
@@ -132,7 +132,7 @@ def inertia(
 def silhouette(
     input_file: Path = typer.Argument(..., help="CSV to read (use '-' for stdin)."),
     random_state: int = typer.Option(
-        4572, "--seed", "-r", help="Random seed for reproducibility."
+        4572, "--seed", "-seed", help="Random seed for reproducibility."
     ),
     n_init: int = typer.Option(50, "--n-init", "-n", help="Number of initializations per k."),
     algorithm: str = typer.Option(
@@ -186,7 +186,7 @@ def silhouette(
 def calinski(
     input_file: Path = typer.Argument(..., help="CSV to read (use '-' for stdin)."),
     random_state: int = typer.Option(
-        4572, "--seed", "-r", help="Random seed for reproducibility."
+        4572, "--seed", "-seed", help="Random seed for reproducibility."
     ),
     n_init: int = typer.Option(50, "--n-init", "-n", help="Number of initializations per k."),
     algorithm: str = typer.Option(
@@ -240,7 +240,7 @@ def calinski(
 def davies(
     input_file: Path = typer.Argument(..., help="CSV to read (use '-' for stdin)."),
     random_state: int = typer.Option(
-        4572, "--seed", "-r", help="Random seed for reproducibility."
+        4572, "--seed", "-seed", help="Random seed for reproducibility."
     ),
     n_init: int = typer.Option(50, "--n-init", "-n", help="Number of initializations per k."),
     algorithm: str = typer.Option(
