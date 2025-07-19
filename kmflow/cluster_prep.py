@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Optional, Dict
-
+from tqdm import tqdm
+from loguru import logger
 import typer
 
 from kmflow.cli_utils import read_df, _write_df
@@ -35,28 +36,42 @@ def cluster_profiles(
     """
     Generate per-cluster summary profiles.
     """
-    # 1) read both tables
-    raw_df = read_df(raw_file)
-    cluster_df = read_df(cluster_file)
-
-    # 2) merge
-    if key_col:
-        merged = raw_df.merge(
-            cluster_df[[key_col, cluster_col]],
-            on=key_col,
-            how="inner",
-        )
-    else:
-        merged = merge_cluster_labels(raw_df, cluster_df, cluster_col)
-
-    # 3) compute profiles
-    profiles = get_cluster_profiles(merged, cluster_col)
-
-    # 4) write out
+    # decide output path up front
     if output_file is None:
         stem = raw_file.stem if raw_file != Path("-") else "stdin"
-        output_file = Path.cwd() / f"{stem}_{cluster_col}_profiles.csv"
-    _write_df(profiles, output_file)
+        out_path = Path.cwd() / f"{stem}_{cluster_col}_profiles.csv"
+    else:
+        out_path = output_file
+
+    with tqdm(total=4, desc="Cluster Profiles", colour="green") as pbar:
+        # 1) read raw
+        raw_df = read_df(raw_file)
+        pbar.update(1)
+
+        # 2) read cluster
+        cluster_df = read_df(cluster_file)
+        pbar.update(1)
+
+        # 3) merge + compute
+        if key_col:
+            merged = raw_df.merge(
+                cluster_df[[key_col, cluster_col]],
+                on=key_col,
+                how="inner",
+            )
+        else:
+            merged = merge_cluster_labels(raw_df, cluster_df, cluster_col)
+        profiles = get_cluster_profiles(merged, cluster_col)
+        pbar.update(1)
+
+        # 4) write out
+        _write_df(profiles, out_path)
+        logger.success(
+            f"Cluster profiles saved to {out_path!r}"
+            if out_path != Path("-")
+            else "Cluster profiles written to stdout."
+        )
+        pbar.update(1)
 
 
 @app.command("map-clusters")
