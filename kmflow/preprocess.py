@@ -5,7 +5,7 @@ from loguru import logger
 from tqdm import tqdm
 import typer
 
-from kmflow.cli_utils import read_df, comma_split, comma_split_int
+from kmflow.cli_utils import read_df, comma_split
 from kmflow.preprocess_utils import (
     find_iqr_outliers,
     compute_pca_summary,
@@ -20,7 +20,7 @@ app = typer.Typer(help="Data preprocessing and PCA-summary commands.")
 
 
 @app.command("outlier")
-def iqr_cli(
+def iqr_outliers(
     input_file: Path = typer.Argument(
         ...,
         help="CSV file to read (use '-' for stdin).",
@@ -45,58 +45,70 @@ def iqr_cli(
     ),
 ):
     """
-    Identify IQR-based outliers, report count, and optionally export or remove them.
+    Identify IQR-based outliers and optionally export and/or remove them.
     """
-    df = read_df(input_file)
-    out = find_iqr_outliers(df)
+    total_steps = 2 + int(export_outliers) + int(remove_outliers)
+    with tqdm(total=total_steps, desc="IQR Outliers", colour="green") as pbar:
+        df = read_df(input_file)
+        pbar.update(1)
 
-    if out.empty:
-        logger.info("No IQR-based outliers detected.")
-        return
+        out = find_iqr_outliers(df)
+        pbar.update(1)
 
-    out_df = out.reset_index().rename(
-        columns={"level_0": "row_index", "level_1": "column", 0: "outlier_value"}
-    )
+        if out.empty:
+            logger.info("No IQR-based outliers detected.")
+            return
 
-    if output_dir is None:
-        output_dir = INTERIM_DATA_DIR
-
-    # If the user didn't ask to export or remove, just log a summary and exit
-    if not export_outliers and not remove_outliers:
-        count = out_df.shape[0]
-        logger.info(
-            f"{count} IQR outliers detected. "
-            "Use --export-outliers (Shorthand: -eo) to save them or --remove-outliers (Shorthand: -ro) to drop them."
+        out_df = out.reset_index().rename(
+            columns={"level_0": "row_index", "level_1": "column", 0: "outlier_value"}
         )
-        return
 
-    if export_outliers:
-        if output_dir == Path("-"):
-            out_df.to_csv(sys.stdout.buffer, index=False)
-            logger.success("Outliers written to stdout.")
-        else:
-            path = write_csv(
-                out_df,
-                prefix=input_file.stem,
-                suffix="iqr_outliers",
-                output_dir=output_dir,
-            )
-            logger.success(f"Outliers written to {path!r}")
+        if output_dir is None:
+            output_dir = INTERIM_DATA_DIR
 
-    if remove_outliers:
-        rows = out_df["row_index"].unique().tolist()
-        cleaned = drop_row(df, rows)
-        if output_dir == Path("-"):
-            cleaned.to_csv(sys.stdout.buffer, index=False)
-            logger.success("Cleaned data written to stdout.")
-        else:
-            path = write_csv(
-                cleaned,
-                prefix=input_file.stem,
-                suffix="no_outliers",
-                output_dir=output_dir,
+        stem = input_file.stem if input_file != Path("-") else "stdin"
+
+        if output_dir == Path("-") and export_outliers and remove_outliers:
+            logger.warning(
+                "You're exporting both outliers and cleaned data to stdout in one stream. "
+                "They'll be concatenated. If you want separate files,\n "
+                "omit '-o - ' so you write two files into the default directory."
             )
-            logger.success(f"Cleaned data written to {path!r}")
+
+        if not remove_outliers and export_outliers:
+            count = out_df.shape[0]
+            logger.info(
+                f"{count} IQR outliers detected. "
+                "Use --remove-outliers (Shorthand: -ro) to identify and remove them."
+            )
+        if export_outliers:
+            if output_dir == Path("-"):
+                out_df.to_csv(sys.stdout.buffer, index=False)
+                logger.success("Detected IQR outlier data written to stdout.")
+            else:
+                path = write_csv(
+                    out_df,
+                    prefix=stem,
+                    suffix="iqr_outliers",
+                    output_dir=output_dir,
+                )
+                logger.success(f"Data written to {path!r}")
+            pbar.update(1)
+        if remove_outliers:
+            rows = out_df["row_index"].unique().tolist()
+            cleaned = drop_row(df, rows)
+            if output_dir == Path("-"):
+                cleaned.to_csv(sys.stdout.buffer, index=False)
+                logger.success("IQR outliers removed and data written to stdout.")
+            else:
+                path = write_csv(
+                    cleaned,
+                    prefix=stem,
+                    suffix="no_outliers",
+                    output_dir=output_dir,
+                )
+                logger.success(f"Data written to {path!r}")
+            pbar.update(1)
 
 
 @app.command("preprocess")
@@ -105,32 +117,25 @@ def preprocess(
         ...,
         help="CSV to read (use '-' for stdin).",
     ),
-    dropped_columns: list[str] = typer.Option(
-        [],
+    dropped_columns: str = typer.Option(
+        "",
         "--dropped-column",
         "-dc",
         help="Columns to drop, comma-separated or repeatable.",
         callback=lambda x: comma_split(x) if isinstance(x, str) else x,
     ),
-    dotless_columns: list[str] = typer.Option(
-        [],
+    dotless_columns: str = typer.Option(
+        "",
         "--dotless-column",
         "-dot",
         help="Columns whose dots to remove, comma-separated or repeatable.",
         callback=lambda x: comma_split(x) if isinstance(x, str) else x,
     ),
-    drop_rows: list[int] = typer.Option(
-        [],
-        "--dropped-row",
-        "-dr",
-        help="Row indices to drop, comma-separated or repeatable.",
-        callback=lambda x: comma_split_int(x) if isinstance(x, str) else x,
-    ),
     preview: bool = typer.Option(
         False,
         "--preview",
         "-p",
-        help="Show first 5 rows of the final DataFrame.",
+        help="Show first 5 rows of the preprocessed DataFrame.",
     ),
     output_file: Path = typer.Option(
         None,
@@ -150,8 +155,6 @@ def preprocess(
         steps.append(("drop_column", drop_column, [col]))
     for col in dotless_columns:
         steps.append(("dotless_column", dotless_column, [col]))
-    for idx in drop_rows:
-        steps.append(("drop_row", drop_row, [[idx]]))
 
     for name, func, args in tqdm(steps, desc="Data Preprocessing Steps", colour="green"):
         logger.info(f"Applying {name}...")
