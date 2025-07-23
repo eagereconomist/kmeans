@@ -8,30 +8,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from math import ceil
 
-
-from kmflow.utils.plots_utils import (
-    _run_plot_with_progress,
-    _apply_cubehelix_style,
-    _ensure_unique_path,
-    bar_plot,
-    histogram,
-    scatter_plot,
-    box_plot,
-    violin_plot,
-    correlation_heatmap,
-    qq_plot,
-    inertia_plot,
-    silhouette_plot,
-    scree_plot,
-    cumulative_var_plot,
-    biplot,
-    biplot_3d,
-    cluster_scatter,
-    cluster_scatter_3d,
-    plot_batch_clusters,
-)
-
-from kmflow.utils.wrangle_utils import compute_pca_summary
+import kmflow.utils.plots_utils as plots_utils
+import kmflow.utils.pca_utils as pca_utils
 
 app = typer.Typer()
 
@@ -59,10 +37,10 @@ def barplot(
     Bar plot of <numeric_col> by <category_col>, with stdin/stdout or file I/O.
     """
     default_name = f"{category_col.capitalize()}_by_{numeric_col.capitalize()}_barplot.png"
-    _run_plot_with_progress(
+    plots_utils.plots_utils._run_plot_with_progress(
         name="Barplot",
         input_file=input_file,
-        plot_fn=bar_plot,
+        plot_fn=plots_utils.bar_plot,
         kwargs={
             "numeric_col": numeric_col,
             "category_col": category_col,
@@ -97,10 +75,10 @@ def hist(
     """
     default_name = f"{x_axis}_hist.png"
 
-    _run_plot_with_progress(
+    plots_utils.plots_utils._run_plot_with_progress(
         name="Histogram",
         input_file=input_file,
-        plot_fn=histogram,
+        plot_fn=plots_utils.histogram,
         kwargs={
             "num_bins": num_bins,
             "x_axis": x_axis,
@@ -132,10 +110,10 @@ def scatterplot(
     """
     default_name = f"{x_axis}_vs_{y_axis}_scatter.png"
 
-    _run_plot_with_progress(
+    plots_utils._run_plot_with_progress(
         name="Scatter plot",
         input_file=input_file,
-        plot_fn=scatter_plot,
+        plot_fn=plots_utils.scatter_plot,
         kwargs={
             "x_axis": x_axis,
             "y_axis": y_axis,
@@ -176,10 +154,10 @@ def boxplot(
     """
     default_name = f"{(f'filtered_{category_col}' if patterns else (f'by_{category_col}' if category_col else 'all'))}_{numeric_col}_boxplot.png"  # new
 
-    _run_plot_with_progress(
+    plots_utils._run_plot_with_progress(
         name="Boxplot",
         input_file=input_file,
-        plot_fn=box_plot,
+        plot_fn=plots_utils.box_plot,
         kwargs={
             "numeric_col": numeric_col,
             "category_col": category_col,
@@ -229,10 +207,10 @@ def violinplot(
     )
 
     # delegate to shared helper
-    _run_plot_with_progress(
+    plots_utils._run_plot_with_progress(
         name="Violin",
         input_file=input_file,
-        plot_fn=violin_plot,
+        plot_fn=plots_utils.violin_plot,
         kwargs={
             "numeric_col": numeric_col,
             "category_col": category_col,
@@ -264,10 +242,10 @@ def corr_heatmap(
     """
     default_name = "heatmap.png"
 
-    _run_plot_with_progress(
+    plots_utils._run_plot_with_progress(
         name="Correlation Heatmap",
         input_file=input_file,
-        plot_fn=correlation_heatmap,
+        plot_fn=plots_utils.correlation_heatmap,
         kwargs={},
         output_file=output_file,
         default_name=default_name,
@@ -306,7 +284,7 @@ def qq_plt(
 
         with tqdm(total=2, desc="Q-Q Plots", colour="green") as pbar:
             # 1) draw grid
-            _apply_cubehelix_style()
+            plots_utils._apply_cubehelix_style()
             n = len(cols)
             ncols = 3
             nrows = ceil(n / ncols)
@@ -314,7 +292,7 @@ def qq_plt(
             axes_flat = axes.flatten()
             for i, col in enumerate(cols):
                 # draw but don't save yet
-                qq_plot(df, col, output_path=None, save=False, ax=axes_flat[i])
+                plots_utils.qq_plot(df, col, output_path=None, save=False, ax=axes_flat[i])
                 axes_flat[i].set_title(col)
             for ax in axes_flat[n:]:
                 ax.set_visible(False)
@@ -332,7 +310,7 @@ def qq_plt(
                 plt.close(fig)
                 logger.success("Q-Q plots displayed (not saved).")
             else:
-                out = _ensure_unique_path(output_file or Path.cwd() / default_name)
+                out = plots_utils._ensure_unique_path(output_file or Path.cwd() / default_name)
                 fig.savefig(out)
                 plt.close(fig)
                 logger.success(f"Q-Q plots saved to {out!r}")
@@ -345,10 +323,10 @@ def qq_plt(
         raise typer.BadParameter("Specify a column via argument or use --all.")
 
     default_name = f"{numeric_col}_qq.png"
-    _run_plot_with_progress(
+    plots_utils._run_plot_with_progress(
         name=f"Q-Q Plot: {numeric_col}",
         input_file=input_file,
-        plot_fn=qq_plot,
+        plot_fn=plots_utils.qq_plot,
         kwargs={"numeric_col": numeric_col},
         output_file=output_file,
         default_name=default_name,
@@ -379,10 +357,10 @@ def inertia(
     """
     default_name = "inertia.png"
 
-    _run_plot_with_progress(
+    plots_utils._run_plot_with_progress(
         name="Inertia",
         input_file=input_file,
-        plot_fn=lambda df, output_path, save: inertia_plot(
+        plot_fn=lambda df, output_path, save: plots_utils.inertia_plot(
             inertia_df=df,
             output_path=output_path,
             save=save,
@@ -414,10 +392,10 @@ def silhouette(
     """
     default_name = "silhouette.png"
 
-    _run_plot_with_progress(
+    plots_utils._run_plot_with_progress(
         name="Silhouette",
         input_file=input_file,
-        plot_fn=lambda df, output_path, save: silhouette_plot(
+        plot_fn=lambda df, output_path, save: plots_utils.silhouette_plot(
             silhouette_df=df, output_path=output_path, save=save
         ),
         kwargs={},
@@ -447,10 +425,10 @@ def scree(
     """
     default_name = "scree.png"
 
-    _run_plot_with_progress(
+    plots_utils._run_plot_with_progress(
         name="Proportion of Variance (Scree)",
         input_file=input_file,
-        plot_fn=lambda df, output_path, save: scree_plot(
+        plot_fn=lambda df, output_path, save: plots_utils.scree_plot(
             df=df,
             output_path=output_path,
             save=save,
@@ -482,10 +460,10 @@ def cpv(
     """
     default_name = "cumulative_prop_var.png"
 
-    _run_plot_with_progress(
+    plots_utils._run_plot_with_progress(
         name="Proportion of Cumulative Variance",
         input_file=input_file,
-        plot_fn=cumulative_var_plot,
+        plot_fn=plots_utils.cumulative_var_plot,
         kwargs={},
         output_file=output_file,
         default_name=default_name,
@@ -515,7 +493,7 @@ def cluster(
     default_name = f"{x_axis}_vs_{y_axis}_cluster.png"
     out_path = output_file or (Path.cwd() / default_name)
     if out_path != Path("-"):
-        out_path = _ensure_unique_path(out_path)
+        out_path = plots_utils._ensure_unique_path(out_path)
 
     with tqdm(total=3, desc="Cluster Scatter", colour="green") as pbar:
         # 1) LOAD
@@ -526,7 +504,7 @@ def cluster(
         pbar.update(1)
 
         # 2) PLOT
-        ax = cluster_scatter(
+        ax = plots_utils.cluster_scatter(
             df=df,
             x_axis=x_col,
             y_axis=y_col,
@@ -591,11 +569,11 @@ def cluster3d(
         if out_path is None:
             out_path = Path.cwd() / default_name
         if out_path != Path("-"):
-            out_path = _ensure_unique_path(out_path)
+            out_path = plots_utils._ensure_unique_path(out_path)
         pbar.update(1)
 
         # ─── 2) PLOT ───────────────────────────────────────────────────────────
-        fig = cluster_scatter_3d(
+        fig = plots_utils.cluster_scatter_3d(
             df=df,
             numeric_cols=cols,
             cluster_col=cluster_col,
@@ -678,12 +656,12 @@ def batch_cluster_plot(
         if out_path is None:
             out_path = Path.cwd() / default_name
         if out_path != Path("-"):
-            out_path = _ensure_unique_path(out_path)
+            out_path = plots_utils._ensure_unique_path(out_path)
 
         pbar.update(1)
 
         # ─── 2) DRAW (helper returns a Matplotlib Figure) ───────────
-        fig = plot_batch_clusters(
+        fig = plots_utils.plot_batch_clusters(
             df=df,
             x_axis=x_col,
             y_axis=y_col,
@@ -744,7 +722,7 @@ def plot_biplot(
     default_name = f"biplot_pc{pc_x + 1}-{pc_y + 1}.png"
     out_path = output_file or (Path.cwd() / default_name)
     if out_path != Path("-"):
-        out_path = _ensure_unique_path(out_path)
+        out_path = plots_utils._ensure_unique_path(out_path)
 
     with tqdm(total=3, desc="Biplot", colour="green") as pbar:
         # 1) LOAD ────────────────────────────────────────────────
@@ -752,7 +730,7 @@ def plot_biplot(
         pbar.update(1)
 
         # 2) DRAW ────────────────────────────────────────────────
-        summary = compute_pca_summary(
+        summary = pca_utils.compute_pca(
             df=df,
             numeric_cols=numeric_cols,
             hue_column=hue_column,
@@ -761,7 +739,7 @@ def plot_biplot(
         pve = summary["pve"]
         hue_ser = df[hue_column] if hue_column else None
 
-        fig = biplot(
+        fig = plots_utils.biplot(
             df=df,
             loadings=loadings,
             pve=pve,
@@ -837,19 +815,19 @@ def plot_3d_biplot(
         raise typer.BadParameter("Need at least three numeric columns for PCA.")
 
     # ─── 3) compute PCA once ───────────────────────────────────
-    summary = compute_pca_summary(df, numeric_cols=numerics, hue_column=hue_column)
+    summary = pca_utils.compute_pca(df, numeric_cols=numerics, hue_column=hue_column)
     loadings = summary["loadings"]
     pve = summary["pve"]
 
     # ─── 4) finalize output path ──────────────────────────────
     out_path = output_file or (Path.cwd() / default_name)
     if out_path != Path("-"):
-        out_path = _ensure_unique_path(out_path)
+        out_path = plots_utils._ensure_unique_path(out_path)
 
     # ─── 5) build & report under tqdm ────────────────────────
     with tqdm(total=3, desc="3D Biplot", colour="green") as pbar:
         # step 1: prepare figure
-        fig = biplot_3d(
+        fig = plots_utils.biplot_3d(
             df=df,
             loadings=loadings,
             pve=pve,
