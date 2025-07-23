@@ -5,9 +5,9 @@ from loguru import logger
 from tqdm import tqdm
 import typer
 
-from kmflow.utils.process_utils import write_csv
-from kmflow.utils.cli_utils import read_df, comma_split
-from kmflow.utils.pca_utils import compute_pca
+import kmflow.utils.process_utils as process_utils
+import kmflow.utils.cli_utils as cli_utils
+import kmflow.utils.pca_utils as pca_utils
 
 
 app = typer.Typer(help="Principal Component Analysis.")
@@ -24,7 +24,7 @@ def pca_summary(
         "--numeric-cols",
         "-numeric-cols",
         help="Numeric columns to include; comma-separated or repeatable.",
-        callback=lambda x: comma_split(x) if isinstance(x, str) else x,
+        callback=lambda x: cli_utils.comma_split(x) if isinstance(x, str) else x,
     ),
     n_components: int = typer.Option(
         None,
@@ -51,7 +51,7 @@ def pca_summary(
     Compute PCA loadings, scores, explained variance, and cumulative variance,
     then write four CSVs with a progress bar.
     """
-    df = read_df(input_file)
+    df = cli_utils.read_df(input_file)
     stem = input_file.stem if input_file != Path("-") else "stdin"
 
     if not numeric_cols:
@@ -59,7 +59,7 @@ def pca_summary(
     else:
         numeric_cols_arg = numeric_cols
 
-    summary = compute_pca(
+    summary = pca_utils.compute_pca(
         df=df,
         numeric_cols=numeric_cols_arg,
         n_components=n_components,
@@ -96,7 +96,9 @@ def pca_summary(
             df_out.to_csv(sys.stdout.buffer, index=False)
             logger.success(f"{desc} written to stdout.")
         else:
-            path = write_csv(df_out, prefix=stem, suffix=suffix, output_dir=output_dir)
+            path = process_utils.write_csv(
+                df_out, prefix=stem, suffix=suffix, output_dir=output_dir
+            )
             logger.success(f"Saved {desc} -> {path!r}")
 
 
