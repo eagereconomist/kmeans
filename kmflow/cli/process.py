@@ -2,15 +2,8 @@ from pathlib import Path
 
 import typer
 
-from kmflow.utils.process_utils import (
-    _run_scaler_with_progress,
-    apply_normalizer,
-    apply_standardization,
-    apply_minmax,
-    apply_log1p,
-    apply_yeo_johnson,
-)
-from kmflow.config import PROCESSED_DATA_DIR
+import kmflow.utils.process_utils as process_utils
+import kmflow.config as config
 
 app = typer.Typer(help="Apply individual scaler to a preprocessed CSV.")
 
@@ -19,15 +12,19 @@ app = typer.Typer(help="Apply individual scaler to a preprocessed CSV.")
 def normalize(
     input_file: Path = typer.Argument(..., help="CSV to read (use '-' to read from stdin)."),
     output_file: Path = typer.Option(
-        PROCESSED_DATA_DIR,
+        config.PROCESSED_DATA_DIR,
         "--output-file",
         "-o",
         help="Where to save normalized CSV; use '-' for stdout. Defaults to processed directory.",
     ),
 ):
     """L2-normalize all numeric columns."""
-    _run_scaler_with_progress(
-        apply_normalizer, input_file, output_file, "norm", desc="Applying Normalize Scaler to Data"
+    process_utils._run_scaler_with_progress(
+        process_utils.apply_normalizer,
+        input_file,
+        output_file,
+        "norm",
+        desc="Applying Normalize Scaler to Data",
     )
 
 
@@ -38,7 +35,7 @@ def standardize(
         help="CSV to read (use '-' to read from stdin).",
     ),
     output_file: Path = typer.Option(
-        PROCESSED_DATA_DIR,
+        config.PROCESSED_DATA_DIR,
         "--output-file",
         "-o",
         help="Where to save standardized CSV; use '-' for stdout. Defaults to processed directory.",
@@ -47,8 +44,8 @@ def standardize(
     """
     Z-score standardize all numeric columns.
     """
-    _run_scaler_with_progress(
-        apply_standardization,
+    process_utils._run_scaler_with_progress(
+        process_utils.apply_standardization,
         input_file,
         output_file,
         "standardized",
@@ -63,7 +60,7 @@ def minmax(
         help="CSV to read (use '-' to read from stdin).",
     ),
     output_file: Path = typer.Option(
-        PROCESSED_DATA_DIR,
+        config.PROCESSED_DATA_DIR,
         "--output-file",
         "-o",
         help="Where to save min-max scaled CSV; use '-' for stdout. Defaults to processed directory.",
@@ -72,8 +69,12 @@ def minmax(
     """
     Scale all numeric columns to [0,1].
     """
-    _run_scaler_with_progress(
-        apply_minmax, input_file, output_file, "minmax", desc="Applying MinMax Scaler to Data"
+    process_utils._run_scaler_with_progress(
+        process_utils.apply_minmax,
+        input_file,
+        output_file,
+        "minmax",
+        desc="Applying MinMax Scaler to Data",
     )
 
 
@@ -84,7 +85,7 @@ def log_scale(
         help="CSV to read (use '-' to read from stdin).",
     ),
     output_file: Path = typer.Option(
-        PROCESSED_DATA_DIR,
+        config.PROCESSED_DATA_DIR,
         "--output-file",
         "-o",
         help="Where to save log1p-transformed CSV; use '-' for stdout. Defaults to processed directory.",
@@ -93,8 +94,8 @@ def log_scale(
     """
     Apply log(1 + x) transform to all numeric columns.
     """
-    _run_scaler_with_progress(
-        apply_log1p,
+    process_utils._run_scaler_with_progress(
+        process_utils.apply_log1p,
         input_file,
         output_file,
         "log_scale",
@@ -109,7 +110,7 @@ def yeo_johnson_scale(
         help="CSV to read (use '-' to read from stdin).",
     ),
     output_file: Path = typer.Option(
-        PROCESSED_DATA_DIR,
+        config.PROCESSED_DATA_DIR,
         "--output-file",
         "-o",
         help="Where to save Yeo-Johnson transformed CSV; use '-' for stdout. Defaults to processed directory.",
@@ -118,8 +119,8 @@ def yeo_johnson_scale(
     """
     Apply Yeo-Johnson transform to all numeric columns.
     """
-    _run_scaler_with_progress(
-        apply_yeo_johnson,
+    process_utils._run_scaler_with_progress(
+        process_utils.apply_yeo_johnson,
         input_file,
         output_file,
         "yeo_johnson",
