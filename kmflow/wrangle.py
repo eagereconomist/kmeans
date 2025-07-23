@@ -6,7 +6,7 @@ from tqdm import tqdm
 import typer
 
 from kmflow.cli_utils import read_df, comma_split
-from kmflow.preprocess_utils import (
+from kmflow.wrangle_utils import (
     find_iqr_outliers,
     drop_column,
     drop_row,

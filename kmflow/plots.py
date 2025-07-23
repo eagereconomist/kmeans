@@ -31,7 +31,7 @@ from kmflow.plots_utils import (
     plot_batch_clusters,
 )
 
-from kmflow.preprocess_utils import compute_pca_summary
+from kmflow.wrangle_utils import compute_pca_summary
 
 app = typer.Typer()
 
