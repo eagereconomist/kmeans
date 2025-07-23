@@ -17,6 +17,8 @@ classifiers = [
 ]
 requires-python = "~=3.13.0"
 
+[project.scripts]
+kmflow = "main.entrypoint:app"
 
 [tool.ruff]
 line-length = 99
