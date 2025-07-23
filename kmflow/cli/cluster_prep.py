@@ -4,13 +4,8 @@ from tqdm import tqdm
 from loguru import logger
 import typer
 
-from kmflow.utils.cli_utils import read_df, _write_df
-from kmflow.utils.cluster_prep_utils import (
-    merge_cluster_labels,
-    clusters_to_labels,
-    count_labels,
-    get_cluster_profiles,
-)
+import kmflow.utils.cli_utils as cli_utils
+import kmflow.utils.cluster_prep_utils as cluster_prep_utils
 
 app = typer.Typer(help="Profile and label K-Means clusters.")
 
@@ -45,11 +40,11 @@ def cluster_profiles(
 
     with tqdm(total=4, desc="Cluster Profiles", colour="green") as pbar:
         # 1) read raw
-        raw_df = read_df(raw_file)
+        raw_df = cli_utils.read_df(raw_file)
         pbar.update(1)
 
         # 2) read cluster
-        cluster_df = read_df(cluster_file)
+        cluster_df = cli_utils.read_df(cluster_file)
         pbar.update(1)
 
         # 3) merge + compute
@@ -60,12 +55,12 @@ def cluster_profiles(
                 how="inner",
             )
         else:
-            merged = merge_cluster_labels(raw_df, cluster_df, cluster_col)
-        profiles = get_cluster_profiles(merged, cluster_col)
+            merged = cluster_prep_utils.merge_cluster_labels(raw_df, cluster_df, cluster_col)
+        profiles = cluster_prep_utils.get_cluster_profiles(merged, cluster_col)
         pbar.update(1)
 
         # 4) write out
-        _write_df(profiles, out_path)
+        cli_utils._write_df(profiles, out_path)
         logger.success(
             f"Cluster profiles saved to {out_path!r}"
             if out_path != Path("-")
@@ -88,7 +83,7 @@ def map_clusters(
     """
     Prompt for human labels per cluster ID, then count.
     """
-    df = read_df(cluster_file)
+    df = cli_utils.read_df(cluster_file)
     unique_ids = sorted(df[cluster_col].unique())
 
     # 1) interactively build mapping
@@ -97,8 +92,8 @@ def map_clusters(
         mapping[cid] = typer.prompt(f"Label for cluster {cid}")
 
     # 2) apply mapping & count
-    labels = clusters_to_labels(df[cluster_col], mapping)
-    counts = count_labels(labels, label_col="cluster_label")
+    labels = cluster_prep_utils.clusters_to_labels(df[cluster_col], mapping)
+    counts = cluster_prep_utils.count_labels(labels, label_col="cluster_label")
 
     # 3) echo mapping & counts
     typer.echo("\nCluster -> Label mapping:")
@@ -112,7 +107,7 @@ def map_clusters(
     if output_file is None:
         stem = cluster_file.stem if cluster_file != Path("-") else "stdin"
         output_file = Path.cwd() / f"{stem}_cluster_counts.csv"
-    _write_df(counts, output_file)
+    cli_utils._write_df(counts, output_file)
 
 
 if __name__ == "__main__":
