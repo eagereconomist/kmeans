@@ -4,8 +4,8 @@ from tqdm import tqdm
 from loguru import logger
 import typer
 
-from kmflow.cli_utils import read_df, _write_df
-from kmflow.cluster_prep_utils import (
+from kmflow.utils.cli_utils import read_df, _write_df
+from kmflow.utils.cluster_prep_utils import (
     merge_cluster_labels,
     clusters_to_labels,
     count_labels,

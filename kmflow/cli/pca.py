@@ -5,9 +5,9 @@ from loguru import logger
 from tqdm import tqdm
 import typer
 
-from kmflow.process_utils import write_csv
-from kmflow.cli_utils import read_df, comma_split
-from kmflow.pca_utils import compute_pca
+from kmflow.utils.process_utils import write_csv
+from kmflow.utils.cli_utils import read_df, comma_split
+from kmflow.utils.pca_utils import compute_pca
 
 
 app = typer.Typer(help="Principal Component Analysis.")

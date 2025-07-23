@@ -10,7 +10,7 @@ from loguru import logger
 from sklearn import preprocessing
 from sklearn.preprocessing import Normalizer, StandardScaler, MinMaxScaler
 
-from cli_utils import read_df
+from kmflow.utils.cli_utils import read_df
 
 __all__ = [
     "_run_scaler_with_progress",

@@ -6,9 +6,9 @@ import typer
 from loguru import logger
 from tqdm import tqdm
 
-from kmflow.cli_utils import read_df, _write_df
+from kmflow.utils.cli_utils import read_df, _write_df
 from kmflow.config import DATA_DIR
-from kmflow.evaluation_utils import (
+from kmflow.utils.evaluation_utils import (
     load_calinski_results,
     load_davies_results,
     merge_benchmarks,

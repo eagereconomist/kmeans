@@ -5,14 +5,14 @@ from loguru import logger
 from tqdm import tqdm
 import typer
 
-from kmflow.cli_utils import read_df, comma_split
-from kmflow.wrangle_utils import (
+from kmflow.utils.cli_utils import read_df, comma_split
+from kmflow.utils.wrangle_utils import (
     find_iqr_outliers,
     drop_column,
     drop_row,
     dotless_column,
 )
-from kmflow.process_utils import write_csv
+from kmflow.utils.process_utils import write_csv
 from kmflow.config import INTERIM_DATA_DIR
 
 app = typer.Typer(help="Data preprocessing commands.")

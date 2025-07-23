@@ -2,7 +2,7 @@ from pathlib import Path
 
 import typer
 
-from kmflow.process_utils import (
+from kmflow.utils.process_utils import (
     _run_scaler_with_progress,
     apply_normalizer,
     apply_standardization,

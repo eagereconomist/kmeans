@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from math import ceil
 
 
-from kmflow.plots_utils import (
+from kmflow.utils.plots_utils import (
     _run_plot_with_progress,
     _apply_cubehelix_style,
     _ensure_unique_path,
@@ -31,7 +31,7 @@ from kmflow.plots_utils import (
     plot_batch_clusters,
 )
 
-from kmflow.wrangle_utils import compute_pca_summary
+from kmflow.utils.wrangle_utils import compute_pca_summary
 
 app = typer.Typer()
 

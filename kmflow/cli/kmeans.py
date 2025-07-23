@@ -5,9 +5,9 @@ import typer
 from loguru import logger
 from tqdm import tqdm
 
-from kmflow.cli_utils import read_df, _write_df
-from kmflow.plots_utils import _ensure_unique_path
-from kmflow.modeling.kmeans_utils import fit_kmeans, batch_kmeans
+from kmflow.utils.cli_utils import read_df, _write_df
+from kmflow.utils.plots_utils import _ensure_unique_path
+from kmflow.utils.kmeans_utils import fit_kmeans, batch_kmeans
 
 app = typer.Typer(help="K-means clustering commands.")
 
