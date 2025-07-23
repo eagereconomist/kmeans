@@ -5,11 +5,11 @@ import typer
 from loguru import logger
 from tqdm import tqdm
 
-from kmflow.utils.cli_utils import read_df, _write_df
-from kmflow.utils.plots_utils import _ensure_unique_path
-from kmflow.utils.kmeans_utils import fit_kmeans, batch_kmeans
+import kmflow.utils.cli_utils as cli_utils
+import kmflow.utils.plots_utils as plots_utils
+import kmflow.utils.kmeans_utils as kmeans_utils
 
-app = typer.Typer(help="K-means clustering commands.")
+app = typer.Typer(help="K-Means clustering commands.")
 
 
 @app.command("fit-km")
@@ -37,15 +37,15 @@ def fit_km_cli(
     default_name = f"{stem}_clustered_{k}.csv"
     out_path = output_file or (Path.cwd() / default_name)
     if out_path != Path("-"):
-        out_path = _ensure_unique_path(out_path)
+        out_path = plots_utils._ensure_unique_path(out_path)
 
     with tqdm(total=3, desc="Fit K-Means", colour="green") as pbar:
         # 1) load
-        df = read_df(input_file)
+        df = cli_utils.read_df(input_file)
         pbar.update(1)
 
         # 2) fit
-        df_out = fit_kmeans(
+        df_out = kmeans_utils.fit_kmeans(
             df=df,
             k=k,
             numeric_cols=numeric_cols,
@@ -58,7 +58,7 @@ def fit_km_cli(
         pbar.update(1)
 
         # 3) write
-        _write_df(df_out, out_path)
+        cli_utils._write_df(df_out, out_path)
         if out_path == Path("-"):
             logger.success("K-means clustering CSV written to stdout.")
         else:
@@ -93,15 +93,15 @@ def batch_km_cli(
     default_name = f"{stem}_batch_km_{suffix}.csv"
     out_path = output_file or (Path.cwd() / default_name)
     if out_path != Path("-"):
-        out_path = _ensure_unique_path(out_path)
+        out_path = plots_utils._ensure_unique_path(out_path)
 
     with tqdm(total=3, desc="Batch K-Means", colour="green") as pbar:
         # 1) load
-        df = read_df(input_file)
+        df = cli_utils.read_df(input_file)
         pbar.update(1)
 
         # 2) batch-fit
-        df_out = batch_kmeans(
+        df_out = kmeans_utils.batch_kmeans(
             df=df,
             k_range=range(start, stop + 1),
             numeric_cols=numeric_cols,
@@ -114,7 +114,7 @@ def batch_km_cli(
         pbar.update(1)
 
         # 3) write
-        _write_df(df_out, out_path)
+        cli_utils._write_df(df_out, out_path)
         if out_path == Path("-"):
             logger.success("Batch K-means clustering CSV written to stdout.")
         else:
