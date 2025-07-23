@@ -5,15 +5,10 @@ from loguru import logger
 from tqdm import tqdm
 import typer
 
-from kmflow.utils.cli_utils import read_df, comma_split
-from kmflow.utils.wrangle_utils import (
-    find_iqr_outliers,
-    drop_column,
-    drop_row,
-    dotless_column,
-)
-from kmflow.utils.process_utils import write_csv
-from kmflow.config import INTERIM_DATA_DIR
+import kmflow.utils.cli_utils as cli_utils
+import kmflow.utils.wrangle_utils as wrangle_utils
+import kmflow.utils.process_utils as process_utils
+import kmflow.config as config
 
 app = typer.Typer(help="Data preprocessing commands.")
 
@@ -48,10 +43,10 @@ def iqr_outliers(
     """
     total_steps = 2 + int(export_outliers) + int(remove_outliers)
     with tqdm(total=total_steps, desc="IQR Outliers", colour="green") as pbar:
-        df = read_df(input_file)
+        df = cli_utils.read_df(input_file)
         pbar.update(1)
 
-        out = find_iqr_outliers(df)
+        out = wrangle_utils.find_iqr_outliers(df)
         pbar.update(1)
 
         if out.empty:
@@ -63,7 +58,7 @@ def iqr_outliers(
         )
 
         if output_dir is None:
-            output_dir = INTERIM_DATA_DIR
+            output_dir = config.INTERIM_DATA_DIR
 
         stem = input_file.stem if input_file != Path("-") else "stdin"
 
@@ -85,7 +80,7 @@ def iqr_outliers(
                 out_df.to_csv(sys.stdout.buffer, index=False)
                 logger.success("Detected IQR outlier data written to stdout.")
             else:
-                path = write_csv(
+                path = process_utils.write_csv(
                     out_df,
                     prefix=stem,
                     suffix="iqr_outliers",
@@ -95,12 +90,12 @@ def iqr_outliers(
             pbar.update(1)
         if remove_outliers:
             rows = out_df["row_index"].unique().tolist()
-            cleaned = drop_row(df, rows)
+            cleaned = wrangle_utils.drop_row(df, rows)
             if output_dir == Path("-"):
                 cleaned.to_csv(sys.stdout.buffer, index=False)
                 logger.success("IQR outliers removed and data written to stdout.")
             else:
-                path = write_csv(
+                path = process_utils.write_csv(
                     cleaned,
                     prefix=stem,
                     suffix="no_outliers",
@@ -121,14 +116,14 @@ def preprocess(
         "--dropped-column",
         "-dc",
         help="Columns to drop, comma-separated or repeatable.",
-        callback=lambda x: comma_split(x) if isinstance(x, str) else x,
+        callback=lambda x: cli_utils.comma_split(x) if isinstance(x, str) else x,
     ),
     dotless_columns: str = typer.Option(
         "",
         "--dotless-column",
         "-dot",
         help="Columns whose dots to remove, comma-separated or repeatable.",
-        callback=lambda x: comma_split(x) if isinstance(x, str) else x,
+        callback=lambda x: cli_utils.comma_split(x) if isinstance(x, str) else x,
     ),
     preview: bool = typer.Option(
         False,
@@ -146,14 +141,14 @@ def preprocess(
     """
     Apply column/row drops and dotless renaming to a CSV. Does NOT handle IQR outliers.
     """
-    df = read_df(input_file)
+    df = cli_utils.read_df(input_file)
     stem = input_file.stem if input_file != Path("-") else "stdin"
 
     steps: list[tuple[str, callable, list]] = []
     for col in dropped_columns:
-        steps.append(("drop_column", drop_column, [col]))
-    for col in dotless_columns:
-        steps.append(("dotless_column", dotless_column, [col]))
+        steps.append(("drop_column", wrangle_utils.drop_column, [col]))
+    for col in wrangle_utils.dotless_columns:
+        steps.append(("dotless_column", wrangle_utils.dotless_column, [col]))
 
     for name, func, args in tqdm(steps, desc="Data Preprocessing Steps", colour="green"):
         logger.info(f"Applying {name}...")
@@ -163,7 +158,7 @@ def preprocess(
         typer.echo(df.head())
 
     if output_file is None:
-        output_file = INTERIM_DATA_DIR / f"{stem}_preprocessed.csv"
+        output_file = config.INTERIM_DATA_DIR / f"{stem}_preprocessed.csv"
 
     if output_file == Path("-"):
         df.to_csv(sys.stdout.buffer, index=False)
