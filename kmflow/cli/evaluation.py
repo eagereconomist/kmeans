@@ -6,17 +6,9 @@ import typer
 from loguru import logger
 from tqdm import tqdm
 
-from kmflow.utils.cli_utils import read_df, _write_df
-from kmflow.config import DATA_DIR
-from kmflow.utils.evaluation_utils import (
-    load_calinski_results,
-    load_davies_results,
-    merge_benchmarks,
-    compute_inertia_scores,
-    compute_silhouette_scores,
-    compute_calinski_scores,
-    compute_davies_scores,
-)
+import kmflow.config as config
+import kmflow.utils.cli_utils as cli_utils
+import kmflow.utils.evaluation_utils as evaluation_utils
 
 app = typer.Typer(help="K-Means evaluation metrics CLI.")
 
@@ -43,19 +35,19 @@ def benchmark(
     """
     Load all calinski & davies CSVs under data/<input_dir>/… and merge into one table.
     """
-    processed_root = DATA_DIR / input_dir
+    processed_root = config.DATA_DIR / input_dir
 
     with tqdm(total=4, desc="Benchmark", colour="green") as pbar:
         # 1) load calinski
-        calinski_df = load_calinski_results(processed_root)
+        calinski_df = evaluation_utils.load_calinski_results(processed_root)
         pbar.update(1)
 
         # 2) load davies
-        davies_df = load_davies_results(processed_root)
+        davies_df = evaluation_utils.load_davies_results(processed_root)
         pbar.update(1)
 
         # 3) merge & round
-        merged = merge_benchmarks(calinski_df, davies_df)
+        merged = evaluation_utils.merge_benchmarks(calinski_df, davies_df)
         merged["calinski"] = merged["calinski"].round(decimals)
         merged["davies"] = merged["davies"].round(decimals)
         pbar.update(1)
@@ -104,15 +96,15 @@ def inertia(
     """
     # 1) load
     if input_file == Path("-"):
-        df = read_df(input_file)
+        df = cli_utils.read_df(input_file)
         stem = "stdin"
     else:
-        df = read_df(DATA_DIR / "processed" / input_file)
+        df = cli_utils.read_df(config.DATA_DIR / "processed" / input_file)
         stem = input_file.stem
 
     # 2) compute
     ks = tqdm(range(start, stop + 1), desc="Inertia", colour="green")
-    inertia_df = compute_inertia_scores(
+    inertia_df = evaluation_utils.compute_inertia_scores(
         df=df,
         k_range=ks,
         numeric_cols=numeric_cols,
@@ -125,7 +117,7 @@ def inertia(
     # 3) write out
     if output_file is None:
         output_file = Path.cwd() / f"{stem}_inertia.csv"
-    _write_df(inertia_df, output_file)
+    cli_utils._write_df(inertia_df, output_file)
 
 
 @app.command("silhouette")
@@ -158,16 +150,16 @@ def silhouette(
     Compute K-Means silhouette score for k=2…n_samples-1.
     """
     if input_file == Path("-"):
-        df = read_df(input_file)
+        df = cli_utils.read_df(input_file)
         stem = "stdin"
     else:
-        df = read_df(DATA_DIR / "processed" / input_file)
+        df = cli_utils.read_df(config.DATA_DIR / "processed" / input_file)
         stem = input_file.stem
 
     ks = tqdm(
         range(2, df.select_dtypes(include="number").shape[0]), desc="Silhouette", colour="green"
     )
-    silhouette_df = compute_silhouette_scores(
+    silhouette_df = evaluation_utils.compute_silhouette_scores(
         df=df,
         numeric_cols=numeric_cols,
         k_values=ks,
@@ -179,7 +171,7 @@ def silhouette(
 
     if output_file is None:
         output_file = Path.cwd() / f"{stem}_silhouette.csv"
-    _write_df(silhouette_df, output_file)
+    cli_utils._write_df(silhouette_df, output_file)
 
 
 @app.command("calinski")
@@ -212,16 +204,16 @@ def calinski(
     Compute K-Means Calinski-Harabasz score for k=2…n_samples-1.
     """
     if input_file == Path("-"):
-        df = read_df(input_file)
+        df = cli_utils.read_df(input_file)
         stem = "stdin"
     else:
-        df = read_df(DATA_DIR / "processed" / input_file)
+        df = cli_utils.read_df(config.DATA_DIR / "processed" / input_file)
         stem = input_file.stem
 
     ks = tqdm(
         range(2, df.select_dtypes(include="number").shape[0]), desc="Calinski", colour="green"
     )
-    calinski_df = compute_calinski_scores(
+    calinski_df = evaluation_utils.compute_calinski_scores(
         df=df,
         numeric_cols=numeric_cols,
         k_values=ks,
@@ -233,7 +225,7 @@ def calinski(
 
     if output_file is None:
         output_file = Path.cwd() / f"{stem}_calinski.csv"
-    _write_df(calinski_df, output_file)
+    cli_utils._write_df(calinski_df, output_file)
 
 
 @app.command("davies")
@@ -266,14 +258,14 @@ def davies(
     Compute K-Means Davies-Bouldin score for k=2…n_samples-1.
     """
     if input_file == Path("-"):
-        df = read_df(input_file)
+        df = cli_utils.read_df(input_file)
         stem = "stdin"
     else:
-        df = read_df(DATA_DIR / "processed" / input_file)
+        df = cli_utils.read_df(config.DATA_DIR / "processed" / input_file)
         stem = input_file.stem
 
     ks = tqdm(range(2, df.select_dtypes(include="number").shape[0]), desc="Davies", colour="green")
-    davies_df = compute_davies_scores(
+    davies_df = evaluation_utils.compute_davies_scores(
         df=df,
         numeric_cols=numeric_cols,
         k_values=ks,
@@ -285,7 +277,7 @@ def davies(
 
     if output_file is None:
         output_file = Path.cwd() / f"{stem}_davies.csv"
-    _write_df(davies_df, output_file)
+    cli_utils._write_df(davies_df, output_file)
 
 
 if __name__ == "__main__":
