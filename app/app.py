@@ -9,9 +9,9 @@ import plotly.graph_objects as go
 
 from pandas.api import types as pd_types
 from sklearn.cluster import KMeans
-from kmflow.modeling.kmeans_utils import fit_kmeans
+from kmflow.utils.kmeans_utils import fit_kmeans
 from joblib import Parallel, delayed
-from kmflow.wrangle_utils import compute_pca_summary
+from kmflow.utils.wrangle_utils import compute_pca_summary
 
 
 # ─── 0) Cache wrappers for heavy computations ───────────────────────────────────
