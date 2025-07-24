@@ -48,7 +48,7 @@ def standardize(
         process_utils.apply_standardization,
         input_file,
         output_file,
-        "standardized",
+        "std",
         desc="Applying Standardize Scaler to Data",
     )
 
@@ -98,7 +98,7 @@ def log_scale(
         process_utils.apply_log1p,
         input_file,
         output_file,
-        "log_scale",
+        "log1p",
         desc="Applying log(1 + x) Scaler to Data",
     )
 
@@ -123,7 +123,7 @@ def yeo_johnson_scale(
         process_utils.apply_yeo_johnson,
         input_file,
         output_file,
-        "yeo_johnson",
+        "yj",
         desc="Applying Yeo-Johnson Scaler to Data",
     )
 
