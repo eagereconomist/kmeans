@@ -8,6 +8,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from math import ceil
 
+import kmflow.utils.cli_utils as cli_utils
 import kmflow.utils.plots_utils as plots_utils
 import kmflow.utils.pca_utils as pca_utils
 
@@ -256,11 +257,12 @@ def corr_heatmap(
 @app.command("qq")
 def qq_plt(
     input_file: Path = typer.Argument(..., help="CSV file path or '-' to read from stdin."),
-    numeric_col: Optional[str] = typer.Option(
-        None,
+    numeric_cols: str = typer.Option(
+        "",
         "--numeric-col",
-        "-numeric-col",
-        help="Numeric column for Q-Q plot, ex: 'Price, Quantity', (omit when using --all).",
+        "-nc",
+        help="Comma-separated list of numeric columns for Q-Q plot, ex: 'Price, Quantity', (omit when using --all).",
+        callback=lambda x: cli_utils.comma_split(x) if isinstance(x, str) else x,
     ),
     all_cols: bool = typer.Option(
         False, "--all", "-a", help="Generate Q-Q plots for all numeric columns."
@@ -291,7 +293,6 @@ def qq_plt(
             fig, axes = plt.subplots(nrows, ncols, figsize=(4 * ncols, 4 * nrows))
             axes_flat = axes.flatten()
             for i, col in enumerate(cols):
-                # draw but don't save yet
                 plots_utils.qq_plot(df, col, output_path=None, save=False, ax=axes_flat[i])
                 axes_flat[i].set_title(col)
             for ax in axes_flat[n:]:
@@ -318,20 +319,49 @@ def qq_plt(
 
         return
 
-    # ─── Single-column mode ───────────────────────────────────────────────
-    if not numeric_col:
-        raise typer.BadParameter("Specify a column via argument or use --all.")
+    # ─── Single‑column (or sequential) mode ────────────────────────────────────────────────
+    if not numeric_cols:
+        raise typer.BadParameter("Specify --numeric-col (Shorthand: -nc) or use --all.")
 
-    default_name = f"{numeric_col}_qq.png"
-    plots_utils._run_plot_with_progress(
-        name=f"Q-Q Plot: {numeric_col}",
-        input_file=input_file,
-        plot_fn=plots_utils.qq_plot,
-        kwargs={"numeric_col": numeric_col},
-        output_file=output_file,
-        default_name=default_name,
-        save=save,
-    )
+    # new: read all of stdin into a DataFrame for reuse
+    if input_file == Path("-"):
+        df = pd.read_csv(sys.stdin)
+
+    for col in numeric_cols:
+        default_name = f"{col}_qq.png"
+
+        if input_file == Path("-"):
+            with tqdm(total=2, desc=f"Q-Q Plot: {col}", colour="green") as pbar:
+                plots_utils._apply_cubehelix_style()
+                fig, ax = plt.subplots()
+                plots_utils.qq_plot(df, col, output_path=None, save=False, ax=ax)
+                pbar.update(1)
+
+                if output_file == Path("-"):
+                    fig.savefig(sys.stdout.buffer, format="png")
+                    logger.success(f"Q-Q Plot: {col} PNG written to stdout.")
+                elif not save:
+                    plt.show()
+                    plt.close(fig)
+                    logger.success(f"Q-Q Plot: {col} displayed (not saved).")
+                else:
+                    out = plots_utils._ensure_unique_path(output_file or Path.cwd() / default_name)
+                    fig.savefig(out)
+                    plt.close(fig)
+                    logger.success(f"Q-Q Plot: {col} saved to {out!r}.")
+                pbar.update(1)
+
+        else:
+            # existing file-based logic
+            plots_utils._run_plot_with_progress(
+                name=f"Q-Q Plot: {col}",
+                input_file=input_file,
+                plot_fn=plots_utils.qq_plot,
+                kwargs={"numeric_col": col},
+                output_file=output_file,
+                default_name=default_name,
+                save=save,
+            )
 
 
 @app.command("inertia")
