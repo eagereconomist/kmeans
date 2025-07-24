@@ -13,23 +13,22 @@ import kmflow.utils.pca_utils as pca_utils
 app = typer.Typer(help="Principal Component Analysis.")
 
 
-@app.command("pca")
-def pca_summary(
+def run_pca(
     input_file: Path = typer.Argument(
         ...,
         help="CSV file to read (use '-' for stdin).",
     ),
-    numeric_cols: list[str] = typer.Option(
-        [],
+    numeric_cols: str = typer.Option(
+        "",
         "--numeric-cols",
-        "-numeric-cols",
+        "-nc",
         help="Numeric columns to include; comma-separated or repeatable.",
         callback=lambda x: cli_utils.comma_split(x) if isinstance(x, str) else x,
     ),
     n_components: int = typer.Option(
         None,
         "--n-components",
-        "-components",
+        "-c",
         help="Number of PCs to compute (defaults to all).",
     ),
     random_state: int = typer.Option(
@@ -66,6 +65,8 @@ def pca_summary(
         random_state=random_state,
     )
 
+    if output_dir is None:
+        output_dir = Path(f"{stem}_pca")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     tasks = [
