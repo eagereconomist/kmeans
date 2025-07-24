@@ -147,7 +147,7 @@ def preprocess(
     steps: list[tuple[str, callable, list]] = []
     for col in dropped_columns:
         steps.append(("drop_column", wrangle_utils.drop_column, [col]))
-    for col in wrangle_utils.dotless_columns:
+    for col in dotless_columns:
         steps.append(("dotless_column", wrangle_utils.dotless_column, [col]))
 
     for name, func, args in tqdm(steps, desc="Data Preprocessing Steps", colour="green"):
