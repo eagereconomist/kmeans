@@ -135,7 +135,7 @@ def _prepare_category(
             raise ValueError(
                 f"No categories match patterns {patterns!r}\n"
                 "Hint: when specifying multiple patterns, separate them with\n"
-                "a comma and space, (e.g. -p 'Price, Weight')."
+                "a comma and space, (e.g. -p 'price, weight')."
             )
         df_plot = df_plot[df_plot["Category"].isin(filtered)]
         categories = filtered
