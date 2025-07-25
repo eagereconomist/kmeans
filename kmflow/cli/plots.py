@@ -153,7 +153,7 @@ def boxplot(
     """
     Box plot of `numeric_col`, optionally grouped by `category_col` and filtered by `patterns`.
     """
-    default_name = f"{(f'filtered_{category_col}' if patterns else (f'by_{category_col}' if category_col else 'all'))}_{numeric_col}_boxplot.png"  # new
+    default_name = f"{(f'filtered_{category_col}' if patterns else (f'by_{category_col}' if category_col else 'all'))}_{numeric_col}_boxplot.png"
 
     plots_utils._run_plot_with_progress(
         name="Boxplot",
@@ -562,10 +562,13 @@ def cluster(
 @app.command("3d-cluster")
 def cluster3d(
     input_file: Path = typer.Argument(..., help="Clustered CSV file, or '-' to read from stdin."),
-    numeric_cols: Optional[List[str]] = typer.Argument(
-        None,
-        help="Exactly three numeric columns (e.g. 'weight' 'height' 'width'); "
+    numeric_cols: str = typer.Option(
+        "",
+        "--numeric-cols",
+        "-nc",
+        help="Exactly three numeric columns (e.g. 'weight', 'height', 'width'); "
         "if omitted, defaults to the first three numeric columns.",
+        callback=lambda x: cli_utils.comma_split(x) if isinstance(x, str) else x,
     ),
     cluster_col: str = typer.Argument(..., help="Column with cluster labels."),
     scale: float = typer.Option(
@@ -722,11 +725,12 @@ def batch_cluster_plot(
 @app.command("biplot")
 def plot_biplot(
     input_file: Path = typer.Argument(..., help="CSV file to read (use '-' to read from stdin)."),
-    numeric_cols: list[str] = typer.Option(
-        None,
+    numeric_cols: str = typer.Option(
+        "",
         "--numeric-cols",
-        "-numeric-cols",
-        help="Defaults to all numeric columns if omitted.",
+        "-nc",
+        help="Choose numeric columns, comma-separated or repeatable. Defaults to all numeric columns if omitted.",
+        callback=lambda x: cli_utils.comma_split(x) if isinstance(x, str) else x,
     ),
     skip_scores: bool = typer.Option(
         True,
@@ -759,10 +763,12 @@ def plot_biplot(
         df = pd.read_csv(sys.stdin) if input_file == Path("-") else pd.read_csv(input_file)
         pbar.update(1)
 
+        num_cols = numeric_cols or None
+
         # 2) DRAW ────────────────────────────────────────────────
         summary = pca_utils.compute_pca(
             df=df,
-            numeric_cols=numeric_cols,
+            numeric_cols=num_cols,
             hue_column=hue_column,
         )
         loadings = summary["loadings"]
@@ -801,13 +807,14 @@ def plot_biplot(
 @app.command("3d-biplot")
 def plot_3d_biplot(
     input_file: Path = typer.Argument(..., help="CSV file or '-' for stdin."),
-    numeric_cols: list[str] | None = typer.Argument(
-        None,
+    numeric_cols: str | None = typer.Option(
+        "",
+        "--numeric-cols",
+        "-nc",
         help="Exactly three features for PCA; if omitted, uses all numeric columns minus hue.",
+        callback=lambda x: cli_utils.comma_split(x) if isinstance(x, str) else x,
     ),
-    hue_column: str | None = typer.Option(
-        None, "--hue-column", "-h", help="Column to color points by (e.g. cluster)."
-    ),
+    hue_column: str | None = typer.Argument(..., help="Column to color points by (e.g. cluster)."),
     skip_scores: bool = typer.Option(
         True,
         "--skip-scores",
@@ -834,7 +841,7 @@ def plot_3d_biplot(
     df = pd.read_csv(sys.stdin) if input_file == Path("-") else pd.read_csv(input_file)
 
     # ─── 2) pick numeric columns ──────────────────────────────
-    if numeric_cols is None:
+    if not numeric_cols:
         numerics = df.select_dtypes(include="number").columns.tolist()
         if hue_column in numerics:
             numerics.remove(hue_column)
