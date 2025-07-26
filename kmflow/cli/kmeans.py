@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import typer
 from loguru import logger
@@ -19,9 +19,13 @@ def fit_km_cli(
     random_state: int = typer.Option(4572, "--seed", "-seed", help="Random seed."),
     n_init: int = typer.Option(50, "--n-init", "-n-init", help="Runs with different seeds."),
     algorithm: str = typer.Option("lloyd", "--algorithm", "-algo", help="'lloyd' or 'elkan'."),
-    init: str = typer.Option("k-means++", "--init", "-init", help="Init method."),
-    numeric_cols: Optional[List[str]] = typer.Option(
-        None, "--numeric-cols", "-numeric-cols", help="Numeric cols to use; repeat for multiple."
+    init: str = typer.Option("k-means++", "--init", "-init", help="'k-means++' or 'random'."),
+    numeric_cols: str = typer.Option(
+        "",
+        "--numeric-cols",
+        "-nc",
+        help="Comma-separated list of numeric columns; omit to use all numeric columns.",
+        callback=lambda x: cli_utils.comma_split(x) if isinstance(x, str) else x,
     ),
     output_file: Optional[Path] = typer.Option(
         None,
@@ -60,9 +64,9 @@ def fit_km_cli(
         # 3) write
         cli_utils._write_df(df_out, out_path)
         if out_path == Path("-"):
-            logger.success("K-means clustering CSV written to stdout.")
+            logger.success("K-means CSV written to stdout.")
         else:
-            logger.success(f"K-means clustering results saved to {out_path!r}")
+            logger.success(f"Saved to {out_path!r}")
         pbar.update(1)
 
 
@@ -74,9 +78,13 @@ def batch_km_cli(
     random_state: int = typer.Option(4572, "--seed", "-seed", help="Random seed."),
     n_init: int = typer.Option(50, "--n-init", "-n-init", help="Runs per k."),
     algorithm: str = typer.Option("lloyd", "--algorithm", "-algo", help="'lloyd' or 'elkan'."),
-    init: str = typer.Option("k-means++", "--init", "-init", help="Init method."),
-    numeric_cols: Optional[List[str]] = typer.Option(
-        None, "--numeric-cols", "-numeric-cols", help="Numeric cols to use; repeat for multiple."
+    init: str = typer.Option("k-means++", "--init", "-init", help="'k-means++' or 'random'."),
+    numeric_cols: str = typer.Option(
+        "",
+        "--numeric-cols",
+        "-nc",
+        help="Comma-separated list of numeric columns; omit to use all numeric columns.",
+        callback=lambda x: cli_utils.comma_split(x) if isinstance(x, str) else x,
     ),
     output_file: Optional[Path] = typer.Option(
         None,
