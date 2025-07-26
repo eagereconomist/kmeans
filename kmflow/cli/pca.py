@@ -17,7 +17,7 @@ def run_pca(
         "",
         "--numeric-cols",
         "-nc",
-        help="Comma-separated list of columns; omit to use all numeric columns.",
+        help="Comma-separated list of numeric columns; omit to use all numeric columns.",
     ),
     n_components: int = typer.Option(
         None,
