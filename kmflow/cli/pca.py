@@ -1,18 +1,13 @@
 import sys
 from pathlib import Path
-
-from loguru import logger
-from tqdm import tqdm
 import typer
+from tqdm import tqdm
+from kmflow.utils import cli_utils, process_utils, pca_utils
 
-import kmflow.utils.process_utils as process_utils
-import kmflow.utils.cli_utils as cli_utils
-import kmflow.utils.pca_utils as pca_utils
-
-
-app = typer.Typer(help="Principal Component Analysis.")
+app = typer.Typer()
 
 
+@app.command("pca")
 def run_pca(
     input_file: Path = typer.Argument(
         ...,
@@ -22,8 +17,7 @@ def run_pca(
         "",
         "--numeric-cols",
         "-nc",
-        help="Numeric columns to include; comma-separated or repeatable.",
-        callback=lambda x: cli_utils.comma_split(x) if isinstance(x, str) else x,
+        help="Comma-separated list of columns; omit to use all numeric columns.",
     ),
     n_components: int = typer.Option(
         None,
@@ -53,10 +47,11 @@ def run_pca(
     df = cli_utils.read_df(input_file)
     stem = input_file.stem if input_file != Path("-") else "stdin"
 
-    if not numeric_cols:
+    # ─── parse numeric_cols into a list or None ────────────────────
+    if numeric_cols.strip() == "":
         numeric_cols_arg = None
     else:
-        numeric_cols_arg = numeric_cols
+        numeric_cols_arg = cli_utils.comma_split(numeric_cols)
 
     summary = pca_utils.compute_pca(
         df=df,
@@ -67,7 +62,8 @@ def run_pca(
 
     if output_dir is None:
         output_dir = Path(f"{stem}_pca")
-    output_dir.mkdir(parents=True, exist_ok=True)
+    if output_dir != Path("-"):
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     tasks = [
         (
@@ -95,13 +91,9 @@ def run_pca(
     for desc, df_out, suffix in tqdm(tasks, desc="Writing PCA CSVs", colour="green"):
         if output_dir == Path("-"):
             df_out.to_csv(sys.stdout.buffer, index=False)
-            logger.success(f"{desc} written to stdout.")
+            typer.secho(f"{desc} written to stdout.", fg="green")
         else:
             path = process_utils.write_csv(
                 df_out, prefix=stem, suffix=suffix, output_dir=output_dir
             )
-            logger.success(f"Saved {desc} -> {path!r}")
-
-
-if __name__ == "__main__":
-    app()
+            typer.secho(f"Saved {desc} -> {path!r}", fg="green")
