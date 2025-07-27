@@ -9,9 +9,9 @@ import plotly.graph_objects as go
 
 from pandas.api import types as pd_types
 from sklearn.cluster import KMeans
-from kmflow.utils.kmeans_utils import fit_kmeans
 from joblib import Parallel, delayed
-from kmflow.utils.wrangle_utils import compute_pca_summary
+from kmflow.utils.kmeans_utils import fit_kmeans
+from kmflow.utils.pca_utils import compute_pca
 
 
 # ─── 0) Cache wrappers for heavy computations ───────────────────────────────────
@@ -74,7 +74,7 @@ def cached_silhouette(
             algorithm=algorithm,
         )
         labels = km.fit_predict(X)
-        # we import here to avoid top‐level overhead
+        # import here to avoid top‐level overhead
         from sklearn.metrics import silhouette_score
 
         score = silhouette_score(X, labels)
@@ -92,7 +92,7 @@ def cached_pca(
     df_hash: bytes,
     hue_column: str,
 ) -> dict:
-    return compute_pca_summary(df=df, hue_column=hue_column)
+    return compute_pca(df=raw_df, hue_column=hue_column)
 
 
 # ─── 1) Page config ───────────────────────────────────────────────────────────
@@ -569,7 +569,7 @@ if show_model_settings:
             df_clustered = fit_kmeans(
                 raw_df,
                 k=n_clusters,
-                feature_columns=None,
+                numeric_cols=None,
                 init=init,
                 n_init=n_init,
                 random_state=seed,
