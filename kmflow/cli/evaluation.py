@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import typer
 from loguru import logger
@@ -66,23 +66,24 @@ def benchmark(
 @app.command("inertia")
 def inertia(
     input_file: Path = typer.Argument(..., help="CSV to read (use '-' for stdin)."),
-    start: int = typer.Option(1, "--start", "-s", help="Minimum k (inclusive)."),
-    stop: int = typer.Option(20, "--stop", "-e", help="Maximum k (inclusive)."),
+    start: int = typer.Option(1, "--start", "-start", help="Minimum k (inclusive)."),
+    stop: int = typer.Option(20, "--stop", "-stop", help="Maximum k (inclusive)."),
     random_state: int = typer.Option(
         4572, "--seed", "-seed", help="Random seed for reproducibility."
     ),
-    n_init: int = typer.Option(50, "--n-init", "-n", help="Number of initializations per k."),
+    n_init: int = typer.Option(50, "--n-init", "-n-init", help="Number of initializations per k."),
     algorithm: str = typer.Option(
-        "lloyd", "--algorithm", "-a", help="KMeans algorithm: 'lloyd' or 'elkan'."
+        "lloyd", "--algorithm", "-algo", help="KMeans algorithm: 'lloyd' or 'elkan'."
     ),
     init: str = typer.Option(
-        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'."
+        "k-means++", "--init", "-init", help="Initialization: 'k-means++' or 'random'."
     ),
-    numeric_cols: Optional[List[str]] = typer.Option(
+    numeric_cols: str = typer.Option(
         None,
         "--numeric-cols",
-        "-numeric-cols",
-        help="Numeric column to include; repeat flag to add more.",
+        "-nc",
+        help="Comma-separated list of numeric columns; omit to use all numeric columns.",
+        callback=lambda x: cli_utils.comma_split(x) if isinstance(x, str) else x,
     ),
     output_file: Optional[Path] = typer.Option(
         None,
@@ -95,19 +96,19 @@ def inertia(
     Compute K-Means inertia over k=start…stop.
     """
     # 1) load
-    if input_file == Path("-"):
-        df = cli_utils.read_df(input_file)
-        stem = "stdin"
+    df = cli_utils.read_df(input_file)
+
+    if not numeric_cols:
+        numeric_cols_arg = None
     else:
-        df = cli_utils.read_df(config.DATA_DIR / "processed" / input_file)
-        stem = input_file.stem
+        numeric_cols_arg = numeric_cols
 
     # 2) compute
     ks = tqdm(range(start, stop + 1), desc="Inertia", colour="green")
     inertia_df = evaluation_utils.compute_inertia_scores(
         df=df,
         k_range=ks,
-        numeric_cols=numeric_cols,
+        numeric_cols=numeric_cols_arg,
         random_state=random_state,
         n_init=n_init,
         algorithm=algorithm,
@@ -116,7 +117,7 @@ def inertia(
 
     # 3) write out
     if output_file is None:
-        output_file = Path.cwd() / f"{stem}_inertia.csv"
+        output_file = Path.cwd() / "stdin_inertia.csv"
     cli_utils._write_df(inertia_df, output_file)
 
 
@@ -126,18 +127,19 @@ def silhouette(
     random_state: int = typer.Option(
         4572, "--seed", "-seed", help="Random seed for reproducibility."
     ),
-    n_init: int = typer.Option(50, "--n-init", "-n", help="Number of initializations per k."),
+    n_init: int = typer.Option(50, "--n-init", "-n-init", help="Number of initializations per k."),
     algorithm: str = typer.Option(
-        "lloyd", "--algorithm", "-a", help="KMeans algorithm: 'lloyd' or 'elkan'."
+        "lloyd", "--algorithm", "-algo", help="KMeans algorithm: 'lloyd' or 'elkan'."
     ),
     init: str = typer.Option(
-        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'."
+        "k-means++", "--init", "-init", help="Initialization: 'k-means++' or 'random'."
     ),
-    numeric_cols: Optional[List[str]] = typer.Option(
+    numeric_cols: str = typer.Option(
         None,
         "--numeric-cols",
-        "-numeric-cols",
-        help="Numeric column to include; repeat flag to add more.",
+        "-nc",
+        help="Comma-separated list of numeric columns; omit to use all numeric columns.",
+        callback=lambda x: cli_utils.comma_split(x) if isinstance(x, str) else x,
     ),
     output_file: Optional[Path] = typer.Option(
         None,
@@ -149,19 +151,20 @@ def silhouette(
     """
     Compute K-Means silhouette score for k=2…n_samples-1.
     """
-    if input_file == Path("-"):
-        df = cli_utils.read_df(input_file)
-        stem = "stdin"
+    # 1) load
+    df = cli_utils.read_df(input_file)
+
+    if not numeric_cols:
+        numeric_cols_arg = None
     else:
-        df = cli_utils.read_df(config.DATA_DIR / "processed" / input_file)
-        stem = input_file.stem
+        numeric_cols_arg = numeric_cols
 
     ks = tqdm(
         range(2, df.select_dtypes(include="number").shape[0]), desc="Silhouette", colour="green"
     )
     silhouette_df = evaluation_utils.compute_silhouette_scores(
         df=df,
-        numeric_cols=numeric_cols,
+        numeric_cols=numeric_cols_arg,
         k_values=ks,
         random_state=random_state,
         n_init=n_init,
@@ -170,7 +173,7 @@ def silhouette(
     )
 
     if output_file is None:
-        output_file = Path.cwd() / f"{stem}_silhouette.csv"
+        output_file = Path.cwd() / "stdin_silhouette.csv"
     cli_utils._write_df(silhouette_df, output_file)
 
 
@@ -180,18 +183,19 @@ def calinski(
     random_state: int = typer.Option(
         4572, "--seed", "-seed", help="Random seed for reproducibility."
     ),
-    n_init: int = typer.Option(50, "--n-init", "-n", help="Number of initializations per k."),
+    n_init: int = typer.Option(50, "--n-init", "-n-init", help="Number of initializations per k."),
     algorithm: str = typer.Option(
-        "lloyd", "--algorithm", "-a", help="KMeans algorithm: 'lloyd' or 'elkan'."
+        "lloyd", "--algorithm", "-algo", help="KMeans algorithm: 'lloyd' or 'elkan'."
     ),
     init: str = typer.Option(
-        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'."
+        "k-means++", "--init", "-init", help="Initialization: 'k-means++' or 'random'."
     ),
-    numeric_cols: Optional[List[str]] = typer.Option(
+    numeric_cols: str = typer.Option(
         None,
         "--numeric-cols",
-        "-numeric-cols",
-        help="Numeric column to include; repeat flag to add more.",
+        "-nc",
+        help="Comma-separated list of numeric columns; omit to use all numeric columns.",
+        callback=lambda x: cli_utils.comma_split(x) if isinstance(x, str) else x,
     ),
     output_file: Optional[Path] = typer.Option(
         None,
@@ -203,19 +207,20 @@ def calinski(
     """
     Compute K-Means Calinski-Harabasz score for k=2…n_samples-1.
     """
-    if input_file == Path("-"):
-        df = cli_utils.read_df(input_file)
-        stem = "stdin"
+    # 1) load
+    df = cli_utils.read_df(input_file)
+
+    if not numeric_cols:
+        numeric_cols_arg = None
     else:
-        df = cli_utils.read_df(config.DATA_DIR / "processed" / input_file)
-        stem = input_file.stem
+        numeric_cols_arg = numeric_cols
 
     ks = tqdm(
         range(2, df.select_dtypes(include="number").shape[0]), desc="Calinski", colour="green"
     )
     calinski_df = evaluation_utils.compute_calinski_scores(
         df=df,
-        numeric_cols=numeric_cols,
+        numeric_cols=numeric_cols_arg,
         k_values=ks,
         random_state=random_state,
         n_init=n_init,
@@ -224,7 +229,7 @@ def calinski(
     )
 
     if output_file is None:
-        output_file = Path.cwd() / f"{stem}_calinski.csv"
+        output_file = Path.cwd() / "stdin_calinski.csv"
     cli_utils._write_df(calinski_df, output_file)
 
 
@@ -234,18 +239,19 @@ def davies(
     random_state: int = typer.Option(
         4572, "--seed", "-seed", help="Random seed for reproducibility."
     ),
-    n_init: int = typer.Option(50, "--n-init", "-n", help="Number of initializations per k."),
+    n_init: int = typer.Option(50, "--n-init", "-n-init", help="Number of initializations per k."),
     algorithm: str = typer.Option(
-        "lloyd", "--algorithm", "-a", help="KMeans algorithm: 'lloyd' or 'elkan'."
+        "lloyd", "--algorithm", "-algo", help="KMeans algorithm: 'lloyd' or 'elkan'."
     ),
     init: str = typer.Option(
-        "k-means++", "--init", "-i", help="Initialization: 'k-means++' or 'random'."
+        "k-means++", "--init", "-init", help="Initialization: 'k-means++' or 'random'."
     ),
-    numeric_cols: Optional[List[str]] = typer.Option(
+    numeric_cols: str = typer.Option(
         None,
         "--numeric-cols",
-        "-numeric-cols",
-        help="Numeric column to include; repeat flag to add more.",
+        "-nc",
+        help="Comma-separated list of numeric columns; omit to use all numeric columns.",
+        callback=lambda x: cli_utils.comma_split(x) if isinstance(x, str) else x,
     ),
     output_file: Optional[Path] = typer.Option(
         None,
@@ -257,17 +263,18 @@ def davies(
     """
     Compute K-Means Davies-Bouldin score for k=2…n_samples-1.
     """
-    if input_file == Path("-"):
-        df = cli_utils.read_df(input_file)
-        stem = "stdin"
+    # 1) load
+    df = cli_utils.read_df(input_file)
+
+    if not numeric_cols:
+        numeric_cols_arg = None
     else:
-        df = cli_utils.read_df(config.DATA_DIR / "processed" / input_file)
-        stem = input_file.stem
+        numeric_cols_arg = numeric_cols
 
     ks = tqdm(range(2, df.select_dtypes(include="number").shape[0]), desc="Davies", colour="green")
     davies_df = evaluation_utils.compute_davies_scores(
         df=df,
-        numeric_cols=numeric_cols,
+        numeric_cols=numeric_cols_arg,
         k_values=ks,
         random_state=random_state,
         n_init=n_init,
@@ -276,7 +283,7 @@ def davies(
     )
 
     if output_file is None:
-        output_file = Path.cwd() / f"{stem}_davies.csv"
+        output_file = Path.cwd() / "stdin_davies.csv"
     cli_utils._write_df(davies_df, output_file)
 
 
