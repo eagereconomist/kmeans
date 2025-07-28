@@ -574,7 +574,7 @@ if show_model_settings:
                 n_init=n_init,
                 random_state=seed,
                 algorithm=algo,
-                label_column="cluster",
+                cluster_col="cluster",
             )
             progress_bar.progress(100, text="K-Means Completed!")
         except Exception:
