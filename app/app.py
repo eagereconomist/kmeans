@@ -23,17 +23,19 @@ MAX_DIAG_K = 20
 
 @st.cache_data(show_spinner=False)
 def cached_inertia(
-    df_hash: bytes,
+    df: pd.DataFrame,
     feature_columns: tuple[str, ...],
     init_method: str,
     n_init: int,
     random_state: int,
     algorithm: str,
 ) -> pd.DataFrame:
-    X = raw_df[list(feature_columns)].to_numpy()
+    """
+    Compute K-Means inertia for k=1..MAX_DIAG_K in parallel on the given DataFrame.
+    """
+    X = df[list(feature_columns)].to_numpy()
 
     def _inertia(k: int) -> dict:
-        # elkan doesn't make sense for k=1, so switch to lloyd in that one case
         algo_use = "lloyd" if (algorithm == "elkan" and k == 1) else algorithm
         km = KMeans(
             n_clusters=k,
@@ -53,7 +55,7 @@ def cached_inertia(
 
 @st.cache_data(show_spinner=False)
 def cached_silhouette(
-    df_hash: bytes,
+    df: pd.DataFrame,
     feature_columns: tuple[str, ...],
     init_method: str,
     n_init: int,
@@ -61,11 +63,11 @@ def cached_silhouette(
     algorithm: str,
 ) -> pd.DataFrame:
     """
-    Compute silhouette scores for k=2..MAX_DIAG_K in parallel.
+    Compute silhouette scores for k=2..MAX_DIAG_K in parallel on the given DataFrame.
     """
-    X = raw_df[list(feature_columns)].to_numpy()
+    X = df[list(feature_columns)].to_numpy()
 
-    def _sil(k):
+    def _sil(k: int) -> dict:
         km = KMeans(
             n_clusters=k,
             init=init_method,
@@ -74,14 +76,12 @@ def cached_silhouette(
             algorithm=algorithm,
         )
         labels = km.fit_predict(X)
-        # import here to avoid top‐level overhead
         from sklearn.metrics import silhouette_score
 
-        score = silhouette_score(X, labels)
-        return {"k": k, "silhouette_score": score}
+        return {"k": k, "silhouette_score": silhouette_score(X, labels)}
 
     results = Parallel(n_jobs=-1)(delayed(_sil)(k) for k in range(2, MAX_DIAG_K + 1))
-    sil_df = pd.DataFrame(results).rename(columns={"silhouette_score": "silhouette_score"})
+    sil_df = pd.DataFrame(results)
     sil_df["k"] = sil_df["k"].astype(int)
     sil_df.set_index("k", inplace=True)
     return sil_df
@@ -92,6 +92,9 @@ def cached_pca(
     df_to_pca: pd.DataFrame,
     hue_column: str | None = None,
 ) -> dict[str, pd.DataFrame | pd.Series]:
+    """
+    Compute PCA on the given DataFrame.
+    """
     return compute_pca(df=df_to_pca, hue_column=hue_column)
 
 
@@ -144,7 +147,7 @@ with st.sidebar.expander("Help & Instructions", expanded=False):
 
         **After** a successful run:  
         - Imported data includes a new cluster column  
-        - PC Biplot is created using the clustered data and is ready to view in the dashboard immediately  
+        - Biplot is created using the clustered data and is ready to view in the dashboard immediately  
         - A download button of the clustered data appears under the `K-Means Completed!` message (sidebar)  
 
         **6. Biplot**  
@@ -440,34 +443,32 @@ if not initial and not is_pca_loadings_file:
     if diagnostics_requested:
         diag_bar = st.sidebar.progress(0, text="Running Clustering Diagnostics...")
 
-        # Build cache key parts
-        import pandas as pd
-
-        df_hash = pd.util.hash_pandas_object(raw_df, index=True).values.tobytes()
         num_cols = tuple(numeric_cols)
-        params = (init, n_init, seed, algo)
+
+        inert_df = pd.DataFrame()
+        sil_df = pd.DataFrame()
+        sil_ser = pd.Series(dtype=float)
 
         try:
             # Inertia
             if show_diag_data or show_inertia:
                 diag_bar.progress(10, text="Loading Cached Inertia...")
-                inert_all = cached_inertia(df_hash, num_cols, *params)
-
-                # now slice down to what the user chose
-                if show_diag_data or show_inertia:
-                    inert_df = inert_all[inert_all["k"] <= max_k]
-            else:
-                inert_df = pd.DataFrame()
+                inert_all = cached_inertia(
+                    df=raw_df,
+                    feature_columns=num_cols,
+                    init_method=init,
+                    n_init=n_init,
+                    random_state=seed,
+                    algorithm=algo,
+                )
+                inert_df = inert_all[inert_all["k"] <= max_k]
 
             # Silhouette
             if show_silhouette:
                 diag_bar.progress(60, text="Loading Cached Silhouette...")
-                sil_all = cached_silhouette(df_hash, num_cols, *params)
+                sil_all = cached_silhouette(raw_df, num_cols, init, n_init, seed, algo)
                 sil_df = sil_all.loc[2:max_k]
                 sil_ser = sil_df["silhouette_score"].reindex(range(1, max_k + 1), fill_value=None)
-            else:
-                sil_df = pd.DataFrame()
-                sil_ser = pd.Series(dtype=float)
 
             diag_bar.progress(100, text="Diagnostics Complete!")
         except Exception as e:
@@ -588,17 +589,15 @@ if show_model_settings:
         else:
             # Define the new cluster column name
             cluster_col_name = f"cluster_{n_clusters}"
-            # Convert to int in-place
+            # ensure integer dtype
             df_clustered[cluster_col_name] = df_clustered[cluster_col_name].astype(int)
-            # Create a 1-based string label in-place
-            df_clustered["cluster_label"] = (df_clustered[cluster_col_name] + 1).astype(str)
 
             # Persist to session_state
             st.session_state.df = df_clustered
             st.session_state.cluster_col = cluster_col_name
-            st.session_state.color_col = "cluster_label"
+            st.session_state.color_col = cluster_col_name
             st.session_state.cluster_order = [
-                str(i) for i in sorted(df_clustered[cluster_col_name].astype(int).unique())
+                str(i) for i in sorted(df_clustered[cluster_col_name].unique())
             ]
             st.session_state.did_cluster = True
 
@@ -610,14 +609,16 @@ if show_model_settings:
 
 # ─── Download Clustering Results ────────────────────────────────────────────────
 if st.session_state.get("did_cluster", False):
-    export_df = st.session_state.df.drop(columns=["cluster_label"])
+    # copy so we don’t mutate session_state
+    export_df = st.session_state.df.copy()
+    # drop cluster_label if present (no error if not)
+    export_df = export_df.drop(columns=["cluster_label"], errors="ignore")
     make_download(
         export_df,
         f"{base_name}_cluster_{n_clusters}",
         f"download_clustered_{n_clusters}_{download_format}",
         label="Clustered Data",
     )
-
 
 # ─── Determine df & cluster_col ────────────────────────────────────────────────
 if st.session_state.get("did_cluster", False):
@@ -628,26 +629,22 @@ else:
     cluster_col = None
 
 # ─── Always refresh the table with the current df ───────────────────────────────
-# (drop the helper column if present)
-to_show = df.drop(columns=["cluster_label"]) if "cluster_label" in df.columns else df
-show_dataset(to_show)
+show_dataset(df)
+
 
 # ─── PCA & Biplot (only after clustering) ──────────────────────────────────────
 if not st.session_state.get("did_cluster", False):
-    st.warning("Please run K-Means to view the PCA Biplot.")
+    st.warning("Please run K-Means to view the Biplot.")
 else:
+    # 1) Compute or load PCA results
     if is_pca_scores_file:
-        # Use the uploaded PC scores directly (no .copy())
         scores = raw_df[imported_pcs]
-        pcs = list(imported_pcs)
+        pcs = imported_pcs
         loadings = None
         variances = scores.var(ddof=0)
         pve = variances / variances.sum()
         cpve = pve.cumsum()
     else:
-        # Cached PCA compute
-        import pandas as pd
-
         pca_bar = st.progress(0, text="Computing PCA Summary...")
         try:
             pca_res = cached_pca(df, st.session_state.cluster_col)
@@ -664,91 +661,79 @@ else:
         finally:
             pca_bar.empty()
 
-    # drop any old PC columns in-place
-    old_pcs = [col for col in df.columns if re.fullmatch(r"(?i)PC\d+", col)]
-    for col in old_pcs:
-        df.drop(columns=col, inplace=True)
-
-    # assign each new PC directly
+    # 2) Drop old PCs & assign new ones
+    old_pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC\d+", c)]
+    df.drop(columns=old_pcs, inplace=True)
     for pc in pcs:
         df[pc] = scores[pc].values
 
-    hover_cols = ["unique_id", st.session_state.get("color_col")] + pcs[:3]
-    hover_template = "Unique ID = %{customdata[0]}<br>Cluster = %{customdata[1]}"
-    for i, pc in enumerate(pcs[:3], start=2):
-        hover_template += f"<br>{pc} = %{{customdata[{i}]:.3f}}"
+    # 3) Restore unique_id if it became the index
+    if df.index.name == "unique_id":
+        df = df.reset_index()
 
+    # 4) Create a 1-based categorical cluster column for plotting
+    df["cluster_str"] = (df[st.session_state.cluster_col].astype(int) + 1).astype(str)
+    plot_col = "cluster_str"
+    cat_order = sorted(df[plot_col].unique(), key=lambda x: int(x))
+
+    # 5) Build hover metadata
+    base_hover = ["unique_id", plot_col]
+    hover_cols = [c for c in base_hover + pcs[:3] if c in df.columns]
+    hover_template_parts = []
+    if "unique_id" in hover_cols:
+        idx = hover_cols.index("unique_id")
+        hover_template_parts.append(f"Unique ID = %{{customdata[{idx}]}}")
+    if plot_col in hover_cols:
+        idx = hover_cols.index(plot_col)
+        hover_template_parts.append(f"Cluster = %{{customdata[{idx}]}}")
+    for pc in pcs[:3]:
+        if pc in hover_cols:
+            idx = hover_cols.index(pc)
+            hover_template_parts.append(f"{pc} = %{{customdata[{idx}]:.3f}}")
+    hover_template = "<br>".join(hover_template_parts)
+
+    # 6) Sidebar controls for PCA outputs
     st.sidebar.header("PCA Output Options")
-
-    if is_pca_scores_file:
-        pca_opts = ["PVE", "CPVE"]
-    else:
-        pca_opts = ["Scores", "Loadings", "PVE", "CPVE"]
-
-    selected_pca = st.sidebar.multiselect(
-        "Show PCA Outputs",
-        pca_opts,
-        default=[],
-        help=(
-            "Choose which PCA results to display or download:\n"
-            "- **Scores**: PC coordinates per observation\n"
-            "- **Loadings**: feature contributions to each PC\n"
-            "- **PVE**: percent variance explained by each PC\n"
-            "- **CPVE**: cumulative percent variance explained"
-        ),
-    )
-
+    pca_opts = ["PVE", "CPVE"] if is_pca_scores_file else ["Scores", "Loadings", "PVE", "CPVE"]
+    selected_pca = st.sidebar.multiselect("Show PCA Outputs", pca_opts, default=[])
     show_scores = "Scores" in selected_pca and not is_pca_scores_file
     show_loadings = "Loadings" in selected_pca and not is_pca_scores_file
     show_pve = "PVE" in selected_pca
     show_cpve = "CPVE" in selected_pca
 
+    # 7) Choose biplot dimension and axes
     dim = st.sidebar.selectbox("Plot dimension", ["2D"] + (["3D"] if len(pcs) >= 3 else []))
-    pc_x = st.sidebar.selectbox("X-Axis Principal Component", pcs, index=0)
-    pc_y = st.sidebar.selectbox(
-        "Y-Axis Principal Component", [pc for pc in pcs if pc != pc_x], index=0
+    pc_x = st.sidebar.selectbox("X-Axis Principal Component", pcs)
+    pc_y = st.sidebar.selectbox("Y-Axis Principal Component", [pc for pc in pcs if pc != pc_x])
+    pc_z = (
+        st.sidebar.selectbox(
+            "Z-Axis Principal Component", [pc for pc in pcs if pc not in (pc_x, pc_y)]
+        )
+        if dim == "3D"
+        else None
     )
-    pc_z = None
+    scale = (
+        st.sidebar.slider("Loading Vector Scale", 0.1, 10.0, 0.7, step=0.05)
+        if not is_pca_scores_file
+        else None
+    )
+
+    # 8) Labels & sanity check
+    x_label = f"{pc_x} ({pve[pc_x]:.1%})" if pve.get(pc_x) is not None else pc_x
+    y_label = f"{pc_y} ({pve[pc_y]:.1%})" if pve.get(pc_y) is not None else pc_y
     if dim == "3D":
-        pc_z = st.sidebar.selectbox(
-            "Z-Axis Principal Component", [pc for pc in pcs if pc not in (pc_x, pc_y)], index=0
-        )
-
-    if not is_pca_scores_file:
-        scale = st.sidebar.slider(
-            "Loading Vector Scale",
-            0.1,
-            10.0,
-            0.7,
-            step=0.05,
-            help=(
-                "Scale factor for PC loading vectors in the biplot:\n"
-                "- Multiplies arrow lengths for visibility\n"
-                "- Only applies when you’ve uploaded feature data (not pure PC scores)"
-            ),
-        )
-    else:
-        scale = None
-
-    x_label = pc_x if pve.get(pc_x) is None else f"{pc_x} ({pve[pc_x]:.1%})"
-    y_label = pc_y if pve.get(pc_y) is None else f"{pc_y} ({pve[pc_y]:.1%})"
-    if dim == "3D":
-        z_label = pc_z if pve.get(pc_z) is None else f"{pc_z} ({pve[pc_z]:.1%})"
-
-    if dim == "2D" and len(pcs) < 2:
-        st.error("At least 2 PCs required for a 2D biplot.")
-        st.stop()
-    if dim == "3D" and len(pcs) < 3:
-        st.error("At least 3 PCs required for a 3D biplot.")
+        z_label = f"{pc_z} ({pve[pc_z]:.1%})" if pve.get(pc_z) is not None else pc_z
+    if (dim == "2D" and len(pcs) < 2) or (dim == "3D" and len(pcs) < 3):
+        st.error(f"At least {2 if dim == '2D' else 3} PCs required for a {dim} biplot.")
         st.stop()
 
     common = {
-        "color": st.session_state["color_col"],
-        "category_orders": {st.session_state["color_col"]: st.session_state["cluster_order"]},
+        "color": plot_col,
+        "category_orders": {plot_col: cat_order},
         "custom_data": hover_cols,
     }
 
-    # 2D PC Biplot
+    # ─── 2D Biplot ──────────────────────────────────────────────────────────────
     if dim == "2D":
         fig = px.scatter(
             df,
@@ -765,24 +750,8 @@ else:
         fig.update_xaxes(title_font_size=17, tickfont_size=14)
         fig.update_yaxes(title_font_size=17, tickfont_size=14)
 
-        if show_scores:
-            make_download(
-                scores,
-                f"{base_name}_pc_scores",
-                f"download_pc_scores_{download_format}",
-                label="PC Scores Data",
-            )
-
-        if show_loadings:
-            loadings_df = loadings.T.reset_index().rename(columns={"index": "component"})
-            make_download(
-                loadings_df,
-                f"{base_name}_pc_loadings",
-                f"download_loadings_{download_format}",
-                label="PC Loadings Data",
-            )
-
-        if scale is not None:
+        # draw loading vectors when we have raw feature data
+        if not is_pca_scores_file:
             span_x = df[pc_x].max() - df[pc_x].min()
             span_y = df[pc_y].max() - df[pc_y].min()
             vec = min(span_x, span_y) * scale
@@ -799,7 +768,7 @@ else:
                         "xref": "x",
                         "yref": "y",
                         "line": {"color": "grey", "width": 2},
-                    },
+                    }
                 )
                 fig.add_annotation(
                     x=x_end,
@@ -823,9 +792,10 @@ else:
                     text=feat,
                     font=dict(size=12, color="grey"),
                 )
+
         st.plotly_chart(fig, use_container_width=True)
 
-    # 3D PC Biplot
+    # ─── 3D Biplot ──────────────────────────────────────────────────────────────
     else:
         fig3d = px.scatter_3d(
             df,
@@ -851,8 +821,9 @@ else:
             ),
         )
 
-        if scale is not None:
-            spans = [df[column].max() - df[column].min() for column in (pc_x, pc_y, pc_z)]
+        # draw loading vectors when we have raw feature data
+        if not is_pca_scores_file:
+            spans = [df[col].max() - df[col].min() for col in (pc_x, pc_y, pc_z)]
             vec = min(spans) * scale
             frac = 0.1
             for feat in loadings.columns:
@@ -898,8 +869,10 @@ else:
                         hoverinfo="skip",
                     )
                 )
+
         st.plotly_chart(fig3d, use_container_width=True)
 
+    # ─── Optional downloads below …
     if show_scores:
         st.markdown("### Principal Component Scores")
         st.dataframe(scores, use_container_width=True)
@@ -916,7 +889,6 @@ else:
             f"download_pve_{download_format}",
             label="PVE Table",
         )
-
     if show_cpve:
         st.markdown("### Cumulative Variance Explained")
         st.line_chart(cpve)
