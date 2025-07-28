@@ -89,11 +89,10 @@ def cached_silhouette(
 
 @st.cache_data(show_spinner=False)
 def cached_pca(
-    df_hash: bytes,
-    df: pd.DataFrame,
-    hue_column: str,
-) -> dict:
-    return compute_pca(df=df, hue_column=hue_column)
+    df_to_pca: pd.DataFrame,
+    hue_column: str | None = None,
+) -> dict[str, pd.DataFrame | pd.Series]:
+    return compute_pca(df=df_to_pca, hue_column=hue_column)
 
 
 # ─── 1) Page config ───────────────────────────────────────────────────────────
@@ -649,10 +648,9 @@ else:
         # Cached PCA compute
         import pandas as pd
 
-        clustered_hash = pd.util.hash_pandas_object(df, index=True).values.tobytes()
         pca_bar = st.progress(0, text="Computing PCA Summary...")
         try:
-            pca_res = cached_pca(clustered_hash, st.session_state.cluster_col)
+            pca_res = cached_pca(df, st.session_state.cluster_col)
             scores = pca_res["scores"]
             loadings = pca_res["loadings"]
             pve = pca_res["pve"]
