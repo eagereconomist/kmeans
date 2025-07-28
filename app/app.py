@@ -393,7 +393,11 @@ def show_dataset(df: pd.DataFrame):
     dataset_placeholder.markdown(
         f"**Dataset:** `{uploaded.name}` — {df.shape[0]} rows, {df.shape[1]} cols"
     )
-    table_placeholder.dataframe(df.set_index("unique_id"), use_container_width=True)
+    if "unique_id" in df.columns:
+        table = df.set_index("unique_id")
+    else:
+        table = df
+    table_placeholder.dataframe(table, use_container_width=True)
 
 
 show_dataset(raw_df)
