@@ -15,4 +15,5 @@ typer
 plotly
 openpyxl
 seaborn
+statsmodels
 -e .
