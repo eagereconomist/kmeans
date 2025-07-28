@@ -90,9 +90,10 @@ def cached_silhouette(
 @st.cache_data(show_spinner=False)
 def cached_pca(
     df_hash: bytes,
+    df: pd.DataFrame,
     hue_column: str,
 ) -> dict:
-    return compute_pca(df=raw_df, hue_column=hue_column)
+    return compute_pca(df=df, hue_column=hue_column)
 
 
 # ─── 1) Page config ───────────────────────────────────────────────────────────
@@ -666,7 +667,7 @@ else:
             pca_bar.empty()
 
     # drop any old PC columns in-place
-    old_pcs = [c for c in df.columns if re.fullmatch(r"(?i)PC\\d+", c)]
+    old_pcs = [col for col in df.columns if re.fullmatch(r"(?i)PC\d+", col)]
     for col in old_pcs:
         df.drop(columns=col, inplace=True)
 
