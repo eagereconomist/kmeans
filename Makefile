@@ -2,7 +2,7 @@
 # GLOBALS                                                                       #
 #################################################################################
 
-PROJECT_NAME = tennis-racquet-analysis
+PROJECT_NAME = kmflow
 PYTHON_VERSION = 3.13
 PYTHON_INTERPRETER = python
 
