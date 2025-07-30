@@ -76,7 +76,7 @@ def hist(
     """
     default_name = f"{x_axis}_hist.png"
 
-    plots_utils.plots_utils._run_plot_with_progress(
+    plots_utils._run_plot_with_progress(
         name="Histogram",
         input_file=input_file,
         plot_fn=plots_utils.histogram,
