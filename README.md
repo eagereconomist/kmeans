@@ -27,29 +27,34 @@ Key features:
 2. **Create & activate a virtual environment**
 
    ```bash
+   # Create venv
    python -m venv .venv
 
    # Activate
-   
-   # macOS / Linux
-   source .venv/bin/activate
-   
-   # Windows
-   .venv\Scripts\activate
+   source .venv/bin/activate    # macOS / Linux
    ```
 
 3. **Install dependencies**
 
    ```bash
    pip install -r requirements.txt
+
+   # If pip isn't installed, run this and then install dependencies
+   pip install -U pip
    ```
 
-4. **Run the dashboard**
+4. **Run the dashboard if you want a more user-friendly experience** *(Optionally)*
 
    ```bash
    cd app
    streamlit run app.py
    ```
+   This will launch and host the dashboard on your local machine. Alternatively, you can skip
+   hosting it locally and use the hosted version by following this link:
+   [K-Means Clustering Dashboard](https://kmeans-dash.streamlit.app/)
+
+6. **Check out the *Description* below for a detailed breakdown and examples of how to use the CLI
+   if you'd like to go beyond the dashboard experience.**
 
    
 ## Project Organization
@@ -156,7 +161,9 @@ cat data/raw/example.csv \
 - **Purpose:** Apply configurable scaling and transformations (normalization, standardization, min–max, log1p, Yeo–Johnson) to prepare data for PCA and K-Means.  
 - **CLI (`process.py`):** Entry-point for data processing—reads from file or stdin (`-`), accepts flags for one or more transformations (e.g. `--standardize`, `--minmax`, `--log1p`, `--yeo-johnson`), and writes the transformed DataFrame to file or stdout (`-o`).  
 - **Utils (`process_utils.py`):** Implements core scaling functions, handles column selection and transformer fitting, and integrates with I/O helpers for seamless DataFrame processing.  
-- **When to use:** Run immediately after wrangling raw data to ensure features are on comparable scales before PCA or K-Means clustering if your data is not already on a similar scale.  
+- **When to use:** Run immediately after wrangling raw data to ensure features are on comparable scales before PCA or K-Means clustering if your data is not already on a similar scale.
+
+#### **Example usage in bash**
 
 - Using stdin -> default stdout (no `-o` flag)
   ```bash
@@ -181,7 +188,7 @@ cat data/raw/example.csv \
 - **Utils (`pca_utils.py`):** Implements PCA decomposition (using scikit-learn), computes scores, loadings, proportion of variance, and cumulative variance explained.  
 - **When to use:** After preprocessing (wrangling and scaling) — and optionally clustering — to explore principal components and feed them into downstream analyses.
 
-#### Example usage in bash
+#### **Example usage in bash**
 
 - Using stdin -> default stdout (no `-o` flag)  
 
@@ -208,7 +215,7 @@ cat data/raw/example.csv \
 - **Utils (`kmeans_utils.py`):** Core functions that wrap scikit-learn’s KMeans, handle single- or multi-`k` fits, manage random-state reproducibility, and append cluster labels to the DataFrame.  
 - **When to use:** Run after data has been wrangled and scaled to segment into groups before evaluation or plotting.
 
-#### Example usage in bash
+#### **Example usage in bash**
 
 - Using stdin -> default stdout (no `-o` flag)  
   ```bash
@@ -236,7 +243,7 @@ cat data/raw/example.csv \
 - **Utils (`evaluation_utils.py`):** Core functions that calculate each metric, assemble them into a tidy DataFrame, and hand off to I/O helpers.  
 - **When to use:** Immediately after all clustering is finished to generate a quantitative report (see "Benchmarking Multiple Metrics" section below).
 
-#### Example usage in bash
+#### **Example usage in bash**
 
 - Using stdin -> default stdout (no `-o` flag)
   ```bash
@@ -290,7 +297,7 @@ cat data/raw/example.csv \
 - `--output-file, -o` = destination file or use `-` for stdout (default)
 - `--decimals, d` = round metric values (default 3 decimal places)
 
-#### Example usage
+#### **Example usage in bash**
 
 - Write to stdout
   
@@ -328,7 +335,7 @@ The **cluster_prep** tools let you reattach cluster assignments to the *unscaled
 - Count and compare cluster sizes accurately  
 - Preserve the benefits of scaling for analysis while keeping outputs interpretable
 
-#### Example usage in bash
+#### **Example usage in bash**
 
 **Note**: While stdin -> stdout piping is supported, I *highly* recommend using explicit file arguments as shown below.
 
