@@ -16,4 +16,5 @@ plotly
 openpyxl
 seaborn
 statsmodels
+streamlit
 -e .
