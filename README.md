@@ -20,34 +20,39 @@ Key features:
 1. **Clone the repo**
 
    ```bash
-   git clone git@github.com:you/kmflow.git
-   cd kmflow
+   $ git clone git@github.com:you/kmflow.git
+   $ cd kmflow
    ```
 
 2. **Create & activate a virtual environment**
 
    ```bash
    # Create venv
-   python -m venv .venv
+   $ python -m venv .venv
 
    # Activate
-   source .venv/bin/activate    # macOS / Linux
+   $ source .venv/bin/activate    # macOS / Linux
    ```
 
-3. **Install dependencies**
+3. **Install kmflow package** *(editable mode)*
+   ```bash
+   $ pip install -e .
+   ```
+
+4. **Install dependencies**
 
    ```bash
-   pip install -r requirements.txt
+   $ pip install -r requirements.txt
 
    # If pip isn't installed, run this and then install dependencies
-   pip install -U pip
+   $ pip install -U pip
    ```
 
-4. **Run the dashboard if you want a more user-friendly experience** *(Optionally)*
+5. **Run the dashboard if you want a more user-friendly experience** *(Optionally)*
 
    ```bash
-   cd app
-   streamlit run app.py
+   $ cd app
+   $ streamlit run app.py
    ```
    This will launch and host the dashboard on your local machine. Alternatively, you can skip
    hosting it locally and use the hosted version by following this link:
@@ -63,7 +68,7 @@ Key features:
 ├── app/                          
 │   └── app.py                   # Streamlit dashboard entrypoint  
 ├── docs/                        # A default mkdocs project
-│   └── business-understanding.md  
+│   └── mkdocs.md  
 ├── kmflow/                      # Python package  
 │   ├── cli/                     # Command-line interface  
 │   ├── utils/                   # Helper modules (wrangle, scale, PCA, plots, eval)  
@@ -114,7 +119,7 @@ Key features:
 - Using stdin -> default stdout (no `-o` flag)
 
 ```bash
-cat data/raw/example.csv \
+$ cat data/raw/example.csv \
     | kmflow wrangle outlier - \
       --export-outliers \
       --remove-outliers
@@ -123,7 +128,7 @@ cat data/raw/example.csv \
 - Using stdin -> custom stdout (`-o` -)
   
 ```bash
-cat data/raw/example.csv \
+$ cat data/raw/example.csv \
   | kmflow wrangle outlier - \
     --export-outliers \
     --remove-outliers \
@@ -141,7 +146,7 @@ cat data/raw/example.csv \
 - Using stdin -> default stdout (no `-o` flag)
 
 ```bash
-cat data/raw/example.csv \
+$ cat data/raw/example.csv \
     | kmflow plots histogram - COLUMN \
       --bins 50 \
       --no-save
@@ -150,7 +155,7 @@ cat data/raw/example.csv \
 - Using stdin -> custom stdout (`-o` -)
   
 ```bash
-cat data/raw/example.csv \
+$ cat data/raw/example.csv \
   | kmflow plots histogram - COLUMN \
     --bins 25 \
     -o - > ../../data/DIR/histogram.png
@@ -167,7 +172,7 @@ cat data/raw/example.csv \
 
 - Using stdin -> default stdout (no `-o` flag)
   ```bash
-  cat data/raw/example.csv \
+  $ cat data/raw/example.csv \
     | kmflow process - \
       --standardize
   ```
@@ -175,7 +180,7 @@ cat data/raw/example.csv \
 - Using stdin -> custom stdout (`-o` -)
 
   ```bash
-  cat data/raw/example.csv \
+  $ cat data/raw/example.csv \
   | kmflow process - \
     --standardize \
     -o - > ../../data/DIR/std.csv
@@ -193,7 +198,7 @@ cat data/raw/example.csv \
 - Using stdin -> default stdout (no `-o` flag)  
 
   ```bash
-  cat data/processed/DIR/std.csv \
+  $ cat data/processed/DIR/std.csv \
     | kmflow pca - \
       --seed 3429 \
       --numeric-cols "COLUMN, COLUMN2, COLUMN3" \
@@ -203,7 +208,7 @@ cat data/raw/example.csv \
 - Using stdin -> custom stdout (`-o` -)
   
   ```bash
-  cat data/processed/DIR/std.csv \
+  $ cat data/processed/DIR/std.csv \
     | kmflow pca - \
       -o - > ../../data/processed/DIR/std_pca.csv
   ```
@@ -219,7 +224,7 @@ cat data/raw/example.csv \
 
 - Using stdin -> default stdout (no `-o` flag)  
   ```bash
-  cat data/processed/DIR/std.csv \
+  $ cat data/processed/DIR/std.csv \
     | kmflow kmeans fit-km - 8 \
       --seed 123
       --init-method k-means++ 
@@ -227,7 +232,7 @@ cat data/raw/example.csv \
 
   - Using stdin -> custom stdout (`-o` -)
   ```bash
-  cat data/processed/DIR/std.csv \
+  $ cat data/processed/DIR/std.csv \
     | kmflow kmeans fit-km - 8 \
       --seed 9250 \
       --algorithm elkan \
@@ -247,7 +252,7 @@ cat data/raw/example.csv \
 
 - Using stdin -> default stdout (no `-o` flag)
   ```bash
-  cat data/processed/DIR/std.csv \
+  $ cat data/processed/DIR/std.csv \
     | kmflow evaluate silhouette - \
       --seed 2985 \ 
       --algorithm elkan \
@@ -258,7 +263,7 @@ cat data/raw/example.csv \
 - Using stdin -> custom stdout (`-o` -)
 
   ```bash
-  cat data/processed/DIR/std.csv \
+  $ cat data/processed/DIR/std.csv \
     | kmflow evaluate silhouette - \
       --seed 2985 \
       -o - > ../../data/processed/DIR/std_silhouette.csv
@@ -290,7 +295,7 @@ cat data/raw/example.csv \
   #### Merge via the CLI
 
   ```bash
-  kmflow evaluate benchmark <input_dir> [flags]
+  $ kmflow evaluate benchmark <input_dir> [flags]
   ```
 
 - `<input_dir>` = subfolder under `data/` (e.g. `processed_std`)
@@ -302,14 +307,14 @@ cat data/raw/example.csv \
 - Write to stdout
   
   ```bash
-  kmflow evaluate benchmark processed \
+  $ kmflow evaluate benchmark processed \
     --decimals 4
   ```
 
 - Write to a file
 
   ```bash
-  kmflow evaluate benchmark processed \
+  $ kmflow evaluate benchmark processed \
   -o - > ../../data/external/benchmark.csv
   ```
 
@@ -342,7 +347,7 @@ The **cluster_prep** tools let you reattach cluster assignments to the *unscaled
 - Write to stdout 
 
   ```bash
-  kmflow cluster-prep cluster-profiles \
+  $ kmflow cluster-prep cluster-profiles \
     ../../data/raw/DIR/example.csv \
     ../../data/processed/DIR/variant/algo_<algorithm>_init_<init>/std_clustered_5.csv \
     cluster_5
@@ -351,7 +356,7 @@ The **cluster_prep** tools let you reattach cluster assignments to the *unscaled
 - Write to a file
 
   ```bash
-  kmflow cluster-prep cluster-profiles \
+  $ kmflow cluster-prep cluster-profiles \
     ../../data/raw/DIR/example.csv \
     ../../data/processed/DIR/variant/algo_<algorithm>_init_<init>/std_clustered_5.csv \
     cluster_5 \
