@@ -288,7 +288,7 @@ $ cat data/raw/example.csv \
               └── <input_stem>_davies.csv
   ```
 
- - `<variant> = your processing variant (e.g. `std`, etc.)
+ - `<variant>` = your processing variant (e.g. `std`, etc.)
  - `algo_<algorithm>_init_<init>` *must* match the regex above
  - **Files** *must* end in `_calinski.csv` or `_davies.csv`
 
@@ -298,7 +298,7 @@ $ cat data/raw/example.csv \
   $ kmflow evaluate benchmark <input_dir> [flags]
   ```
 
-- `<input_dir>` = subfolder under `data/` (e.g. `processed_std`)
+- `<input_dir>` = subfolder under `data/` (e.g. `processed`)
 - `--output-file, -o` = destination file or use `-` for stdout (default)
 - `--decimals, d` = round metric values (default 3 decimal places)
 
